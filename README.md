@@ -1,5 +1,7 @@
 # MyDly
 
+[![CI](https://github.com/GabrieliModollo/mydly/actions/workflows/ci.yml/badge.svg)](https://github.com/GabrieliModollo/mydly/actions/workflows/ci.yml)
+
 > Controle de rotinas e finanças com lançamento em linguagem natural.
 
 Você escreve como falaria — **"Gastei 50 reais de energético na farmácia"**, **"50 reais"**, **"Fui à academia"**, **"Bebi 2 litros de água"** — e o MyDly entende se é um gasto ou um hábito, organiza os dados e devolve estatísticas, incentivos e, quando necessário, umas broncas.
@@ -44,8 +46,9 @@ Detalhes em [`docs/arquitetura.md`](docs/arquitetura.md).
 
 ```
 mydly/
-├── backend/            # API Java + Spring Boot (monólito modular)
-├── frontend/           # App web e mobile
+├── backend/            # API Java 21 + Spring Boot (monólito modular)
+├── frontend/           # App Angular + Ionic/Capacitor (web e mobile)
+├── .github/            # CI (GitHub Actions) e Dependabot
 ├── docs/
 │   ├── arquitetura.md  # visão geral, módulos e modelo de dados
 │   └── adr/            # Architecture Decision Records
@@ -55,12 +58,14 @@ mydly/
 
 ## Rodando localmente
 
-Por enquanto o `docker-compose` sobe só o PostgreSQL. Backend e frontend entram no compose assim que forem criados.
+Requisito: Docker. O `docker-compose` sobe o PostgreSQL e o backend; o frontend entra quando for criado.
 
 ```bash
 cp .env.example .env
-docker compose up -d
+docker compose up --build
 ```
+
+Saúde da API: <http://localhost:8080/actuator/health>. Para desenvolver o backend fora do container, veja [`backend/README.md`](backend/README.md).
 
 ## Roadmap
 

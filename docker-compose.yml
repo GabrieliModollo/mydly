@@ -16,7 +16,22 @@ services:
       timeout: 5s
       retries: 10
 
-  # backend e frontend entram aqui quando forem criados
+  backend:
+    build: ./backend
+    container_name: mydly-backend
+    environment:
+      DB_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-mydly}
+      POSTGRES_USER: ${POSTGRES_USER:-mydly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mydly}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # frontend entra aqui quando for criado
 
 volumes:
   postgres-data:

@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: mydly
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:mydly}
+    username: ${POSTGRES_USER:mydly}
+    password: ${POSTGRES_PASSWORD:mydly}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
