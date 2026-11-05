@@ -1,0 +1,115 @@
+# Arquitetura do MyDly
+
+## Visão geral
+
+O MyDly é um **monólito modular** em Java + Spring Boot, com um app web e mobile que funciona offline e sincroniza depois. Cada módulo tem fronteira própria e se comunica com os outros por eventos de domínio, o que permite extrair um módulo para um serviço separado no futuro sem reescrever o resto.
+
+## Fluxo de um lançamento
+
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant App as App (offline-first)
+    participant E as entries
+    participant P as Parser
+    participant LLM as LLM (fallback)
+    participant D as finance / routines
+    participant I as insights
+
+    U->>App: "Gastei 50 reais na farmácia"
+    App->>App: salva localmente
+    App->>E: sincroniza Entry (texto bruto)
+    E->>P: interpretar
+    P->>P: regras locais
+    alt confiança baixa
+        P->>LLM: extrair JSON estruturado
+        LLM-->>P: tipo, valor, categoria...
+    end
+    alt ainda ambíguo
+        E-->>App: pergunta ao usuário ("Isso foi um gasto?")
+    else confirmado
+        E->>D: EntryParsed (evento)
+        D->>I: TransactionCreated / HabitLogged
+        I-->>App: estatísticas e mensagens
+    end
+```
+
+## Módulos
+
+| Módulo | Responsabilidade |
+| --- | --- |
+| `entries` | Recebe o texto bruto, guarda sempre o original e coordena a interpretação |
+| `finance` | Transações, categorias, orçamentos |
+| `routines` | Hábitos, registros diários, metas |
+| `insights` | Estatísticas, streaks, cruzamentos rotina × finanças, mensagens |
+| `integrations` | Fontes externas de transação (extrato, Open Finance) e reconciliação |
+| `notifications` | Push e lembretes |
+
+## Modelo de dados (núcleo)
+
+```mermaid
+erDiagram
+    USER ||--o{ ENTRY : escreve
+    ENTRY ||--o{ TRANSACTION : gera
+    ENTRY ||--o{ HABIT_LOG : gera
+    USER ||--o{ HABIT : define
+    HABIT ||--o{ HABIT_LOG : registra
+    USER ||--o{ GOAL : define
+    USER ||--o{ INSIGHT : recebe
+
+    ENTRY {
+        uuid id
+        text raw_text
+        timestamp created_at
+        string detected_type
+        jsonb parsed_json
+        decimal confidence
+        string status
+    }
+    TRANSACTION {
+        uuid id
+        decimal amount
+        string category
+        string place
+        string source
+    }
+    HABIT {
+        uuid id
+        string name
+        string unit
+        decimal target
+        string polarity
+    }
+    HABIT_LOG {
+        uuid id
+        date day
+        decimal quantity
+        string quality
+    }
+    GOAL {
+        uuid id
+        string kind
+        decimal target
+        string period
+    }
+    INSIGHT {
+        uuid id
+        string kind
+        string tone
+        text message
+        boolean read
+    }
+```
+
+- `Entry.raw_text` nunca é descartado: quando o parser melhorar, os lançamentos antigos podem ser reprocessados.
+- `Habit.polarity` diferencia hábitos bons ("dormi bem") de ruins ("pedi delivery 3x").
+- `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`) e é a base da reconciliação.
+
+## Privacidade (LGPD)
+
+O app guarda dados financeiros e dados que podem ser de saúde (sono, dieta). Por isso:
+
+- consentimento explícito no cadastro;
+- criptografia dos campos sensíveis em repouso;
+- exportação e exclusão de conta;
+- só o texto do lançamento vai para o LLM, sem identificar o usuário.

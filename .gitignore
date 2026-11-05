@@ -1,0 +1,23 @@
+# Ambiente
+.env
+
+# Java / Maven / Gradle
+target/
+build/
+.gradle/
+*.class
+
+# Node / Angular / Ionic
+node_modules/
+dist/
+.angular/
+www/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Sistema
+.DS_Store
+Thumbs.db
