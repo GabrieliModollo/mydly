@@ -52,6 +52,72 @@ class EntryTests {
     }
 
     @Test
+    void semResolucaoOItemEfetivoEODoParser() {
+        Entry entry = entry(LOW_CONFIDENCE);
+
+        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(LOW_CONFIDENCE, false, false, true));
+    }
+
+    @Test
+    void resolucaoTrocaOItemEfetivoSemMudarODoParser() {
+        Entry entry = entry(LOW_CONFIDENCE);
+        ParsedEntry confirmed = ParsedEntry.finance(Direction.EXPENSE, new BigDecimal("8.50"), "z", 1.0);
+
+        entry.resolve(0, ItemResolution.confirmed(confirmed));
+
+        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(confirmed, true, false, false));
+        assertThat(entry.getItems()).containsExactly(LOW_CONFIDENCE);
+        assertThat(entry.getStatus()).isEqualTo(EntryStatus.PENDING);
+    }
+
+    @Test
+    void descarteMantemOItemDoParserMarcadoComoDescartado() {
+        Entry entry = entry(LOW_CONFIDENCE);
+
+        entry.resolve(0, ItemResolution.dismissed());
+
+        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(LOW_CONFIDENCE, true, true, false));
+    }
+
+    @Test
+    void naoResolveItemInexistenteNemItemQueNaoPrecisaDeConfirmacao() {
+        Entry entry = entry(FINANCE, LOW_CONFIDENCE);
+
+        assertThat(reasonOf(() -> entry.resolve(-1, ItemResolution.dismissed())))
+                .isEqualTo(EntryResolutionException.Reason.ITEM_NOT_FOUND);
+        assertThat(reasonOf(() -> entry.resolve(2, ItemResolution.dismissed())))
+                .isEqualTo(EntryResolutionException.Reason.ITEM_NOT_FOUND);
+        assertThat(reasonOf(() -> entry.resolve(0, ItemResolution.dismissed())))
+                .isEqualTo(EntryResolutionException.Reason.NOT_PENDING);
+    }
+
+    @Test
+    void resolverDeNovoOMesmoItemNaoEPermitido() {
+        Entry entry = entry(LOW_CONFIDENCE);
+        entry.resolve(0, ItemResolution.dismissed());
+
+        assertThat(reasonOf(() -> entry.resolve(0, ItemResolution.dismissed())))
+                .isEqualTo(EntryResolutionException.Reason.NOT_PENDING);
+    }
+
+    @Test
+    void naoSeConfirmaUmItemComoDesconhecidoNemDescarteComItem() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> ItemResolution.confirmed(ParsedEntry.unknown("x", 1.0)));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new ItemResolution(ResolutionAction.DISMISS, FINANCE));
+    }
+
+    private static EntryResolutionException.Reason reasonOf(Runnable action) {
+        try {
+            action.run();
+        } catch (EntryResolutionException e) {
+            return e.reason();
+        }
+        throw new AssertionError("esperava EntryResolutionException");
+    }
+
+    @Test
     void exigeAoMenosUmItem() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> Entry.interpreted(UUID.randomUUID(), "x", NOW, NOW, List.of()));

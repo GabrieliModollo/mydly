@@ -1,7 +1,9 @@
 package com.mydly.entries.internal;
 
+import com.mydly.entries.Category;
 import com.mydly.entries.Direction;
 import com.mydly.entries.EntryParser;
+import com.mydly.entries.EntryType;
 import com.mydly.entries.ParsedEntry;
 import com.mydly.entries.RoutineOutcome;
 import java.math.BigDecimal;
@@ -123,6 +125,22 @@ class RuleBasedEntryParser implements EntryParser {
             Map.entry("quilos", "kg"), Map.entry("kg", "kg"),
             Map.entry("copo", "copo"), Map.entry("copos", "copo"));
 
+    /** Palavras-chave de cada categoria, em ordem de prioridade (lugares antes de produtos). */
+    private static final List<Map.Entry<Category, Pattern>> CATEGORY_KEYWORDS = List.of(
+            keywords(Category.PHARMACY, "farmacia|drogaria|remedios?|drogasil"),
+            keywords(Category.GROCERIES, "mercado|supermercado|feira|hortifruti|atacadao|sacolao"),
+            keywords(Category.TRANSPORT, "uber|onibus|metro|gasolina|combustivel|estacionamento|pedagio|taxi|passagem"),
+            keywords(Category.HOUSING, "aluguel|condominio|luz|internet|iptu|gas"),
+            keywords(Category.HEALTH, "medico|consulta|dentista|exames?|academia|terapia|plano de saude"),
+            keywords(Category.WORK, "salario|freela|freelance|curso|coworking"),
+            keywords(Category.LEISURE, "cinema|show|bar|cerveja|netflix|spotify|viagem|ingresso|jogo"),
+            keywords(Category.FOOD, "pao|paes|padaria|acai|lanches?|lanchonete|ifood|restaurante|almoco|jantar"
+                    + "|cafe|pizza|delivery|hamburguer|energetico|sorvete|comida"));
+
+    private static Map.Entry<Category, Pattern> keywords(Category category, String alternatives) {
+        return Map.entry(category, Pattern.compile("\\b(?:" + alternatives + ")\\b"));
+    }
+
     @Override
     public List<ParsedEntry> parse(String text) {
         return List.of(parseSingle(text));
@@ -131,7 +149,27 @@ class RuleBasedEntryParser implements EntryParser {
     private ParsedEntry parseSingle(String text) {
         String original = text == null ? "" : text.strip().replaceAll("\\s+", " ");
         String normalized = CLOCK_TIME.matcher(normalize(original)).replaceAll(" ").strip();
+        ParsedEntry interpreted = interpret(original, normalized);
+        return interpreted.type() == EntryType.FINANCE
+                ? interpreted.withCategory(suggestCategory(normalized))
+                : interpreted;
+    }
 
+    /**
+     * Categoria sugerida pelas palavras da frase, ou {@code null} quando nenhuma bate e o usuário
+     * escolhe. A ordem importa: o lugar vem antes do produto, então {@code energético na farmácia}
+     * fica em Farmácia e não em Alimentação.
+     */
+    static Category suggestCategory(String normalized) {
+        for (Map.Entry<Category, Pattern> keywords : CATEGORY_KEYWORDS) {
+            if (keywords.getValue().matcher(normalized).find()) {
+                return keywords.getKey();
+            }
+        }
+        return null;
+    }
+
+    private ParsedEntry interpret(String original, String normalized) {
         if (!LETTER.matcher(normalized).find() && !ANY_NUMBER.matcher(normalized).find()) {
             return ParsedEntry.unknown(null, CONFIDENCE_EMPTY);
         }

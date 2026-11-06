@@ -39,13 +39,13 @@ class ParsedEntryTests {
     @Test
     void rejeitaDirecaoForaDeFinanca() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> new ParsedEntry(EntryType.ROUTINE, Direction.EXPENSE, null, null, null, null, null, 0.6));
+                .isThrownBy(() -> new ParsedEntry(EntryType.ROUTINE, Direction.EXPENSE, null, null, null, null, null, null, 0.6));
     }
 
     @Test
     void rotinaSemOutcomeEUmHabitoCumprido() {
         // É assim que os itens gravados antes do campo existir chegam do banco.
-        ParsedEntry legacy = new ParsedEntry(EntryType.ROUTINE, null, null, null, null, null, "dormi bem", 0.6);
+        ParsedEntry legacy = new ParsedEntry(EntryType.ROUTINE, null, null, null, null, null, null, "dormi bem", 0.6);
 
         assertThat(legacy.outcome()).isEqualTo(RoutineOutcome.DONE);
     }
@@ -53,7 +53,7 @@ class ParsedEntryTests {
     @Test
     void rejeitaOutcomeForaDeRotina() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> new ParsedEntry(EntryType.UNKNOWN, null, RoutineOutcome.MISSED, null, null, null, null, 0.3));
+                .isThrownBy(() -> new ParsedEntry(EntryType.UNKNOWN, null, RoutineOutcome.MISSED, null, null, null, null, null, 0.3));
     }
 
     @Test
@@ -63,8 +63,30 @@ class ParsedEntryTests {
     }
 
     @Test
+    void categoriaSoExisteEmFinanca() {
+        assertThat(ParsedEntry.finance(Direction.EXPENSE, BigDecimal.TEN, Category.FOOD, "pão", 0.9).category())
+                .isEqualTo(Category.FOOD);
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new ParsedEntry(EntryType.ROUTINE, null, null, Category.FOOD, null, null, null, null, 0.6));
+    }
+
+    @Test
+    void trocaACategoriaSemMudarOResto() {
+        ParsedEntry original = ParsedEntry.finance(Direction.EXPENSE, BigDecimal.TEN, "pão", 0.9);
+
+        assertThat(original.withCategory(Category.FOOD))
+                .isEqualTo(ParsedEntry.finance(Direction.EXPENSE, BigDecimal.TEN, Category.FOOD, "pão", 0.9));
+    }
+
+    @Test
+    void rejeitaUnidadeDesconhecida() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> ParsedEntry.routine(BigDecimal.ONE, "galão", null, 0.9));
+    }
+
+    @Test
     void rejeitaTipoNulo() {
         assertThatNullPointerException()
-                .isThrownBy(() -> new ParsedEntry(null, null, null, null, null, null, null, 0.5));
+                .isThrownBy(() -> new ParsedEntry(null, null, null, null, null, null, null, null, 0.5));
     }
 }

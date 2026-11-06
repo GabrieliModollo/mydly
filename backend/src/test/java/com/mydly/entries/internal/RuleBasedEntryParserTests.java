@@ -2,6 +2,7 @@ package com.mydly.entries.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.mydly.entries.Category;
 import com.mydly.entries.Direction;
 import com.mydly.entries.EntryType;
 import com.mydly.entries.ParsedEntry;
@@ -179,6 +180,43 @@ class RuleBasedEntryParserTests {
         assertThat(single("Não comi besteira").outcome()).isEqualTo(RoutineOutcome.DONE);
     }
 
+    @ParameterizedTest(name = "[{index}] \"{0}\" → {1}")
+    @CsvSource(delimiter = '|', nullValues = "SEM", textBlock = """
+            Gastei 50 reais comprando energético na farmácia | PHARMACY
+            Paguei 30 na drogaria                            | PHARMACY
+            Gastei 200 reais no mercado                      | GROCERIES
+            Paguei 25 no uber                                | TRANSPORT
+            Gastei 150 de gasolina                           | TRANSPORT
+            Paguei 12,50 no estacionamento                   | TRANSPORT
+            Paguei o aluguel de 1.500                        | HOUSING
+            Gastei 120 na consulta                           | HEALTH
+            Paguei 99 reais da academia                      | HEALTH
+            Caiu o salário de 3.000                          | WORK
+            Ganhei 200 no freela                             | WORK
+            Gastei 40 no cinema                              | LEISURE
+            Comprei pão                                      | FOOD
+            Gastei 30 no açaí                                | FOOD
+            Pedi ifood de 45 reais                           | FOOD
+            # Sem palavra conhecida, quem escolhe é o usuário.
+            50 reais                                         | SEM
+            Gastei 10 reais                                  | SEM
+            # "gastei" não pode casar com "gas" (Moradia).
+            Gastei 5 reais                                   | SEM
+            """)
+    void sugereCategoriaParaFinancas(String text, Category expected) {
+        ParsedEntry result = single(text);
+
+        assertThat(result.type()).isEqualTo(EntryType.FINANCE);
+        assertThat(result.category()).isEqualTo(expected);
+    }
+
+    @Test
+    void unidadesDoParserSaoAsUnidadesAceitasPeloContrato() {
+        for (String unit : new String[] {"2 litros", "500ml", "2h", "30min", "5km", "70kg", "3 copos"}) {
+            assertThat(ParsedEntry.UNITS).contains(single("Bebi " + unit).unit());
+        }
+    }
+
     @ParameterizedTest
     @NullSource
     void textoNuloViraDesconhecidoSemLancarExcecao(String text) {
@@ -249,6 +287,9 @@ class RuleBasedEntryParserTests {
         assertThat(result.unit()).as("unidade").isEqualTo(unit);
         assertThat(result.outcome()).as("cumprido")
                 .isEqualTo(type == EntryType.ROUTINE ? RoutineOutcome.DONE : null);
+        if (type != EntryType.FINANCE) {
+            assertThat(result.category()).as("categoria").isNull();
+        }
         assertThat(Confidence.of(result.confidence())).as("faixa de confiança (%s)", result.confidence())
                 .isEqualTo(confidence);
     }

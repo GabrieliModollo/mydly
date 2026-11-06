@@ -7,7 +7,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.mydly.entries.Category;
 import com.mydly.entries.Direction;
+import com.mydly.entries.RoutineOutcome;
 import com.mydly.entries.EntryParser;
 import com.mydly.entries.ParsedEntry;
 import com.mydly.entries.internal.EntryService.Outcome;
@@ -20,6 +22,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Casos do serviço que o teste de integração não alcança de forma determinística.
@@ -94,6 +97,77 @@ class EntryServiceTests {
 
         verify(repository).findByOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtDesc(
                 Instant.parse("2026-11-05T03:00:00Z"), Instant.parse("2026-11-06T03:00:00Z"));
+    }
+
+    private static final EntryService.ResolveCommand DISMISS =
+            new EntryService.ResolveCommand(ResolutionAction.DISMISS, null, null, null, null, null, null);
+
+    private Entry pendingEntry() {
+        return Entry.interpreted(id, "Comprei  pão ", NOW_IN_MICROS, NOW_IN_MICROS,
+                List.of(ParsedEntry.finance(Direction.EXPENSE, null, "Comprei pão", 0.4)));
+    }
+
+    @Test
+    void resolverLancamentoInexistenteOuDeOutraVersaoFalha() {
+        when(repository.findById(id)).thenReturn(Optional.empty());
+        assertThat(resolveReason(0, DISMISS)).isEqualTo(EntryResolutionException.Reason.ENTRY_NOT_FOUND);
+
+        when(repository.findById(id)).thenReturn(Optional.of(pendingEntry()));
+        assertThat(resolveReason(7, DISMISS)).isEqualTo(EntryResolutionException.Reason.VERSION_MISMATCH);
+    }
+
+    @Test
+    void alteracaoConcorrenteNoMomentoDeGravarViraVersaoDesatualizada() {
+        when(repository.findById(id)).thenReturn(Optional.of(pendingEntry()));
+        when(repository.saveAndFlush(any())).thenThrow(new ObjectOptimisticLockingFailureException(Entry.class, id));
+
+        assertThat(resolveReason(0, DISMISS)).isEqualTo(EntryResolutionException.Reason.VERSION_MISMATCH);
+    }
+
+    @Test
+    void gastoConfirmadoESaidaPorPadraoComODescricaoDoTexto() {
+        when(repository.findById(id)).thenReturn(Optional.of(pendingEntry()));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Entry entry = service.resolve(id, 0, 0, new EntryService.ResolveCommand(ResolutionAction.CONFIRM_FINANCE,
+                new BigDecimal("8.50"), null, Category.FOOD, null, null, null));
+
+        ParsedEntry item = entry.effectiveItems().getFirst().item();
+        assertThat(item.direction()).isEqualTo(Direction.EXPENSE);
+        assertThat(item.category()).isEqualTo(Category.FOOD);
+        assertThat(item.description()).isEqualTo("Comprei pão");
+        assertThat(item.confidence()).isEqualTo(ParsedEntry.CONFIRMED_BY_USER);
+    }
+
+    @Test
+    void rotinaConfirmadaECumpridaPorPadrao() {
+        when(repository.findById(id)).thenReturn(Optional.of(pendingEntry()));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Entry entry = service.resolve(id, 0, 0,
+                new EntryService.ResolveCommand(ResolutionAction.CONFIRM_ROUTINE, null, null, null, null, null, null));
+
+        assertThat(entry.effectiveItems().getFirst().item().outcome()).isEqualTo(RoutineOutcome.DONE);
+    }
+
+    @Test
+    void rotinaPodeSerConfirmadaComoNaoCumprida() {
+        when(repository.findById(id)).thenReturn(Optional.of(pendingEntry()));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Entry entry = service.resolve(id, 0, 0, new EntryService.ResolveCommand(ResolutionAction.CONFIRM_ROUTINE,
+                null, null, null, null, null, RoutineOutcome.MISSED));
+
+        assertThat(entry.effectiveItems().getFirst().item().outcome()).isEqualTo(RoutineOutcome.MISSED);
+    }
+
+    private EntryResolutionException.Reason resolveReason(long version, EntryService.ResolveCommand command) {
+        try {
+            service.resolve(id, 0, version, command);
+        } catch (EntryResolutionException e) {
+            return e.reason();
+        }
+        throw new AssertionError("esperava EntryResolutionException");
     }
 
     private void simulateConcurrentInsert() {

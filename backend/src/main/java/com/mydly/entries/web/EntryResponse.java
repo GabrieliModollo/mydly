@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Lançamento como a API devolve: o texto original e os itens interpretados.
+ * Lançamento como a API devolve: o texto original e os itens com o valor efetivo.
  */
 @Schema(description = "Lançamento interpretado")
 public record EntryResponse(
@@ -16,7 +16,9 @@ public record EntryResponse(
         @Schema(description = "Texto original, como foi enviado") String text,
         Instant occurredAt,
         EntryStatus status,
-        @Schema(description = "Se o app deve confirmar com o usuário antes de registrar") boolean needsConfirmation,
+        @Schema(description = "Se o app deve confirmar algum item com o usuário") boolean needsConfirmation,
+        @Schema(description = "Versão do lançamento; envie no If-Match ao resolver um item (também vem no ETag)")
+        long version,
         @Schema(description = "Itens interpretados; uma frase composta pode gerar mais de um")
         List<EntryItemResponse> items) {
 
@@ -27,6 +29,12 @@ public record EntryResponse(
                 entry.getOccurredAt(),
                 entry.getStatus(),
                 entry.getStatus() == EntryStatus.NEEDS_INPUT,
-                entry.getItems().stream().map(EntryItemResponse::from).toList());
+                entry.getVersion(),
+                entry.effectiveItems().stream().map(EntryItemResponse::from).toList());
+    }
+
+    /** Valor do header ETag: a versão entre aspas, como manda a RFC 9110. */
+    String etag() {
+        return "\"" + version + "\"";
     }
 }

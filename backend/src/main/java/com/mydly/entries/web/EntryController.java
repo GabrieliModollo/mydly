@@ -1,5 +1,6 @@
 package com.mydly.entries.web;
 
+import com.mydly.entries.internal.EntryResolutionException;
 import com.mydly.entries.internal.EntryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,12 +14,14 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -62,9 +65,12 @@ class EntryController {
                 EntryResponse body = EntryResponse.from(result.entry());
                 URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                         .path("/{id}").buildAndExpand(body.id()).toUri();
-                yield ResponseEntity.created(location).body(body);
+                yield ResponseEntity.created(location).eTag(body.etag()).body(body);
             }
-            case ALREADY_EXISTS -> ResponseEntity.ok(EntryResponse.from(result.entry()));
+            case ALREADY_EXISTS -> {
+                EntryResponse body = EntryResponse.from(result.entry());
+                yield ResponseEntity.ok().eTag(body.etag()).body(body);
+            }
             case CONFLICT -> throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Já existe um lançamento com este id e outro conteúdo. Para enviar um lançamento novo, use outro id.");
         };
@@ -87,9 +93,69 @@ class EntryController {
     @Operation(summary = "Busca um lançamento pelo id", responses = {
             @ApiResponse(responseCode = "200", description = "Lançamento encontrado"),
             @ApiResponse(responseCode = "404", description = "Não existe lançamento com esse id")})
-    EntryResponse find(@PathVariable UUID id) {
-        return service.find(id)
+    ResponseEntity<EntryResponse> find(@PathVariable UUID id) {
+        EntryResponse body = service.find(id)
                 .map(EntryResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lançamento não encontrado"));
+        return ResponseEntity.ok().eTag(body.etag()).body(body);
+    }
+
+    @PostMapping("/{id}/items/{index}/resolution")
+    @Operation(
+            summary = "Resolve um item que precisa de confirmação",
+            description = "Confirma o item como finança ou rotina, ou o descarta. Vale para itens com confiança "
+                    + "abaixo de 0,50, inclusive os não entendidos. O que o parser entendeu continua guardado "
+                    + "(ADR 0007). Exige If-Match com a versão lida (ETag), para não resolver um item que mudou. "
+                    + "Quando não sobra item pendente, o lançamento sai de NEEDS_INPUT para PENDING.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(examples = {
+                    @ExampleObject(name = "Confirmar gasto", value =
+                            "{\"action\": \"CONFIRM_FINANCE\", \"amount\": 8.50, \"category\": \"FOOD\"}"),
+                    @ExampleObject(name = "Confirmar entrada", value =
+                            "{\"action\": \"CONFIRM_FINANCE\", \"amount\": 100, \"direction\": \"INCOME\"}"),
+                    @ExampleObject(name = "Confirmar rotina", value =
+                            "{\"action\": \"CONFIRM_ROUTINE\", \"quantity\": 2, \"unit\": \"L\"}"),
+                    @ExampleObject(name = "Não foi um gasto", value = "{\"action\": \"DISMISS\"}")})),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Item resolvido; o ETag traz a versão nova"),
+                    @ApiResponse(responseCode = "400", description = "Dados inválidos, como valor menor ou igual a zero"),
+                    @ApiResponse(responseCode = "404", description = "Lançamento ou item inexistente"),
+                    @ApiResponse(responseCode = "409", description = "Item já resolvido ou que não precisa de confirmação"),
+                    @ApiResponse(responseCode = "412", description = "O lançamento mudou desde a leitura (If-Match desatualizado)"),
+                    @ApiResponse(responseCode = "428", description = "Faltou o header If-Match")})
+    ResponseEntity<EntryResponse> resolve(
+            @PathVariable UUID id,
+            @PathVariable int index,
+            @Parameter(description = "Versão lida do lançamento, como veio no ETag", example = "\"0\"")
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
+            @Valid @RequestBody ResolveItemRequest request) {
+        long expectedVersion = parseVersion(ifMatch);
+        try {
+            EntryResponse body = EntryResponse.from(service.resolve(id, index, expectedVersion, request.toCommand()));
+            return ResponseEntity.ok().eTag(body.etag()).body(body);
+        } catch (EntryResolutionException e) {
+            throw new ResponseStatusException(statusFor(e.reason()), e.getMessage());
+        }
+    }
+
+    private static long parseVersion(String ifMatch) {
+        if (ifMatch == null || ifMatch.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.PRECONDITION_REQUIRED,
+                    "Envie o header If-Match com a versão do lançamento (o ETag recebido).");
+        }
+        String value = ifMatch.strip().replaceFirst("^W/", "").replace("\"", "");
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            throw new ResponseStatusException(HttpStatus.PRECONDITION_FAILED, "If-Match não corresponde a uma versão.");
+        }
+    }
+
+    private static HttpStatus statusFor(EntryResolutionException.Reason reason) {
+        return switch (reason) {
+            case ENTRY_NOT_FOUND, ITEM_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case VERSION_MISMATCH -> HttpStatus.PRECONDITION_FAILED;
+            case NOT_PENDING -> HttpStatus.CONFLICT;
+            case INVALID -> HttpStatus.BAD_REQUEST;
+        };
     }
 }

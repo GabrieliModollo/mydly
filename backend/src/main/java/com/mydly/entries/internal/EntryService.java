@@ -1,6 +1,11 @@
 package com.mydly.entries.internal;
 
+import com.mydly.entries.Category;
+import com.mydly.entries.Direction;
 import com.mydly.entries.EntryParser;
+import com.mydly.entries.ParsedEntry;
+import com.mydly.entries.RoutineOutcome;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -11,6 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -86,6 +92,83 @@ public class EntryService {
     @Transactional(readOnly = true)
     public Optional<Entry> find(UUID id) {
         return repository.findById(id);
+    }
+
+    /**
+     * Resposta do usuário para um item que precisava de confirmação.
+     *
+     * @param action    confirmar como finança, como rotina, ou descartar
+     * @param amount    valor, obrigatório e positivo em {@link ResolutionAction#CONFIRM_FINANCE}
+     * @param direction saída ou entrada; saída quando omitida
+     * @param category  categoria escolhida; opcional
+     * @param quantity  quantidade da rotina; opcional e positiva
+     * @param unit      unidade da quantidade, uma de {@link ParsedEntry#UNITS}
+     * @param outcome   se o hábito foi cumprido; cumprido quando omitido
+     */
+    public record ResolveCommand(ResolutionAction action, BigDecimal amount, Direction direction, Category category,
+                                 BigDecimal quantity, String unit, RoutineOutcome outcome) {
+    }
+
+    /**
+     * Aplica a resposta do usuário ao item {@code index} do lançamento, desde que ele ainda esteja
+     * na versão que o cliente leu. O que o parser entendeu não é alterado (ADR 0007).
+     *
+     * @return o lançamento atualizado, já com a versão nova
+     * @throws EntryResolutionException quando o lançamento ou o item não existem, a versão mudou,
+     *                                  o item não está pendente ou os dados são inválidos
+     */
+    @Transactional
+    public Entry resolve(UUID id, int index, long expectedVersion, ResolveCommand command) {
+        Entry entry = repository.findById(id).orElseThrow(() -> new EntryResolutionException(
+                EntryResolutionException.Reason.ENTRY_NOT_FOUND, "Lançamento não encontrado."));
+        if (entry.getVersion() != expectedVersion) {
+            throw versionMismatch();
+        }
+        entry.resolve(index, toResolution(command, normalizeSpaces(entry.getRawText())));
+        try {
+            return repository.saveAndFlush(entry);
+        } catch (ObjectOptimisticLockingFailureException concurrentChange) {
+            throw versionMismatch();
+        }
+    }
+
+    private static EntryResolutionException versionMismatch() {
+        return new EntryResolutionException(EntryResolutionException.Reason.VERSION_MISMATCH,
+                "O lançamento mudou desde a última leitura. Carregue de novo e tente outra vez.");
+    }
+
+    private static ItemResolution toResolution(ResolveCommand command, String description) {
+        try {
+            return switch (command.action()) {
+                case DISMISS -> ItemResolution.dismissed();
+                case CONFIRM_FINANCE -> {
+                    if (command.amount() == null || command.amount().signum() <= 0) {
+                        throw invalid("Informe um valor maior que zero.");
+                    }
+                    if (command.amount().stripTrailingZeros().scale() > 2) {
+                        throw invalid("O valor aceita no máximo duas casas decimais.");
+                    }
+                    Direction direction = command.direction() != null ? command.direction() : Direction.EXPENSE;
+                    yield ItemResolution.confirmed(ParsedEntry.finance(direction, command.amount(), command.category(),
+                            description, ParsedEntry.CONFIRMED_BY_USER));
+                }
+                case CONFIRM_ROUTINE -> {
+                    if (command.quantity() != null && command.quantity().signum() <= 0) {
+                        throw invalid("A quantidade precisa ser maior que zero.");
+                    }
+                    RoutineOutcome outcome = command.outcome() != null ? command.outcome() : RoutineOutcome.DONE;
+                    yield ItemResolution.confirmed(ParsedEntry.routine(outcome, command.quantity(), command.unit(),
+                            description, ParsedEntry.CONFIRMED_BY_USER));
+                }
+            };
+        } catch (IllegalArgumentException invalidItem) {
+            // Unidade sem quantidade, unidade desconhecida e afins, vindos das regras do ParsedEntry.
+            throw invalid(invalidItem.getMessage());
+        }
+    }
+
+    private static EntryResolutionException invalid(String message) {
+        return new EntryResolutionException(EntryResolutionException.Reason.INVALID, message);
     }
 
     /**
