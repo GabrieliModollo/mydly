@@ -2,13 +2,17 @@ package com.mydly.entries.web;
 
 import com.mydly.entries.internal.EntryService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -63,6 +68,19 @@ class EntryController {
             case CONFLICT -> throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Já existe um lançamento com este id e outro conteúdo. Para enviar um lançamento novo, use outro id.");
         };
+    }
+
+    @GetMapping
+    @Operation(summary = "Lista os lançamentos de um dia",
+            description = "Filtra pela data em que o usuário escreveu (occurredAt), no fuso America/Sao_Paulo, "
+                    + "do mais recente para o mais antigo.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Lançamentos do dia (pode ser vazio)"),
+                    @ApiResponse(responseCode = "400", description = "Data em formato inválido")})
+    List<EntryResponse> listByDay(
+            @Parameter(description = "Dia no formato AAAA-MM-DD; se omitido, hoje", example = "2026-11-05")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return service.listByDay(date).stream().map(EntryResponse::from).toList();
     }
 
     @GetMapping("/{id}")

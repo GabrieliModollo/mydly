@@ -40,8 +40,9 @@ import org.springframework.stereotype.Component;
 @Component
 class RuleBasedEntryParser implements EntryParser {
 
-    // Nos Javadocs, números com vírgula vão em {@code ...} e não entre aspas: o BasicJsonParser
-    // que o Spring Modulith usa para gerar a documentação dos módulos quebra com "1,5" escapado.
+    // Nos Javadocs do projeto, evite vírgula dentro de aspas ou de colchetes sem par, como em
+    // "1,5" ou [a, b): o BasicJsonParser que o Spring Modulith usa para gerar a documentação dos
+    // módulos quebra com eles. Use {@code ...} para literais.
 
     static final double CONFIDENCE_MONEY_MARKER = 0.95;
     static final double CONFIDENCE_UNIT = 0.90;

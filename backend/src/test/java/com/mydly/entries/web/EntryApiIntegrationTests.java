@@ -225,6 +225,57 @@ class EntryApiIntegrationTests {
                 .andExpect(jsonPath("$.items[0].type").value("ROUTINE"));
     }
 
+    /**
+     * O dia é o de São Paulo (UTC-3): 02:30Z do dia 15 ainda é 23:30 do dia 14 lá,
+     * e 03:30Z já é 00:30 do dia 15.
+     */
+    @Test
+    void listaOsLancamentosDoDiaNoFusoDeSaoPauloDoMaisRecenteParaOMaisAntigo() throws Exception {
+        postEntry("""
+                {"text": "Dormi bem", "occurredAt": "2025-10-15T02:30:00Z"}""").andExpect(status().isCreated());
+        postEntry("""
+                {"text": "Bebi 2 litros de água", "occurredAt": "2025-10-15T03:30:00Z"}""").andExpect(status().isCreated());
+        postEntry("""
+                {"text": "Gastei 50 reais", "occurredAt": "2025-10-16T02:59:59Z"}""").andExpect(status().isCreated());
+        postEntry("""
+                {"text": "Fui à academia", "occurredAt": "2025-10-16T03:00:00Z"}""").andExpect(status().isCreated());
+
+        mvc.perform(get("/api/v1/entries").param("date", "2025-10-15"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].text").value("Gastei 50 reais"))
+                .andExpect(jsonPath("$[1].text").value("Bebi 2 litros de água"));
+
+        mvc.perform(get("/api/v1/entries").param("date", "2025-10-14"))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].text").value("Dormi bem"));
+    }
+
+    @Test
+    void diaSemLancamentosDevolveListaVazia() throws Exception {
+        mvc.perform(get("/api/v1/entries").param("date", "2001-01-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void semDataListaOsLancamentosDeHoje() throws Exception {
+        String id = UUID.randomUUID().toString();
+        postEntry("""
+                {"id": "%s", "text": "Meditei 15 minutos"}""".formatted(id)).andExpect(status().isCreated());
+
+        mvc.perform(get("/api/v1/entries"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '%s')]".formatted(id)).exists());
+    }
+
+    @Test
+    void dataInvalidaNaListagemDevolve400() throws Exception {
+        mvc.perform(get("/api/v1/entries").param("date", "15/10/2025"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
     @Test
     void buscaInexistenteDevolve404ComProblemDetail() throws Exception {
         mvc.perform(get("/api/v1/entries/{id}", UUID.randomUUID()))

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mydly.entries.Direction;
@@ -81,6 +82,18 @@ class EntryServiceTests {
         when(repository.findById(id)).thenReturn(Optional.of(saved));
 
         assertThat(service.create(id, "Gastei 50 reais", NOW).outcome()).isEqualTo(Outcome.ALREADY_EXISTS);
+    }
+
+    @Test
+    void hojeEODiaDeSaoPauloMesmoQuandoEmUtcJaEAmanha() {
+        // 02:00Z do dia 6 ainda são 23:00 do dia 5 em São Paulo.
+        Clock lateNight = Clock.fixed(Instant.parse("2026-11-06T02:00:00Z"), ZoneOffset.UTC);
+        EntryService lateService = new EntryService(repository, parser, lateNight);
+
+        lateService.listByDay(null);
+
+        verify(repository).findByOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtDesc(
+                Instant.parse("2026-11-05T03:00:00Z"), Instant.parse("2026-11-06T03:00:00Z"));
     }
 
     private void simulateConcurrentInsert() {

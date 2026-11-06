@@ -3,7 +3,10 @@ package com.mydly.entries.internal;
 import com.mydly.entries.EntryParser;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class EntryService {
+
+    /** Fuso usado para definir "o dia" de um lançamento até existir fuso por usuário. */
+    public static final ZoneId USER_ZONE = ZoneId.of("America/Sao_Paulo");
 
     private final EntryRepository repository;
     private final EntryParser parser;
@@ -80,6 +86,20 @@ public class EntryService {
     @Transactional(readOnly = true)
     public Optional<Entry> find(UUID id) {
         return repository.findById(id);
+    }
+
+    /**
+     * Lançamentos de um dia no fuso do usuário, pela data em que foram escritos, do mais recente
+     * para o mais antigo. Enquanto não há usuários (e fuso por usuário), vale {@link #USER_ZONE}.
+     *
+     * @param day o dia, ou {@code null} para hoje
+     */
+    @Transactional(readOnly = true)
+    public List<Entry> listByDay(LocalDate day) {
+        LocalDate date = day != null ? day : LocalDate.now(clock.withZone(USER_ZONE));
+        Instant start = date.atStartOfDay(USER_ZONE).toInstant();
+        Instant end = date.plusDays(1).atStartOfDay(USER_ZONE).toInstant();
+        return repository.findByOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtDesc(start, end);
     }
 
     private static CreateResult compareWithExisting(Entry existing, String text, Instant occurredAt) {
