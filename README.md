@@ -68,6 +68,18 @@ docker compose up --build
 
 Saúde da API: <http://localhost:8080/actuator/health>. Para desenvolver o backend fora do container, veja [`backend/README.md`](backend/README.md).
 
+### Testando a API
+
+Com a aplicação rodando, abra o Swagger UI em <http://localhost:8080/swagger-ui.html>. Em **Lançamentos → POST /api/v1/entries**, clique em *Try it out*, escolha um dos exemplos ("Gasto", "Rotina com quantidade", "Precisa de confirmação"...) e envie. A resposta traz o que o parser entendeu e se o app precisa confirmar com o usuário.
+
+Pelo terminal:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/entries \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Gastei 50 reais na farmácia"}'
+```
+
 ## Roadmap
 
 - [ ] **MVP** — campo único de lançamento, parser híbrido, finanças e hábitos básicos, streaks, painel simples
@@ -83,3 +95,4 @@ Saúde da API: <http://localhost:8080/actuator/health>. Para desenvolver o backe
 | [0003](docs/adr/0003-parser-hibrido.md) | Parser híbrido: regras locais + LLM como fallback |
 | [0004](docs/adr/0004-stack-tecnologica.md) | Stack tecnológica |
 | [0005](docs/adr/0005-integracoes-porta-adaptador.md) | Fontes de transação via porta/adaptador |
+| [0006](docs/adr/0006-id-do-cliente-e-occurred-at.md) | Id gerado pelo cliente e data do lançamento |

@@ -17,8 +17,13 @@ sequenceDiagram
     participant I as insights
 
     U->>App: "Gastei 50 reais na farmácia"
-    App->>App: salva localmente
-    App->>E: sincroniza Entry (texto bruto)
+    App->>App: salva localmente com id (UUID) e occurredAt
+    App->>E: POST /api/v1/entries (id, texto bruto, occurredAt)
+    alt id já existe com o mesmo conteúdo (reenvio)
+        E-->>App: 200 com o registro original
+    else id já existe com outro conteúdo
+        E-->>App: 409 Conflict
+    end
     E->>P: interpretar
     P->>P: regras locais
     alt confiança baixa
@@ -35,6 +40,8 @@ sequenceDiagram
 ```
 
 As regras locais do parser, com as faixas de confiança e o limiar a partir do qual o app pergunta ao usuário, estão em [`parser.md`](parser.md).
+
+**O que já está implementado.** O `POST /api/v1/entries` recebe o lançamento, interpreta com as regras locais e grava na tabela `entry`. Ele é idempotente pelo id enviado pelo app: o reenvio do mesmo conteúdo devolve o original, e o mesmo id com outro conteúdo devolve 409 ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)). A resposta da API usa DTOs próprios, separados do formato gravado no `parsed_json`. O status fica `NEEDS_INPUT` quando algum item tem confiança abaixo de 0,50, e `PENDING` nos outros casos. O fallback para o LLM e os eventos para `finance` e `routines` entram nas próximas etapas. Os eventos vão entrar junto com o módulo `finance`, quando houver quem os consuma. A API pode ser testada pelo Swagger UI em `/swagger-ui.html`.
 
 ## Módulos
 
@@ -63,6 +70,7 @@ erDiagram
         uuid id
         text raw_text
         timestamp created_at
+        timestamp occurred_at
         string detected_type
         jsonb parsed_json
         decimal confidence
@@ -104,6 +112,8 @@ erDiagram
 ```
 
 - `Entry.raw_text` nunca é descartado: quando o parser melhorar, os lançamentos antigos podem ser reprocessados.
+- `Entry.occurred_at` é quando o usuário escreveu, informado pelo app; `created_at` é quando o servidor gravou ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)).
+- `Entry.parsed_json` guarda a lista de itens interpretados; `detected_type` é o tipo comum a todos (ou vazio se forem mistos ou desconhecidos) e `confidence` é a menor entre eles.
 - `Habit.polarity` diferencia hábitos bons ("dormi bem") de ruins ("pedi delivery 3x").
 - `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`) e é a base da reconciliação.
 

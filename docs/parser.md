@@ -11,7 +11,7 @@ Como o MyDly interpreta um lançamento em texto livre usando só regras locais, 
 | `type` | `FINANCE`, `ROUTINE` ou `UNKNOWN` |
 | `direction` | `EXPENSE` (padrão) ou `INCOME`. Só existe em `FINANCE` |
 | `amount` | Valor em reais (`BigDecimal`). Só em `FINANCE`, e pode faltar |
-| `quantity` / `unit` | Quantidade em `ROUTINE`. A unidade é normalizada (`L`, `mL`, `h`, `min`, `km`, `copo`) ou fica nula quando é uma contagem ("30 flexões") |
+| `quantity` / `unit` | Quantidade em `ROUTINE`. A unidade é normalizada (`L`, `mL`, `h`, `min`, `km`, `kg`, `copo`) ou fica nula quando é uma contagem ("30 flexões") |
 | `description` | Texto original sem espaços extras, ou nulo quando a frase é só o valor ("50 reais") |
 | `confidence` | De 0 a 1 |
 
@@ -29,7 +29,7 @@ As regras são avaliadas em ordem, e a primeira que casa decide:
 | --- | --- | --- | --- | --- |
 | 1 | Texto vazio, sem letras nem números ou só com horário | `""`, `?!`, `às 6h` | `UNKNOWN` | 0,00 |
 | 2 | Número com marcador monetário (`R$`, `reais`, `real`, `conto(s)`) | `R$50`, `1 real`, `Recebi 100 reais` | `FINANCE` com valor | 0,95 |
-| 3 | Número com unidade de medida | `2 litros`, `500ml`, `2h`, `30min`, `5,5km`, `3 copos` | `ROUTINE` com quantidade e unidade | 0,90 |
+| 3 | Número com unidade de medida (vence os sinais de finança: `ganhei 2 kg` é peso) | `2 litros`, `500ml`, `2h`, `30min`, `5,5km`, `72,5 kg`, `3 copos` | `ROUTINE` com quantidade e unidade | 0,90 |
 | 4 | Número sozinho | `50`, `1.250,90` | `FINANCE` com valor | 0,80 |
 | 5a | Número com sinal de finança, seguido de preposição, pontuação ou fim da frase | `Paguei 12,50 no estacionamento`, `Caiu o salário de 3.000` | `FINANCE` com valor | 0,70 |
 | 5b | Número com sinal de finança, seguido de substantivo (é quantidade, não valor) | `Comprei 2 pães`, `Paguei 3 boletos` | `FINANCE` sem valor | 0,40 |
