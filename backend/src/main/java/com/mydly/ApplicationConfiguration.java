@@ -4,13 +4,18 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
 import java.time.Clock;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * Beans compartilhados entre os módulos.
+ * Beans compartilhados entre os módulos. O agendamento existe para a nova tentativa dos eventos
+ * incompletos ({@link IncompleteEventsRetry}).
  */
 @Configuration(proxyBeanMethods = false)
+@EnableScheduling
+@EnableConfigurationProperties(EventRetryProperties.class)
 class ApplicationConfiguration {
 
     /** Relógio injetável, para os testes controlarem o tempo quando precisarem. */
