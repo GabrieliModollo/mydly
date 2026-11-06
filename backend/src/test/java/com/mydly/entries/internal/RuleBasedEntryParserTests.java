@@ -10,7 +10,6 @@ import com.mydly.entries.RoutineOutcome;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -172,13 +171,14 @@ class RuleBasedEntryParserTests {
     }
 
     /**
-     * Evitar um hábito ruim é cumprir a meta, mas para saber disso o parser precisa da polaridade
-     * do hábito ({@code comer besteira} é ruim), que vem com o módulo routines (etapa 5 do backlog).
+     * O parser diz se a ação aconteceu, sem saber se o hábito é bom ou ruim. Que evitar besteira ou
+     * deixar de fumar é conquista, quem decide é o módulo routines, pela polaridade do hábito
+     * ({@code HabitStatus}, ADR 0008).
      */
-    @Disabled("Depende da polaridade do hábito, etapa 5 do backlog")
-    @Test
-    void evitarHabitoRuimEHabitoCumprido() {
-        assertThat(single("Não comi besteira").outcome()).isEqualTo(RoutineOutcome.DONE);
+    @ParameterizedTest
+    @ValueSource(strings = {"Não comi besteira", "Deixei de fumar"})
+    void habitoRuimEvitadoSaiComoAcaoQueNaoAconteceu(String text) {
+        assertThat(single(text).outcome()).isEqualTo(RoutineOutcome.MISSED);
     }
 
     @ParameterizedTest(name = "[{index}] \"{0}\" → {1}")
