@@ -27,8 +27,9 @@ Cada tipo tem fundo e texto próprios; as cores diferem também em luminosidade,
 | --- | --- | --- | --- |
 | Saída | `#FFEDD5` | `#9A3412` | `Saída · R$ 50,00` |
 | Entrada | `#DBEAFE` | `#1E40AF` | `Entrada · R$ 100,00` |
-| Rotina | `#CCFBF1` | `#115E59` | `Rotina · 2 L` ou `Rotina` |
-| Rotina não cumprida | `#E4E2DA` | `#2F323A` | `Rotina · não cumprido` (texto riscado) |
+| Rotina | `#CCFBF1` | `#115E59` | `Hidratação · 2 L` ou `Evitou besteira` quando cai num hábito do catálogo; `Rotina · 2 L` ou `Rotina` quando é "outros" |
+| Rotina não cumprida | `#E4E2DA` | `#2F323A` | `Rotina · não cumprido` ou `Academia · não cumprido` (texto riscado) |
+| Deslize (hábito ruim consumido) | `#FFE4E6` | `#9F1239` | `Deslize · Energético` (6,7:1; no tema escuro `#4C0519` e `#FDA4AF`, 8,3:1) |
 | Precisa confirmar | `#EDE9FE` | `#5B21B6` | `Precisa confirmar` |
 | Categoria / hábito | `#F1F0EA` | `#3F434C` | `Farmácia`, `Hidratação` |
 
@@ -49,8 +50,8 @@ Cada tipo tem fundo e texto próprios; as cores diferem também em luminosidade,
 ### Hoje
 
 1. Cabeçalho: data, título "Hoje" e pílula escura com a sequência ("6 dias", texto no acento).
-2. Dois cartões de resumo: "Gasto hoje" (soma das saídas) e "Hábitos cumpridos" (X de 5).
-3. Lista do dia, mais recente primeiro: texto original do lançamento, horário à direita e chips de interpretação abaixo. Lançamentos `NEEDS_INPUT` mostram o link "Quanto foi? →".
+2. Dois cartões de resumo, vindos do `GET /api/v1/days/{date}/summary`: "Gasto hoje" (soma das saídas que valem) e "Hábitos cumpridos" (hábitos bons cumpridos mais hábitos ruins evitados).
+3. Lista do dia, mais recente primeiro: texto original do lançamento, horário à direita e uma linha de chips por item. Um item pendente mostra o link "Quanto foi? →". Um item aceito mostra a ação discreta "Não foi isso" (cinza, peso 500), que o tira dos números e abre o painel para corrigir; um item descartado mostra "Desfazer".
 4. Campo de lançamento fixo embaixo, estilo chat ("O que aconteceu?"), com botão redondo no acento; envio também com Enter.
 5. Barra de navegação: Hoje, Resumo, Metas.
 

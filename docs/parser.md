@@ -101,7 +101,7 @@ Toda rotina tem `outcome`. Quem decide é a **oração principal** do item, o tr
 - A negação numa oração seguinte fala de outra coisa: `Bebi água, não refrigerante` e `Fui à academia, não faltei` são `DONE`.
 - "Pulei corda" é exercício, não falta: `Pulei corda 10 minutos` é `DONE`.
 - A quantidade é mantida: `Não bebi 2 litros de água` é `MISSED` com 2 L.
-- No app, o hábito não cumprido aparece como "Rotina · não cumprido" (cinza e riscado) e não conta em "Hábitos cumpridos".
+- O parser só diz se a ação aconteceu. Se isso é bom ou ruim depende do hábito, e quem decide é o módulo `routines`, pela polaridade do catálogo ([ADR 0008](adr/0008-eventos-com-registro-e-revisao-por-item.md)). "Não comi besteira" e "Deixei de fumar" saem do parser como `MISSED`, e `routines` os conta como hábito ruim evitado, ou seja, cumprido.
 
 ## Categoria sugerida
 
@@ -127,8 +127,6 @@ São casos que ficam para o LLM ou para próximas etapas:
 - **Verbos fora do passado em primeira pessoa** ("vou à academia", "a gente comeu pizza") não são âncora, então uma frase composta com eles pode ficar com um item só. Hábitos conhecidos também viram âncora quando existirem, com o módulo `routines`.
 - **Valores por extenso** ("cinquenta reais") viram finança sem valor e com confiança baixa.
 - **Categorias de rotina** (academia, hidratação, sono) ainda não são inferidas; só as de finança.
-- **Hábitos ruins evitados.** "Não comi besteira" vira `MISSED`, mas evitar um hábito ruim é cumprir a meta. Para acertar, o parser precisa da polaridade do hábito, que vem com o módulo `routines` (etapa 5 do [backlog](backlog.md)). O teste está escrito e desativado.
-- **"Deixei de"** vira `MISSED` mesmo em "deixei de fumar", que é uma conquista. Isso também depende da polaridade.
 
 ## Privacidade
 

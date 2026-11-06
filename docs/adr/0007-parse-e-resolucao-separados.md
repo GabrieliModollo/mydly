@@ -1,6 +1,6 @@
 # ADR 0007 — Interpretação do parser e resolução do usuário guardadas separadamente
 
-- **Status:** Aceita
+- **Status:** Aceita. Complementada pelo [ADR 0008](0008-eventos-com-registro-e-revisao-por-item.md)
 - **Data:** 2026-11-05
 
 ## Contexto

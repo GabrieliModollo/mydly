@@ -8,13 +8,12 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 
 | # | Etapa | Escopo | Notas |
 | --- | --- | --- | --- |
-| — | Nenhuma | A próxima é a etapa 5 | |
+| — | Nenhuma | A próxima é a etapa 6 | |
 
 ## Próximas
 
 | # | Prioridade | Etapa | Escopo | Por que agora |
 | --- | --- | --- | --- | --- |
-| 5 | Média | Módulos `finance` e `routines` | Consomem os lançamentos confirmados por eventos (registro de eventos do Spring Modulith); hábitos com polaridade, resolvendo "Não comi besteira" | Base para estatísticas |
 | 6 | Média | Resumo da semana | Módulo `insights`: hábitos por dia, gastos por categoria, mensagem da semana com tom gentil / direto / bronca, cruzamento rotina × dinheiro | O diferencial do produto |
 | 7 | Média | Offline-first | Fila local no app para lançamentos sem internet, sincronização com o id já gerado | Uso no celular, na rua |
 | 8 | Média | Usuário e autenticação | Spring Security com JWT, coluna de usuário nos dados, usuário "demo" com seed | Necessário antes de publicar uma demo |
@@ -42,3 +41,4 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 | Hábitos não cumpridos (`outcome` DONE/MISSED, finança negada, chip "não cumprido") | `9042a9c`, `489f7ee`, `c013cf3` |
 | Confirmação de lançamentos (resolução à parte do parser, ETag/If-Match, categorias fixas, painel "Quanto foi?", ADR 0007) | `675dbf2`, `38fcaaf` e o commit de documentação seguinte |
 | Frases compostas (divisão por âncora, herança do verbo, números compostos com "e", até 5 itens, sem reprocessar lançamentos com resolução) | `b04d996`, `f58dd2e` e o commit de documentação seguinte |
+| Módulos `finance` e `routines` (estado e revisão por item, "Não foi isso", eventos com registro de publicação, catálogo de hábitos com polaridade, resumo do dia, backfill, nova tentativa e saúde, ADR 0008) | `9359a98`, `4a4ef3c`, `76c206b`, `fe91cb9`, `30a64f1`, `50710e3` e o commit de documentação seguinte |
