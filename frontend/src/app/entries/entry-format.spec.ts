@@ -1,4 +1,4 @@
-import { chipsFor, daySummary, formatMoney, formatQuantity, itemChip } from './entry-format';
+import { chipsFor, chipsForItem, daySummary, formatMoney, formatQuantity, itemChip, parseAmount } from './entry-format';
 import { EntryItemResponse, EntryResponse } from './entry.models';
 
 function item(overrides: Partial<EntryItemResponse>): EntryItemResponse {
@@ -9,8 +9,12 @@ function item(overrides: Partial<EntryItemResponse>): EntryItemResponse {
     amount: null,
     quantity: null,
     unit: null,
+    category: null,
     description: null,
     confidence: 0.9,
+    needsConfirmation: false,
+    resolvedByUser: false,
+    dismissed: false,
     ...overrides,
   };
 }
@@ -22,6 +26,7 @@ function entry(items: EntryItemResponse[], needsConfirmation = false): EntryResp
     occurredAt: '2026-11-05T12:00:00Z',
     status: needsConfirmation ? 'NEEDS_INPUT' : 'PENDING',
     needsConfirmation,
+    version: 0,
     items,
   };
 }
@@ -80,9 +85,22 @@ describe('formatação dos chips', () => {
     expect(itemChip(item({ type: 'UNKNOWN', direction: null }))).toEqual({ label: 'Não entendi', tone: 'neutral' });
   });
 
-  it('lançamento que precisa de confirmação mostra só esse aviso', () => {
-    expect(chipsFor(entry([item({ amount: null })], true))).toEqual([
+  it('item que precisa de confirmação mostra só esse aviso', () => {
+    expect(chipsForItem(item({ amount: null, category: 'FOOD', needsConfirmation: true }))).toEqual([
       { label: 'Precisa confirmar', tone: 'attention' },
+    ]);
+  });
+
+  it('finança mostra a categoria num chip neutro', () => {
+    expect(chipsForItem(item({ amount: 8.5, category: 'FOOD' }))).toEqual([
+      { label: 'Saída · R$ 8,50', tone: 'expense' },
+      { label: 'Alimentação', tone: 'neutral' },
+    ]);
+  });
+
+  it('item descartado aparece como descartado', () => {
+    expect(chipsForItem(item({ dismissed: true, resolvedByUser: true }))).toEqual([
+      { label: 'Descartado', tone: 'neutral' },
     ]);
   });
 
@@ -99,7 +117,8 @@ describe('resumo do dia', () => {
       entry([item({ amount: 50 })]),
       entry([item({ amount: 12.5 }), item({ type: 'ROUTINE', direction: null })]),
       entry([item({ direction: 'INCOME', amount: 100 })]),
-      entry([item({ amount: null })], true),
+      entry([item({ amount: null, needsConfirmation: true })], true),
+      entry([item({ amount: 999, dismissed: true, resolvedByUser: true })]),
       entry([item({ type: 'ROUTINE', direction: null, quantity: 2, unit: 'L' })]),
       entry([item({ type: 'UNKNOWN', direction: null })]),
     ]);
@@ -118,5 +137,23 @@ describe('resumo do dia', () => {
 
   it('dia vazio tem tudo zerado', () => {
     expect(daySummary([])).toEqual({ spent: 0, habitsDone: 0 });
+  });
+});
+
+describe('parseAmount', () => {
+  it.each([
+    ['8,50', 8.5],
+    ['8.5', 8.5],
+    ['8', 8],
+    ['1.250,90', 1250.9],
+    ['12.345', 12345],
+    ['R$ 12', 12],
+    [' 0,99 ', 0.99],
+  ])('"%s" vira %s', (text, expected) => {
+    expect(parseAmount(text)).toBe(expected);
+  });
+
+  it.each(['', 'abc', '0', '0,00', '-5', '8,505', '1,2,3', '12.34.5'])('"%s" não é um valor válido', (text) => {
+    expect(parseAmount(text)).toBeNull();
   });
 });

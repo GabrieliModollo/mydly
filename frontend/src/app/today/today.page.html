@@ -24,6 +24,13 @@
       </div>
     </section>
 
+    @if (notice(); as message) {
+      <div class="banner" role="status">
+        <span>{{ message }}</span>
+        <button type="button" class="link-button" (click)="notice.set(null)">Ok</button>
+      </div>
+    }
+
     @if (store.loadState() === 'error') {
       <div class="banner" role="alert">
         <ion-icon name="cloud-offline-outline" aria-hidden="true" />
@@ -60,12 +67,22 @@
               <time class="entry__time" [attr.datetime]="item.occurredAt">{{ item.occurredAt | date: 'HH:mm' }}</time>
             </div>
 
-            @if (item.entry) {
-              <ul class="chips" aria-label="O que o MyDly entendeu">
-                @for (chip of chipsFor(item.entry); track $index) {
-                  <li class="chip" [attr.data-tone]="chip.tone">{{ chip.label }}</li>
-                }
-              </ul>
+            @if (item.entry; as saved) {
+              @for (parsed of saved.items; track $index; let index = $index) {
+                <div class="item">
+                  <ul class="chips" aria-label="O que o MyDly entendeu">
+                    @for (chip of chipsForItem(parsed); track $index) {
+                      <li class="chip" [attr.data-tone]="chip.tone">{{ chip.label }}</li>
+                    }
+                  </ul>
+                  @if (parsed.needsConfirmation) {
+                    <button type="button" class="link-button" (click)="openConfirm(saved, index)">
+                      {{ parsed.type === 'UNKNOWN' ? 'O que foi isso?' : 'Quanto foi?' }}
+                      <span aria-hidden="true">→</span>
+                    </button>
+                  }
+                </div>
+              }
             }
 
             <div class="entry__status" aria-live="polite">
@@ -93,6 +110,27 @@
     }
   </main>
 </ion-content>
+
+<ion-modal
+  class="confirm-modal"
+  [isOpen]="confirming() !== null"
+  [initialBreakpoint]="0.85"
+  [breakpoints]="[0, 0.85, 1]"
+  (didDismiss)="confirming.set(null)"
+>
+  <ng-template>
+    <ion-content class="confirm-modal__content">
+      @if (confirming(); as target) {
+        <app-confirm-sheet
+          [entry]="target.entry"
+          [index]="target.index"
+          (resolved)="resolve(target.entry.id, target.index, $event)"
+          (closed)="confirming.set(null)"
+        />
+      }
+    </ion-content>
+  </ng-template>
+</ion-modal>
 
 <ion-footer class="ion-no-border">
   <form class="composer" (submit)="send($event)">

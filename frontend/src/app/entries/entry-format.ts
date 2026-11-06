@@ -1,4 +1,37 @@
-import { EntryItemResponse, EntryResponse } from './entry.models';
+import { Category, EntryItemResponse, EntryResponse } from './entry.models';
+
+/** Nomes das categorias em português, na ordem em que o app as mostra. */
+export const CATEGORY_LABELS: Record<Category, string> = {
+  FOOD: 'Alimentação',
+  GROCERIES: 'Mercado',
+  PHARMACY: 'Farmácia',
+  TRANSPORT: 'Transporte',
+  HOUSING: 'Moradia',
+  HEALTH: 'Saúde',
+  LEISURE: 'Lazer',
+  WORK: 'Trabalho',
+  OTHER: 'Outros',
+};
+
+/**
+ * Valor digitado pelo usuário em reais: {@code 8,50}, {@code 8.5}, {@code 1.250,90} ou {@code R$ 12}.
+ * Devolve {@code null} quando não é um valor positivo com até duas casas decimais.
+ */
+export function parseAmount(text: string): number | null {
+  const cleaned = text.replace(/r\$/i, '').replace(/\s/g, '');
+  const brazilian = /^\d{1,3}(\.\d{3})+(,\d{1,2})?$|^\d+(,\d{1,2})?$/;
+  const dotDecimal = /^\d+\.\d{1,2}$/;
+  let normalized: string;
+  if (brazilian.test(cleaned)) {
+    normalized = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (dotDecimal.test(cleaned)) {
+    normalized = cleaned;
+  } else {
+    return null;
+  }
+  const value = Number(normalized);
+  return value > 0 ? value : null;
+}
 
 /** Tom visual de um chip; cada um tem fundo e texto próprios no tema (docs/design.md). */
 export type ChipTone = 'expense' | 'income' | 'routine' | 'missed' | 'attention' | 'neutral';
@@ -65,19 +98,32 @@ function routineLabel(item: EntryItemResponse): string {
 }
 
 /**
- * Chips de um lançamento. Quando ele precisa de confirmação, mostra só esse aviso: a interpretação
- * ainda é incerta, e um chip como "Saída · valor a definir" só repetiria a dúvida.
+ * Chips de um item. Quando ele precisa de confirmação, mostra só esse aviso: a interpretação ainda é
+ * incerta, e um chip como "Saída · valor a definir" só repetiria a dúvida. Finanças ganham também o
+ * chip da categoria.
  */
-export function chipsFor(entry: EntryResponse): Chip[] {
-  if (entry.needsConfirmation) {
+export function chipsForItem(item: EntryItemResponse): Chip[] {
+  if (item.needsConfirmation) {
     return [{ label: 'Precisa confirmar', tone: 'attention' }];
   }
-  return entry.items.map(itemChip);
+  if (item.dismissed) {
+    return [{ label: 'Descartado', tone: 'neutral' }];
+  }
+  const chips = [itemChip(item)];
+  if (item.type === 'FINANCE' && item.category) {
+    chips.push({ label: CATEGORY_LABELS[item.category], tone: 'neutral' });
+  }
+  return chips;
 }
 
-/** Soma das saídas e contagem de rotinas cumpridas dos lançamentos do dia. */
+/** Chips de todos os itens de um lançamento. */
+export function chipsFor(entry: EntryResponse): Chip[] {
+  return entry.items.flatMap(chipsForItem);
+}
+
+/** Soma das saídas e contagem de rotinas cumpridas dos lançamentos do dia; itens descartados ficam de fora. */
 export function daySummary(entries: EntryResponse[]): DaySummary {
-  const items = entries.flatMap((entry) => entry.items);
+  const items = entries.flatMap((entry) => entry.items).filter((item) => !item.dismissed);
   return {
     spent: items
       .filter((item) => item.type === 'FINANCE' && item.direction === 'EXPENSE' && item.amount !== null)

@@ -3,7 +3,7 @@ import { computed, inject, Injectable, InjectionToken, signal } from '@angular/c
 import { firstValueFrom } from 'rxjs';
 import { EntriesApi } from './entries-api';
 import { daySummary } from './entry-format';
-import { EntryResponse } from './entry.models';
+import { EntryItemResponse, EntryResponse, ResolveItemRequest } from './entry.models';
 import { randomId } from './random-id';
 
 /** Gera o id de um lançamento novo. Substituível nos testes. */
@@ -37,6 +37,9 @@ export interface TimelineEntry {
 }
 
 export type LoadState = 'idle' | 'loading' | 'loaded' | 'error';
+
+/** Desfecho de uma resolução: gravada, lançamento desatualizado (recarregado) ou erro (desfeita). */
+export type ResolveResult = 'ok' | 'stale' | 'error';
 
 /**
  * Estado da tela "Hoje": os lançamentos do dia e os que estão sendo enviados.
@@ -105,6 +108,44 @@ export class EntriesStore {
     await this.send(entry);
   }
 
+  /** A versão atual de um lançamento já gravado. */
+  find(id: string): EntryResponse | undefined {
+    return this.entries().find((item) => item.id === id)?.entry;
+  }
+
+  /**
+   * Resolve um item que precisava de confirmação. A tela muda na hora (otimista) e é acertada com a
+   * resposta da API. Se o lançamento mudou desde a leitura (412) ou o item já foi resolvido (409), o
+   * lançamento é recarregado e o resultado é {@code stale}, para a tela reabrir com os dados novos.
+   * Em outro erro, a mudança é desfeita.
+   */
+  async resolve(entryId: string, index: number, request: ResolveItemRequest): Promise<ResolveResult> {
+    const current = this.find(entryId);
+    if (!current) {
+      return 'error';
+    }
+    this.replaceEntry(applyResolution(current, index, request));
+    try {
+      this.replaceEntry(await firstValueFrom(this.api.resolve(entryId, index, current.version, request)));
+      return 'ok';
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && (error.status === 412 || error.status === 409)) {
+        try {
+          this.replaceEntry(await firstValueFrom(this.api.get(entryId)));
+        } catch {
+          this.replaceEntry(current);
+        }
+        return 'stale';
+      }
+      this.replaceEntry(current);
+      return 'error';
+    }
+  }
+
+  private replaceEntry(entry: EntryResponse): void {
+    this.entries.update((list) => list.map((item) => (item.id === entry.id ? toSynced(entry) : item)));
+  }
+
   /** Tira da lista um lançamento recusado pela API. */
   dismiss(id: string): void {
     this.entries.update((list) => list.filter((entry) => entry.id !== id || entry.sync !== 'rejected'));
@@ -124,6 +165,40 @@ export class EntriesStore {
   private patch(id: string, changes: Partial<TimelineEntry>): void {
     this.entries.update((list) => list.map((item) => (item.id === id ? { ...item, ...changes } : item)));
   }
+}
+
+/**
+ * O lançamento como fica depois da resposta do usuário, calculado no app para a tela não esperar a
+ * API. A API devolve o mesmo resultado; ele substitui este assim que chega.
+ */
+export function applyResolution(entry: EntryResponse, index: number, request: ResolveItemRequest): EntryResponse {
+  const items = entry.items.map((item, position): EntryItemResponse => {
+    if (position !== index) {
+      return item;
+    }
+    const resolved = { ...item, needsConfirmation: false, resolvedByUser: true };
+    switch (request.action) {
+      case 'DISMISS':
+        return { ...resolved, dismissed: true };
+      case 'CONFIRM_FINANCE':
+        return {
+          ...resolved,
+          type: 'FINANCE',
+          direction: request.direction,
+          outcome: null,
+          category: request.category,
+          amount: request.amount,
+          quantity: null,
+          unit: null,
+          confidence: 1,
+        };
+      case 'CONFIRM_ROUTINE':
+        return { ...resolved, type: 'ROUTINE', direction: null, outcome: 'DONE', category: null, amount: null, confidence: 1 };
+    }
+  });
+  const pending = items.some((item) => item.needsConfirmation);
+  const status = !pending && entry.status === 'NEEDS_INPUT' ? 'PENDING' : entry.status;
+  return { ...entry, items, needsConfirmation: pending, status };
 }
 
 function toSynced(entry: EntryResponse): TimelineEntry {

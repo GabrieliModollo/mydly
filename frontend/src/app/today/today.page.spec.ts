@@ -1,28 +1,60 @@
 import { registerLocaleData } from '@angular/common';
 import localePt from '@angular/common/locales/pt';
-import { LOCALE_ID, signal } from '@angular/core';
+import { LOCALE_ID, signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideIonicAngular } from '@ionic/angular';
-import { EntriesStore, NOW } from '../entries/entries-store';
+import { EntriesStore, NOW, ResolveResult, TimelineEntry } from '../entries/entries-store';
+import { EntryResponse } from '../entries/entry.models';
 import { TodayPage } from './today.page';
 
 registerLocaleData(localePt, 'pt-BR');
+
+const PENDING: EntryResponse = {
+  id: 'p',
+  text: 'Comprei pão',
+  occurredAt: '2026-11-05T12:00:00Z',
+  status: 'NEEDS_INPUT',
+  needsConfirmation: true,
+  version: 0,
+  items: [
+    {
+      type: 'FINANCE',
+      direction: 'EXPENSE',
+      outcome: null,
+      category: 'FOOD',
+      amount: null,
+      quantity: null,
+      unit: null,
+      description: 'Comprei pão',
+      confidence: 0.4,
+      needsConfirmation: true,
+      resolvedByUser: false,
+      dismissed: false,
+    },
+  ],
+};
 
 describe('TodayPage', () => {
   let fixture: ComponentFixture<TodayPage>;
   let submitted: string[];
   let input: HTMLInputElement;
+  let timeline: WritableSignal<TimelineEntry[]>;
+  let resolveResult: ResolveResult;
 
   beforeEach(async () => {
     submitted = [];
+    timeline = signal([]);
+    resolveResult = 'ok';
     const store: Partial<EntriesStore> = {
       loadState: signal('loaded'),
-      timeline: signal([]),
+      timeline,
       summary: signal({ spent: 62.5, habitsDone: 3 }),
       load: async () => undefined,
       submit: async (text: string) => {
         submitted.push(text);
       },
+      resolve: async () => resolveResult,
+      find: () => PENDING,
     };
     TestBed.configureTestingModule({
       imports: [TodayPage],
@@ -101,5 +133,95 @@ describe('TodayPage', () => {
     );
 
     expect(values).toEqual(['R$ 62,50', '3']);
+  });
+});
+
+describe('TodayPage · confirmação', () => {
+  let fixture: ComponentFixture<TodayPage>;
+  let resolveResult: ResolveResult;
+  let resolved: unknown[];
+
+  beforeEach(async () => {
+    resolveResult = 'ok';
+    resolved = [];
+    const store: Partial<EntriesStore> = {
+      loadState: signal('loaded'),
+      timeline: signal<TimelineEntry[]>([
+        { id: 'p', text: PENDING.text, occurredAt: PENDING.occurredAt, sync: 'synced', entry: PENDING },
+      ]),
+      summary: signal({ spent: 0, habitsDone: 0 }),
+      load: async () => undefined,
+      resolve: async (...args: unknown[]) => {
+        resolved.push(args);
+        return resolveResult;
+      },
+      find: () => PENDING,
+    };
+    TestBed.configureTestingModule({
+      imports: [TodayPage],
+      providers: [
+        provideIonicAngular({ mode: 'md' }),
+        { provide: LOCALE_ID, useValue: 'pt-BR' },
+        { provide: EntriesStore, useValue: store },
+        { provide: NOW, useValue: () => new Date('2026-11-05T12:00:00Z') },
+      ],
+    });
+    fixture = TestBed.createComponent(TodayPage);
+    await fixture.whenStable();
+  });
+
+  function link(): HTMLButtonElement | undefined {
+    return [...fixture.nativeElement.querySelectorAll('button')].find((b: HTMLButtonElement) =>
+      b.textContent?.includes('Quanto foi?'),
+    );
+  }
+
+  /** Item aberto no painel; o ion-modal em si é do Ionic (e no jsdom sai do lugar ao abrir). */
+  function confirming(): { entry: EntryResponse; index: number } | null {
+    return (fixture.componentInstance as unknown as { confirming(): { entry: EntryResponse; index: number } | null })
+      .confirming();
+  }
+
+  it('item pendente mostra só "Precisa confirmar" e o link "Quanto foi?"', () => {
+    const chips = [...fixture.nativeElement.querySelectorAll('.chip')].map((c: Element) => c.textContent?.trim());
+
+    expect(chips).toEqual(['Precisa confirmar']);
+    expect(link()).toBeTruthy();
+  });
+
+  it('o link abre o painel de confirmação', async () => {
+    expect(confirming()).toBeNull();
+
+    link()!.click();
+    await fixture.whenStable();
+
+    expect(confirming()).toEqual({ entry: PENDING, index: 0 });
+  });
+
+  it('lançamento desatualizado reabre o painel com aviso', async () => {
+    resolveResult = 'stale';
+    const page = fixture.componentInstance as unknown as {
+      resolve(id: string, index: number, request: unknown): Promise<void>;
+    };
+
+    await page.resolve('p', 0, { action: 'DISMISS' });
+    await fixture.whenStable();
+
+    expect(resolved).toEqual([['p', 0, { action: 'DISMISS' }]]);
+    expect(fixture.nativeElement.querySelector('[role="status"]')?.textContent).toContain('mudou');
+    expect(confirming()).toEqual({ entry: PENDING, index: 0 });
+  });
+
+  it('falha ao salvar mostra aviso e mantém o painel fechado', async () => {
+    resolveResult = 'error';
+    const page = fixture.componentInstance as unknown as {
+      resolve(id: string, index: number, request: unknown): Promise<void>;
+    };
+
+    await page.resolve('p', 0, { action: 'DISMISS' });
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('[role="status"]')?.textContent).toContain('Não foi possível salvar');
+    expect(confirming()).toBeNull();
   });
 });

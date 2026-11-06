@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { EntriesStore, NEW_ENTRY_ID, NOW } from './entries-store';
+import { applyResolution, EntriesStore, NEW_ENTRY_ID, NOW } from './entries-store';
 import { EntryResponse } from './entry.models';
 
 const URL = '/api/v1/entries';
@@ -19,13 +19,40 @@ function saved(id: string, text: string, occurredAt = NOW_ISO): EntryResponse {
         type: 'FINANCE',
         direction: 'EXPENSE',
         outcome: null,
+        category: null,
         amount: 50,
         quantity: null,
         unit: null,
         description: text,
         confidence: 0.95,
+        needsConfirmation: false,
+        resolvedByUser: false,
+        dismissed: false,
       },
     ],
+    version: 0,
+  };
+}
+
+/** "Comprei pão": gasto sem valor, esperando o usuário. */
+function pending(id: string, version = 0): EntryResponse {
+  const base = saved(id, 'Comprei pão');
+  return {
+    ...base,
+    status: 'NEEDS_INPUT',
+    needsConfirmation: true,
+    version,
+    items: [{ ...base.items[0], amount: null, category: 'FOOD', confidence: 0.4, needsConfirmation: true }],
+  };
+}
+
+function confirmed(id: string, version: number): EntryResponse {
+  const base = pending(id, version);
+  return {
+    ...base,
+    status: 'PENDING',
+    needsConfirmation: false,
+    items: [{ ...base.items[0], amount: 8.5, confidence: 1, needsConfirmation: false, resolvedByUser: true }],
   };
 }
 
@@ -149,6 +176,100 @@ describe('EntriesStore', () => {
     http.expectOne(URL).flush(saved('id-1', 'Gastei 30 reais'));
     await sending;
     expect(store.summary()).toEqual({ spent: 100, habitsDone: 0 });
+  });
+
+  describe('resolução de itens', () => {
+    const RESOLVE_URL = '/api/v1/entries/p/items/0/resolution';
+    const CONFIRM = { action: 'CONFIRM_FINANCE', amount: 8.5, direction: 'EXPENSE', category: 'FOOD' } as const;
+
+    async function loadPending(): Promise<void> {
+      const loading = store.load();
+      http.expectOne(URL).flush([pending('p')]);
+      await loading;
+    }
+
+    it('mostra a confirmação na hora e fica com a resposta da API', async () => {
+      await loadPending();
+
+      const resolving = store.resolve('p', 0, CONFIRM);
+      const optimistic = store.find('p');
+      expect(optimistic?.status).toBe('PENDING');
+      expect(optimistic?.items[0]).toMatchObject({ amount: 8.5, needsConfirmation: false, resolvedByUser: true });
+      expect(store.summary().spent).toBe(8.5);
+
+      const req = http.expectOne(RESOLVE_URL);
+      expect(req.request.headers.get('If-Match')).toBe('"0"');
+      req.flush(confirmed('p', 1));
+
+      expect(await resolving).toBe('ok');
+      expect(store.find('p')?.version).toBe(1);
+    });
+
+    it('lançamento desatualizado (412) é recarregado e o resultado avisa a tela', async () => {
+      await loadPending();
+
+      const resolving = store.resolve('p', 0, CONFIRM);
+      http.expectOne(RESOLVE_URL).flush(null, { status: 412, statusText: 'Precondition Failed' });
+      await new Promise((resolve) => setTimeout(resolve));
+      http.expectOne('/api/v1/entries/p').flush(pending('p', 4));
+
+      expect(await resolving).toBe('stale');
+      expect(store.find('p')).toEqual(pending('p', 4));
+    });
+
+    it('se nem o recarregamento funciona, volta ao estado anterior', async () => {
+      await loadPending();
+
+      const resolving = store.resolve('p', 0, { action: 'DISMISS' });
+      http.expectOne(RESOLVE_URL).flush(null, { status: 409, statusText: 'Conflict' });
+      await new Promise((resolve) => setTimeout(resolve));
+      http.expectOne('/api/v1/entries/p').error(new ProgressEvent('error'));
+
+      expect(await resolving).toBe('stale');
+      expect(store.find('p')).toEqual(pending('p'));
+    });
+
+    it('em outro erro, desfaz a mudança', async () => {
+      await loadPending();
+
+      const resolving = store.resolve('p', 0, { action: 'DISMISS' });
+      expect(store.find('p')?.items[0].dismissed).toBe(true);
+      http.expectOne(RESOLVE_URL).error(new ProgressEvent('error'));
+
+      expect(await resolving).toBe('error');
+      expect(store.find('p')).toEqual(pending('p'));
+    });
+
+    it('lançamento desconhecido não é enviado', async () => {
+      expect(await store.resolve('inexistente', 0, { action: 'DISMISS' })).toBe('error');
+      http.expectNone(() => true);
+    });
+  });
+
+  describe('applyResolution', () => {
+    it('confirmar como rotina troca o tipo e marca como cumprida', () => {
+      const result = applyResolution(pending('p'), 0, { action: 'CONFIRM_ROUTINE' });
+
+      expect(result.items[0]).toMatchObject({
+        type: 'ROUTINE',
+        outcome: 'DONE',
+        direction: null,
+        category: null,
+        amount: null,
+        resolvedByUser: true,
+      });
+    });
+
+    it('só muda o item indicado e mantém o status enquanto houver pendência', () => {
+      const two: EntryResponse = { ...pending('p'), items: [...pending('p').items, ...pending('p').items] };
+
+      const result = applyResolution(two, 1, { action: 'DISMISS' });
+
+      expect(result.items[0].needsConfirmation).toBe(true);
+      expect(result.items[1].dismissed).toBe(true);
+      expect(result.status).toBe('NEEDS_INPUT');
+      expect(result.needsConfirmation).toBe(true);
+    });
   });
 
   it('marca erro quando não consegue carregar', async () => {

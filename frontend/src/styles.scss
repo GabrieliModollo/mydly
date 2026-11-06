@@ -5,6 +5,16 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Painel "Quanto foi?". O Ionic move o modal para a raiz do app, então o estilo fica aqui. */
+ion-modal.confirm-modal {
+  --background: var(--mydly-surface);
+  --border-radius: 22px;
+}
+
+.confirm-modal__content {
+  --background: var(--mydly-surface);
+}
+
 /* Visível só para leitores de tela. */
 .sr-only {
   position: absolute;

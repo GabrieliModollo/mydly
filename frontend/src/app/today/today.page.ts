@@ -14,6 +14,7 @@ import {
   IonFooter,
   IonHeader,
   IonIcon,
+  IonModal,
   IonRefresher,
   IonRefresherContent,
   IonSpinner,
@@ -23,7 +24,9 @@ import {
 import { addIcons } from 'ionicons';
 import { arrowUp, cloudOfflineOutline, refreshOutline } from 'ionicons/icons';
 import { EntriesStore, NOW } from '../entries/entries-store';
-import { chipsFor, formatMoney } from '../entries/entry-format';
+import { chipsForItem, formatMoney } from '../entries/entry-format';
+import { EntryResponse, ResolveItemRequest } from '../entries/entry.models';
+import { ConfirmSheet } from './confirm-sheet';
 import { formatDayLabel } from './day-label';
 
 /** Frases do README, para quem abre o app pela primeira vez saber o que escrever. */
@@ -43,6 +46,8 @@ const EXAMPLES = [
     IonFooter,
     IonHeader,
     IonIcon,
+    IonModal,
+    ConfirmSheet,
     IonRefresher,
     IonRefresherContent,
     IonSpinner,
@@ -56,8 +61,13 @@ export class TodayPage implements OnInit {
   protected readonly store = inject(EntriesStore);
   protected readonly todayLabel = formatDayLabel(inject(NOW)(), inject(LOCALE_ID));
   protected readonly examples = EXAMPLES;
-  protected readonly chipsFor = chipsFor;
+  protected readonly chipsForItem = chipsForItem;
   protected readonly formatMoney = formatMoney;
+
+  /** Item aberto no painel "Quanto foi?", ou {@code null} com o painel fechado. */
+  protected readonly confirming = signal<{ entry: EntryResponse; index: number } | null>(null);
+  /** Aviso curto no topo da lista (lançamento desatualizado, falha ao salvar). */
+  protected readonly notice = signal<string | null>(null);
   protected readonly maxLength = 1000;
 
   protected readonly draft = signal('');
@@ -101,6 +111,31 @@ export class TodayPage implements OnInit {
     field.value = text;
     this.draft.set(text);
     field.focus();
+  }
+
+  protected openConfirm(entry: EntryResponse, index: number): void {
+    this.notice.set(null);
+    this.confirming.set({ entry, index });
+  }
+
+  /**
+   * Fecha o painel na hora (a lista já mostra a resposta) e envia. Se o lançamento tinha mudado,
+   * reabre o painel com a versão nova quando o item ainda precisa de confirmação.
+   */
+  protected async resolve(entryId: string, index: number, request: ResolveItemRequest): Promise<void> {
+    this.confirming.set(null);
+    const result = await this.store.resolve(entryId, index, request);
+    if (result === 'stale') {
+      const fresh = this.store.find(entryId);
+      if (fresh?.items[index]?.needsConfirmation) {
+        this.notice.set('Este lançamento mudou. Confira os dados e salve de novo.');
+        this.confirming.set({ entry: fresh, index });
+      } else {
+        this.notice.set('Este lançamento já tinha sido confirmado.');
+      }
+    } else if (result === 'error') {
+      this.notice.set('Não foi possível salvar a confirmação. Tente de novo.');
+    }
   }
 
   protected async refresh(event: RefresherCustomEvent): Promise<void> {

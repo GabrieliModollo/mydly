@@ -177,11 +177,19 @@ ion-footer {
   color: var(--mydly-muted);
 }
 
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+  margin-top: 6px;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 10px 0 0;
+  margin: 4px 0 0;
   padding: 0;
   list-style: none;
 }

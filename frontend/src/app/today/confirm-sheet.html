@@ -1,0 +1,69 @@
+<form class="sheet" (submit)="save($event)" aria-labelledby="confirm-title">
+  <div class="sheet__top">
+    <span class="chip-attention">Precisa confirmar</span>
+    <button type="button" class="sheet__close" aria-label="Fechar" (click)="closed.emit()">
+      <ion-icon name="close-outline" aria-hidden="true" />
+    </button>
+  </div>
+
+  <h2 id="confirm-title" class="sheet__title">{{ title() }}</h2>
+  <blockquote class="sheet__quote">{{ entry().text }}</blockquote>
+
+  @if (unknown()) {
+    <fieldset class="choice">
+      <legend class="label">Isso foi…</legend>
+      <div class="pills">
+        <button type="button" class="pill" [attr.aria-pressed]="kind() === 'EXPENSE'" (click)="chooseKind('EXPENSE')">
+          Um gasto
+        </button>
+        <button type="button" class="pill" [attr.aria-pressed]="kind() === 'INCOME'" (click)="chooseKind('INCOME')">
+          Uma entrada
+        </button>
+        <button type="button" class="pill" [attr.aria-pressed]="kind() === 'ROUTINE'" (click)="chooseKind('ROUTINE')">
+          Uma rotina
+        </button>
+      </div>
+    </fieldset>
+  }
+
+  @if (isFinance()) {
+    <label class="label" for="confirm-amount">Valor</label>
+    <div class="amount" [class.amount--error]="showAmountError()">
+      <span class="amount__currency" aria-hidden="true">R$</span>
+      <input
+        id="confirm-amount"
+        class="amount__input"
+        type="text"
+        inputmode="decimal"
+        autocomplete="off"
+        placeholder="0,00"
+        [attr.aria-invalid]="showAmountError()"
+        [attr.aria-describedby]="showAmountError() ? 'confirm-amount-error' : null"
+        [value]="amountText()"
+        (input)="onAmountInput($event)"
+      />
+    </div>
+    @if (showAmountError()) {
+      <p id="confirm-amount-error" class="error" role="alert">Use um valor como 8,50.</p>
+    }
+
+    <fieldset class="choice">
+      <legend class="label">Categoria</legend>
+      <div class="pills">
+        @for (option of categories; track option[0]) {
+          <button
+            type="button"
+            class="pill"
+            [attr.aria-pressed]="category() === option[0]"
+            (click)="toggleCategory(option[0])"
+          >
+            {{ option[1] }}
+          </button>
+        }
+      </div>
+    </fieldset>
+  }
+
+  <button type="submit" class="primary" [disabled]="!canSave()">{{ saveLabel() }}</button>
+  <button type="button" class="secondary" (click)="dismiss()">{{ dismissLabel() }}</button>
+</form>

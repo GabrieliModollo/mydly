@@ -11,6 +11,7 @@ const RESPONSE: EntryResponse = {
   occurredAt: '2026-11-05T12:00:00Z',
   status: 'PENDING',
   needsConfirmation: false,
+  version: 0,
   items: [],
 };
 
@@ -33,6 +34,26 @@ describe('EntriesApi', () => {
     const req = http.expectOne('/api/v1/entries');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual(request);
+    req.flush(RESPONSE);
+
+    expect(await result).toEqual(RESPONSE);
+  });
+
+  it('busca um lançamento pelo id', async () => {
+    const result = firstValueFrom(api.get(RESPONSE.id));
+
+    http.expectOne(`/api/v1/entries/${RESPONSE.id}`).flush(RESPONSE);
+
+    expect(await result).toEqual(RESPONSE);
+  });
+
+  it('resolve um item enviando a versão no If-Match', async () => {
+    const result = firstValueFrom(api.resolve(RESPONSE.id, 0, 3, { action: 'DISMISS' }));
+
+    const req = http.expectOne(`/api/v1/entries/${RESPONSE.id}/items/0/resolution`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('If-Match')).toBe('"3"');
+    expect(req.request.body).toEqual({ action: 'DISMISS' });
     req.flush(RESPONSE);
 
     expect(await result).toEqual(RESPONSE);
