@@ -1,0 +1,116 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <div class="header">
+      <p class="header__date">{{ todayLabel }}</p>
+      <h1 class="header__title">Hoje</h1>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content />
+  </ion-refresher>
+
+  <main class="page">
+    <section class="summary" aria-label="Resumo de hoje">
+      <div class="summary__card">
+        <p class="summary__label">Gasto hoje</p>
+        <p class="summary__value">{{ formatMoney(store.summary().spent) }}</p>
+      </div>
+      <div class="summary__card">
+        <p class="summary__label">Hábitos cumpridos</p>
+        <p class="summary__value">{{ store.summary().habitsDone }}</p>
+      </div>
+    </section>
+
+    @if (store.loadState() === 'error') {
+      <div class="banner" role="alert">
+        <ion-icon name="cloud-offline-outline" aria-hidden="true" />
+        <span>Não foi possível carregar seus lançamentos.</span>
+        <button type="button" class="link-button" (click)="store.load()">Tentar de novo</button>
+      </div>
+    }
+
+    @if (store.timeline().length === 0) {
+      @if (store.loadState() === 'loading') {
+        <div class="loading">
+          <ion-spinner name="dots" aria-hidden="true" />
+          <span class="sr-only" role="status">Carregando lançamentos</span>
+        </div>
+      } @else if (store.loadState() === 'loaded') {
+        <section class="empty" aria-labelledby="empty-title">
+          <h2 id="empty-title" class="empty__title">Como foi o seu dia?</h2>
+          <p class="empty__text">Escreva como você falaria. O MyDly entende se é um gasto ou um hábito.</p>
+          <ul class="examples" aria-label="Exemplos de frases">
+            @for (example of examples; track example) {
+              <li>
+                <button type="button" class="example" (click)="useExample(example)">{{ example }}</button>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    } @else {
+      <ul class="timeline" aria-label="Lançamentos de hoje">
+        @for (item of store.timeline(); track item.id) {
+          <li class="entry" [attr.data-sync]="item.sync">
+            <div class="entry__head">
+              <p class="entry__text">{{ item.text }}</p>
+              <time class="entry__time" [attr.datetime]="item.occurredAt">{{ item.occurredAt | date: 'HH:mm' }}</time>
+            </div>
+
+            @if (item.entry) {
+              <ul class="chips" aria-label="O que o MyDly entendeu">
+                @for (chip of chipsFor(item.entry); track $index) {
+                  <li class="chip" [attr.data-tone]="chip.tone">{{ chip.label }}</li>
+                }
+              </ul>
+            }
+
+            <div class="entry__status" aria-live="polite">
+              @switch (item.sync) {
+                @case ('sending') {
+                  <ion-spinner name="dots" aria-hidden="true" />
+                  <span>Enviando…</span>
+                }
+                @case ('failed') {
+                  <span>Não foi enviado.</span>
+                  <button type="button" class="link-button" (click)="store.retry(item.id)">
+                    <ion-icon name="refresh-outline" aria-hidden="true" />
+                    Tentar de novo
+                  </button>
+                }
+                @case ('rejected') {
+                  <span>Não foi possível registrar este lançamento.</span>
+                  <button type="button" class="link-button" (click)="store.dismiss(item.id)">Remover</button>
+                }
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </main>
+</ion-content>
+
+<ion-footer class="ion-no-border">
+  <form class="composer" (submit)="send($event)">
+    <label for="entry-text" class="sr-only">O que aconteceu?</label>
+    <input
+      #entryInput
+      id="entry-text"
+      class="composer__input"
+      type="text"
+      placeholder="O que aconteceu?"
+      autocomplete="off"
+      enterkeyhint="send"
+      [attr.maxlength]="maxLength"
+      (input)="onInput($event)"
+      (keydown.enter)="send($event)"
+    />
+    <button type="submit" class="composer__send" aria-label="Enviar lançamento" [disabled]="!draft().trim()">
+      <ion-icon name="arrow-up" aria-hidden="true" />
+    </button>
+  </form>
+</ion-footer>

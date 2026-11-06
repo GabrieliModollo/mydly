@@ -1,0 +1,19 @@
+/* Estilos globais. O tema (cores, fonte) fica em src/theme/variables.css. */
+
+body {
+  font-family: var(--ion-font-family);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visível só para leitores de tela. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
