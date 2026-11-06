@@ -14,7 +14,7 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 
 | # | Prioridade | Etapa | Escopo | Por que agora |
 | --- | --- | --- | --- | --- |
-| 4 | Alta | Frases compostas | "Fui à academia e gastei 30 no açaí" vira dois itens (o contrato já é uma lista) | Frase comum no uso real |
+| 4 | Alta | Frases compostas | "Fui à academia e gastei 30 no açaí" vira dois itens (o contrato já é uma lista). **Decidido pela autora (2026-11-06):** dividir só quando cada parte tem âncora própria (verbo de ação, valor, unidade ou hábito), e na dúvida fica um item ("Comprei pão e leite por 12 reais" é um gasto); parte sem verbo herda o da anterior ("Gastei 30 no açaí e 20 no uber" são dois gastos). Também: até 5 itens por lançamento, e lançamentos com resolução não são reprocessados (ADR 0007) | Frase comum no uso real |
 | 5 | Média | Módulos `finance` e `routines` | Consomem os lançamentos confirmados por eventos (registro de eventos do Spring Modulith); hábitos com polaridade, resolvendo "Não comi besteira" | Base para estatísticas |
 | 6 | Média | Resumo da semana | Módulo `insights`: hábitos por dia, gastos por categoria, mensagem da semana com tom gentil / direto / bronca, cruzamento rotina × dinheiro | O diferencial do produto |
 | 7 | Média | Offline-first | Fila local no app para lançamentos sem internet, sincronização com o id já gerado | Uso no celular, na rua |
