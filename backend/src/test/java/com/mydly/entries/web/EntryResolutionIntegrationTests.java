@@ -46,7 +46,7 @@ class EntryResolutionIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(header().string("ETag", "\"1\""))
                 .andExpect(jsonPath("$.version").value(1))
-                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.needsConfirmation").value(false))
                 .andExpect(jsonPath("$.items[0].type").value("FINANCE"))
                 .andExpect(jsonPath("$.items[0].direction").value("EXPENSE"))
@@ -63,7 +63,7 @@ class EntryResolutionIntegrationTests {
                        resolution -> 0 ->> 'action'                 AS action,
                        resolution -> 0 -> 'item' ->> 'amount'       AS resolved_amount
                 FROM entry WHERE id = ?""", id);
-        assertThat(row.get("status")).isEqualTo("PENDING");
+        assertThat(row.get("status")).isEqualTo("CONFIRMED");
         assertThat(row.get("version")).isEqualTo(1L);
         assertThat(row.get("parsed_amount")).as("o parser continua sem valor").isNull();
         assertThat(row.get("action")).isEqualTo("CONFIRM_FINANCE");
@@ -110,7 +110,7 @@ class EntryResolutionIntegrationTests {
         resolve(id, 0, "\"0\"", """
                 {"action": "DISMISS"}""")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.text").value("Comprei pão"))
                 .andExpect(jsonPath("$.items[0].dismissed").value(true))
                 .andExpect(jsonPath("$.items[0].resolvedByUser").value(true))
@@ -238,7 +238,7 @@ class EntryResolutionIntegrationTests {
     }
 
     @Test
-    void statusSoVoltaParaPendingQuandoOUltimoItemPendenteEResolvido() throws Exception {
+    void statusSoViraConfirmedQuandoOUltimoItemPendenteEResolvido() throws Exception {
         UUID id = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO entry (id, raw_text, occurred_at, detected_type, parsed_json, confidence, status)
@@ -256,7 +256,7 @@ class EntryResolutionIntegrationTests {
         resolve(id, 1, "\"1\"", """
                 {"action": "DISMISS"}""")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.items[0].amount").value(8.5))
                 .andExpect(jsonPath("$.items[1].dismissed").value(true));
     }
@@ -280,7 +280,7 @@ class EntryResolutionIntegrationTests {
         resolve(id, 1, "\"0\"", """
                 {"action": "CONFIRM_FINANCE", "amount": 8.50, "category": "FOOD"}""")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.needsConfirmation").value(false))
                 .andExpect(jsonPath("$.items[0].resolvedByUser").value(false))
                 .andExpect(jsonPath("$.items[1].amount").value(8.5))

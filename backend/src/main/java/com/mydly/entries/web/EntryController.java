@@ -103,11 +103,12 @@ class EntryController {
 
     @PostMapping("/{id}/items/{index}/resolution")
     @Operation(
-            summary = "Resolve um item que precisa de confirmação",
-            description = "Confirma o item como finança ou rotina, ou o descarta. Vale para itens com confiança "
-                    + "abaixo de 0,50, inclusive os não entendidos. O que o parser entendeu continua guardado "
-                    + "(ADR 0007). Exige If-Match com a versão lida (ETag), para não resolver um item que mudou. "
-                    + "Quando não sobra item pendente, o lançamento sai de NEEDS_INPUT para PENDING.",
+            summary = "Resolve ou reabre um item",
+            description = "Confirma um item pendente como finança ou rotina, ou o descarta. REOPEN faz um item "
+                    + "aceito ou descartado voltar a esperar confirmação (Não foi isso / Desfazer) e o tira de "
+                    + "finance e routines (ADR 0008). O que o parser entendeu continua guardado (ADR 0007). "
+                    + "Exige If-Match com a versão lida (ETag), para não resolver um item que mudou. O lançamento "
+                    + "fica NEEDS_INPUT enquanto algum item estiver pendente e CONFIRMED quando nenhum estiver.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(examples = {
                     @ExampleObject(name = "Confirmar gasto", value =
                             "{\"action\": \"CONFIRM_FINANCE\", \"amount\": 8.50, \"category\": \"FOOD\"}"),
@@ -115,7 +116,8 @@ class EntryController {
                             "{\"action\": \"CONFIRM_FINANCE\", \"amount\": 100, \"direction\": \"INCOME\"}"),
                     @ExampleObject(name = "Confirmar rotina", value =
                             "{\"action\": \"CONFIRM_ROUTINE\", \"quantity\": 2, \"unit\": \"L\"}"),
-                    @ExampleObject(name = "Não foi um gasto", value = "{\"action\": \"DISMISS\"}")})),
+                    @ExampleObject(name = "Não foi um gasto", value = "{\"action\": \"DISMISS\"}"),
+                    @ExampleObject(name = "Não foi isso", value = "{\"action\": \"REOPEN\"}")})),
             responses = {
                     @ApiResponse(responseCode = "200", description = "Item resolvido; o ETag traz a versão nova"),
                     @ApiResponse(responseCode = "400", description = "Dados inválidos, como valor menor ou igual a zero"),
@@ -155,7 +157,7 @@ class EntryController {
         return switch (reason) {
             case ENTRY_NOT_FOUND, ITEM_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case VERSION_MISMATCH -> HttpStatus.PRECONDITION_FAILED;
-            case NOT_PENDING -> HttpStatus.CONFLICT;
+            case NOT_PENDING, ALREADY_PENDING -> HttpStatus.CONFLICT;
             case INVALID -> HttpStatus.BAD_REQUEST;
         };
     }

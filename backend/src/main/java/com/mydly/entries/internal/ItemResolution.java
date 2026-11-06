@@ -14,6 +14,9 @@ public record ItemResolution(ResolutionAction action, ParsedEntry item) {
 
     public ItemResolution {
         Objects.requireNonNull(action, "action");
+        if (action == ResolutionAction.REOPEN) {
+            throw new IllegalArgumentException("reabrir não é uma resolução gravada");
+        }
         if ((action == ResolutionAction.DISMISS) != (item == null)) {
             throw new IllegalArgumentException("só o descarte vem sem item");
         }

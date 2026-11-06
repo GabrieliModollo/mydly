@@ -14,10 +14,24 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  modulith:
+    events:
+      # Eventos que ficaram sem concluir (a aplicação caiu, um consumidor falhou) são reenviados ao subir.
+      republish-outstanding-events-on-restart: true
+      # O evento concluído é apagado: ele traz o texto e o valor do lançamento, que já estão em entry (LGPD).
+      completion-mode: delete
 
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+mydly:
+  events:
+    # Nova tentativa dos eventos entre módulos que ficaram sem concluir (ADR 0008).
+    retry-interval: PT1M
+    retry-older-than: PT1M
+    # Depois disso, um evento incompleto deixa o /actuator/health OUT_OF_SERVICE.
+    stale-after: PT10M
 
 management:
   endpoints:

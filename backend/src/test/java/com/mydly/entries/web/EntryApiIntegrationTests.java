@@ -51,7 +51,7 @@ class EntryApiIntegrationTests {
                 .andExpect(header().string("Location", endsWith("/api/v1/entries/" + id)))
                 .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.text").value("Gastei 50 reais na farmácia"))
-                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.needsConfirmation").value(false))
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].type").value("FINANCE"))
@@ -62,7 +62,7 @@ class EntryApiIntegrationTests {
         assertThat(row.get("raw_text")).isEqualTo("Gastei 50 reais na farmácia");
         assertThat(row.get("detected_type")).isEqualTo("FINANCE");
         assertThat((BigDecimal) row.get("confidence")).isEqualByComparingTo("0.95");
-        assertThat(row.get("status")).isEqualTo("PENDING");
+        assertThat(row.get("status")).isEqualTo("CONFIRMED");
         assertThat(row.get("item_type")).isEqualTo("FINANCE");
         assertThat(row.get("item_amount")).isEqualTo("50");
     }
@@ -79,7 +79,7 @@ class EntryApiIntegrationTests {
                 .andExpect(jsonPath("$.items[0].unit").value("L"))
                 .andExpect(jsonPath("$.items[0].direction").doesNotExist());
 
-        assertThat(row(id)).containsEntry("detected_type", "ROUTINE").containsEntry("status", "PENDING");
+        assertThat(row(id)).containsEntry("detected_type", "ROUTINE").containsEntry("status", "CONFIRMED");
     }
 
     @Test

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import com.mydly.entries.Direction;
+import com.mydly.entries.EntryItemAccepted;
+import com.mydly.entries.EntryItemRetracted;
 import com.mydly.entries.ParsedEntry;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,7 +30,7 @@ class EntryTests {
         Entry entry = entry(FINANCE, ROUTINE);
 
         assertThat(entry.getDetectedType()).isNull();
-        assertThat(entry.getStatus()).isEqualTo(EntryStatus.PENDING);
+        assertThat(entry.getStatus()).isEqualTo(EntryStatus.CONFIRMED);
     }
 
     @Test
@@ -55,7 +57,7 @@ class EntryTests {
     void semResolucaoOItemEfetivoEODoParser() {
         Entry entry = entry(LOW_CONFIDENCE);
 
-        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(LOW_CONFIDENCE, false, false, true));
+        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(LOW_CONFIDENCE, ItemStatus.initial(ItemState.PENDING)));
     }
 
     @Test
@@ -65,9 +67,9 @@ class EntryTests {
 
         entry.resolve(0, ItemResolution.confirmed(confirmed));
 
-        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(confirmed, true, false, false));
+        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(confirmed, new ItemStatus(ItemState.ACCEPTED_BY_USER, 2, false)));
         assertThat(entry.getItems()).containsExactly(LOW_CONFIDENCE);
-        assertThat(entry.getStatus()).isEqualTo(EntryStatus.PENDING);
+        assertThat(entry.getStatus()).isEqualTo(EntryStatus.CONFIRMED);
     }
 
     @Test
@@ -76,7 +78,7 @@ class EntryTests {
 
         entry.resolve(0, ItemResolution.dismissed());
 
-        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(LOW_CONFIDENCE, true, true, false));
+        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(LOW_CONFIDENCE, new ItemStatus(ItemState.DISMISSED, 2, false)));
     }
 
     @Test
@@ -125,7 +127,7 @@ class EntryTests {
 
         assertThat(changed).isTrue();
         assertThat(entry.getItems()).containsExactly(ROUTINE, FINANCE);
-        assertThat(entry.getStatus()).isEqualTo(EntryStatus.PENDING);
+        assertThat(entry.getStatus()).isEqualTo(EntryStatus.CONFIRMED);
         assertThat(entry.getConfidence()).isEqualByComparingTo("0.60");
     }
 
@@ -142,7 +144,117 @@ class EntryTests {
 
         assertThat(changed).isFalse();
         assertThat(entry.getItems()).containsExactly(LOW_CONFIDENCE);
-        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(LOW_CONFIDENCE, true, true, false));
+        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(LOW_CONFIDENCE, new ItemStatus(ItemState.DISMISSED, 2, false)));
+    }
+
+    @Test
+    void itemDeConfiancaSuficienteJaValeEGeraEvento() {
+        Entry entry = entry(FINANCE, LOW_CONFIDENCE);
+
+        assertThat(entry.effectiveItems()).extracting(item -> item.status().state())
+                .containsExactly(ItemState.ACCEPTED_AUTO, ItemState.PENDING);
+        assertThat(entry.getStatus()).isEqualTo(EntryStatus.NEEDS_INPUT);
+        assertThat(entry.pullEvents()).containsExactly(new EntryItemAccepted(entry.getId(), 0, 1, NOW, FINANCE));
+        assertThat(entry.pullEvents()).as("os eventos saem uma vez só").isEmpty();
+    }
+
+    @Test
+    void confirmarUmItemGeraEventoComARevisaoNova() {
+        Entry entry = entry(LOW_CONFIDENCE);
+        ParsedEntry confirmed = ParsedEntry.finance(Direction.EXPENSE, new BigDecimal("8.50"), "z", 1.0);
+        entry.pullEvents();
+
+        entry.resolve(0, ItemResolution.confirmed(confirmed));
+
+        assertThat(entry.pullEvents()).containsExactly(new EntryItemAccepted(entry.getId(), 0, 2, NOW, confirmed));
+        assertThat(entry.getStatus()).isEqualTo(EntryStatus.CONFIRMED);
+    }
+
+    @Test
+    void descartarNaoGeraEvento() {
+        Entry entry = entry(LOW_CONFIDENCE);
+
+        entry.resolve(0, ItemResolution.dismissed());
+
+        assertThat(entry.pullEvents()).isEmpty();
+    }
+
+    @Test
+    void naoFoiIssoRetiraOItemAceitoEVoltaAPedirConfirmacao() {
+        Entry entry = entry(FINANCE);
+        entry.pullEvents();
+
+        entry.reopen(0);
+
+        assertThat(entry.pullEvents()).containsExactly(new EntryItemRetracted(entry.getId(), 0, 2));
+        assertThat(entry.effectiveItems()).containsExactly(
+                new EffectiveItem(FINANCE, new ItemStatus(ItemState.PENDING, 2, true)));
+        assertThat(entry.getStatus()).isEqualTo(EntryStatus.NEEDS_INPUT);
+    }
+
+    @Test
+    void itemReabertoPodeSerConfirmadoComOutroValor() {
+        Entry entry = entry(FINANCE);
+        entry.reopen(0);
+        entry.pullEvents();
+        ParsedEntry corrected = ParsedEntry.finance(Direction.EXPENSE, new BigDecimal("35"), "x", 1.0);
+
+        entry.resolve(0, ItemResolution.confirmed(corrected));
+
+        assertThat(entry.pullEvents()).containsExactly(new EntryItemAccepted(entry.getId(), 0, 3, NOW, corrected));
+        assertThat(entry.effectiveItems().getFirst().item()).isEqualTo(corrected);
+        assertThat(entry.effectiveItems().getFirst().status().parserRejected()).isTrue();
+        assertThat(entry.getStatus()).isEqualTo(EntryStatus.CONFIRMED);
+    }
+
+    @Test
+    void desfazerUmDescarteNaoGeraEvento() {
+        Entry entry = entry(LOW_CONFIDENCE);
+        entry.resolve(0, ItemResolution.dismissed());
+
+        entry.reopen(0);
+
+        assertThat(entry.pullEvents()).isEmpty();
+        assertThat(entry.effectiveItems().getFirst().status())
+                .isEqualTo(new ItemStatus(ItemState.PENDING, 3, false));
+    }
+
+    @Test
+    void naoReabreItemQueJaEstaPendente() {
+        Entry entry = entry(LOW_CONFIDENCE);
+
+        assertThat(reasonOf(() -> entry.reopen(0))).isEqualTo(EntryResolutionException.Reason.ALREADY_PENDING);
+        assertThat(reasonOf(() -> entry.reopen(1))).isEqualTo(EntryResolutionException.Reason.ITEM_NOT_FOUND);
+    }
+
+    @Test
+    void reinterpretarRetiraOsItensAntigosEAceitaOsNovosComRevisaoMaior() {
+        Entry entry = entry(FINANCE);
+        entry.pullEvents();
+
+        entry.reinterpret(List.of(ROUTINE, FINANCE));
+
+        assertThat(entry.pullEvents()).containsExactly(
+                new EntryItemRetracted(entry.getId(), 0, 2),
+                new EntryItemAccepted(entry.getId(), 0, 3, NOW, ROUTINE),
+                new EntryItemAccepted(entry.getId(), 1, 1, NOW, FINANCE));
+    }
+
+    @Test
+    void lancamentoReabertoPeloUsuarioNaoEReprocessado() {
+        Entry entry = entry(FINANCE);
+        entry.reopen(0);
+
+        assertThat(entry.reinterpret(List.of(ROUTINE))).isFalse();
+    }
+
+    @Test
+    void itensAceitosViramEventosParaOBackfill() {
+        Entry entry = entry(FINANCE, LOW_CONFIDENCE, ROUTINE);
+
+        assertThat(entry.acceptedItems()).containsExactly(
+                new EntryItemAccepted(entry.getId(), 0, 1, NOW, FINANCE),
+                new EntryItemAccepted(entry.getId(), 2, 1, NOW, ROUTINE));
     }
 
     @Test

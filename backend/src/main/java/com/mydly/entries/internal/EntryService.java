@@ -15,10 +15,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Recebe lançamentos, interpreta com o {@link EntryParser} e guarda o resultado.
@@ -36,11 +39,16 @@ public class EntryService {
     private final EntryRepository repository;
     private final EntryParser parser;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
+    private final TransactionTemplate transactions;
 
-    EntryService(EntryRepository repository, EntryParser parser, Clock clock) {
+    EntryService(EntryRepository repository, EntryParser parser, Clock clock, ApplicationEventPublisher events,
+                 PlatformTransactionManager transactionManager) {
         this.repository = repository;
         this.parser = parser;
         this.clock = clock;
+        this.events = events;
+        this.transactions = new TransactionTemplate(transactionManager);
     }
 
     /** O que aconteceu com um pedido de criação. */
@@ -80,7 +88,14 @@ public class EntryService {
         Entry entry = Entry.interpreted(entryId, text, requestedOccurredAt != null ? requestedOccurredAt : now,
                 now, parser.parse(text));
         try {
-            return new CreateResult(Outcome.CREATED, repository.saveAndFlush(entry));
+            // Gravação e eventos na mesma transação: o registro de publicação só guarda o evento se o
+            // lançamento for gravado (ADR 0008).
+            Entry saved = transactions.execute(status -> {
+                Entry persisted = repository.saveAndFlush(entry);
+                publish(entry);
+                return persisted;
+            });
+            return new CreateResult(Outcome.CREATED, saved);
         } catch (DataIntegrityViolationException concurrentInsert) {
             // Dois envios simultâneos com o mesmo id: o outro gravou primeiro, então comparamos com o dele.
             return repository.findById(entryId)
@@ -124,12 +139,23 @@ public class EntryService {
         if (entry.getVersion() != expectedVersion) {
             throw versionMismatch();
         }
-        entry.resolve(index, toResolution(command, entry.itemText(index)));
+        if (command.action() == ResolutionAction.REOPEN) {
+            entry.reopen(index);
+        } else {
+            entry.resolve(index, toResolution(command, entry.itemText(index)));
+        }
         try {
-            return repository.saveAndFlush(entry);
+            Entry saved = repository.saveAndFlush(entry);
+            publish(entry);
+            return saved;
         } catch (ObjectOptimisticLockingFailureException concurrentChange) {
             throw versionMismatch();
         }
+    }
+
+    /** Publica os eventos guardados pela entidade, dentro da transação atual. */
+    private void publish(Entry entry) {
+        entry.pullEvents().forEach(events::publishEvent);
     }
 
     private static EntryResolutionException versionMismatch() {
@@ -140,6 +166,7 @@ public class EntryService {
     private static ItemResolution toResolution(ResolveCommand command, String description) {
         try {
             return switch (command.action()) {
+                case REOPEN -> throw new IllegalStateException("reabrir não gera resolução");
                 case DISMISS -> ItemResolution.dismissed();
                 case CONFIRM_FINANCE -> {
                     if (command.amount() == null || command.amount().signum() <= 0) {

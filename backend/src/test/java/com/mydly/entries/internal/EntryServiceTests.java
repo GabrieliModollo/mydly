@@ -15,6 +15,8 @@ import com.mydly.entries.ParsedEntry;
 import com.mydly.entries.internal.EntryService.Outcome;
 import java.math.BigDecimal;
 import java.time.Clock;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.PlatformTransactionManager;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -34,7 +36,9 @@ class EntryServiceTests {
 
     private final EntryRepository repository = mock(EntryRepository.class);
     private final EntryParser parser = mock(EntryParser.class);
-    private final EntryService service = new EntryService(repository, parser, Clock.fixed(NOW, ZoneOffset.UTC));
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final EntryService service = new EntryService(repository, parser, Clock.fixed(NOW, ZoneOffset.UTC),
+            events, mock(PlatformTransactionManager.class));
 
     private final UUID id = UUID.randomUUID();
     private final Entry saved = Entry.interpreted(id, "Gastei 50 reais", NOW_IN_MICROS, NOW_IN_MICROS,
@@ -91,7 +95,8 @@ class EntryServiceTests {
     void hojeEODiaDeSaoPauloMesmoQuandoEmUtcJaEAmanha() {
         // 02:00Z do dia 6 ainda são 23:00 do dia 5 em São Paulo.
         Clock lateNight = Clock.fixed(Instant.parse("2026-11-06T02:00:00Z"), ZoneOffset.UTC);
-        EntryService lateService = new EntryService(repository, parser, lateNight);
+        EntryService lateService = new EntryService(repository, parser, lateNight, events,
+                mock(PlatformTransactionManager.class));
 
         lateService.listByDay(null);
 

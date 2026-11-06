@@ -6,6 +6,7 @@ import com.mydly.entries.EntryType;
 import com.mydly.entries.ParsedEntry;
 import com.mydly.entries.RoutineOutcome;
 import com.mydly.entries.internal.EffectiveItem;
+import com.mydly.entries.internal.ItemState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 
@@ -29,12 +30,18 @@ public record EntryItemResponse(
         @Schema(description = "Confiança da interpretação, de 0 a 1; 1 quando confirmado pelo usuário") double confidence,
         @Schema(description = "Ainda precisa de confirmação do usuário") boolean needsConfirmation,
         @Schema(description = "O usuário confirmou ou descartou este item") boolean resolvedByUser,
-        @Schema(description = "O usuário disse que não era nada a registrar") boolean dismissed) {
+        @Schema(description = "O usuário disse que não era nada a registrar") boolean dismissed,
+        @Schema(description = "PENDING, ACCEPTED_AUTO (aceito pelo parser), ACCEPTED_BY_USER ou DISMISSED")
+        ItemState state,
+        @Schema(description = "Revisão do item; cresce a cada mudança de estado") long revision,
+        @Schema(description = "Pode voltar a esperar confirmação com a ação REOPEN (Não foi isso / Desfazer)")
+        boolean canReopen) {
 
     static EntryItemResponse from(EffectiveItem effective) {
         ParsedEntry item = effective.item();
         return new EntryItemResponse(item.type(), item.direction(), item.outcome(), item.category(), item.amount(),
                 item.quantity(), item.unit(), item.description(), item.confidence(), effective.needsConfirmation(),
-                effective.resolvedByUser(), effective.dismissed());
+                effective.resolvedByUser(), effective.dismissed(), effective.status().state(),
+                effective.status().revision(), effective.canReopen());
     }
 }

@@ -14,6 +14,8 @@ public class EntryResolutionException extends RuntimeException {
         VERSION_MISMATCH,
         /** O item já foi resolvido ou nunca precisou de confirmação. */
         NOT_PENDING,
+        /** Pediu para reabrir um item que já espera confirmação. */
+        ALREADY_PENDING,
         /** Os dados enviados não formam uma resolução válida. */
         INVALID
     }

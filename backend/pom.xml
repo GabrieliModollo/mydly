@@ -57,6 +57,11 @@
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-core</artifactId>
         </dependency>
+        <!-- Registro de publicação de eventos em tabela: nenhum evento entre módulos se perde (ADR 0008). -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-starter-jpa</artifactId>
+        </dependency>
         <!-- Swagger UI para testar a API pelo navegador -->
         <dependency>
             <groupId>org.springdoc</groupId>

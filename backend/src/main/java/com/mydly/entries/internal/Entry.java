@@ -1,5 +1,7 @@
 package com.mydly.entries.internal;
 
+import com.mydly.entries.EntryItemAccepted;
+import com.mydly.entries.EntryItemRetracted;
 import com.mydly.entries.EntryType;
 import com.mydly.entries.ParsedEntry;
 import com.mydly.entries.internal.EntryResolutionException.Reason;
@@ -35,6 +37,10 @@ import org.springframework.data.domain.Persistable;
  * ficam separados (ADR 0007): o primeiro nunca é sobrescrito, e o valor efetivo de cada item é a
  * resolução, quando existe.
  *
+ * <p>Cada item tem um estado e uma revisão ({@code item_state}, ADR 0008). Quando um item passa a
+ * valer ou deixa de valer, a entidade guarda um evento ({@link EntryItemAccepted} ou
+ * {@link EntryItemRetracted}) que o serviço publica na mesma transação da gravação.
+ *
  * <p>O id pode vir do cliente (ADR 0006); por isso a entidade implementa {@link Persistable}
  * e diz ao Spring Data quando é nova, evitando um {@code SELECT} antes de cada inserção.
  */
@@ -63,10 +69,15 @@ public class Entry implements Persistable<UUID> {
     @Column(name = "parsed_json")
     private List<ParsedEntry> items;
 
-    /** Respostas do usuário, alinhadas com {@link #items}; posição {@code null} = não resolvido. */
+    /** Respostas do usuário, alinhadas com {@link #items}; posição {@code null} = sem resposta. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "resolution")
     private List<ItemResolution> resolutions;
+
+    /** Estado e revisão de cada item, alinhados com {@link #items} (ADR 0008). */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "item_state")
+    private List<ItemStatus> statuses;
 
     @Column(name = "confidence", precision = 3, scale = 2)
     private BigDecimal confidence;
@@ -83,6 +94,10 @@ public class Entry implements Persistable<UUID> {
     @Transient
     private boolean isNew;
 
+    /** Eventos ainda não publicados; o serviço os publica depois de gravar. */
+    @Transient
+    private final List<Object> events = new ArrayList<>();
+
     protected Entry() {
         // JPA
     }
@@ -92,53 +107,8 @@ public class Entry implements Persistable<UUID> {
         this.rawText = rawText;
         this.occurredAt = occurredAt;
         this.createdAt = createdAt;
-        applyInterpretation(items);
+        applyInterpretation(items, IntStream.range(0, items.size()).mapToLong(i -> 1).toArray());
         this.isNew = true;
-    }
-
-    private void applyInterpretation(List<ParsedEntry> newItems) {
-        this.items = List.copyOf(newItems);
-        this.detectedType = commonType(newItems);
-        this.confidence = lowestConfidence(newItems);
-        this.status = newItems.stream().anyMatch(ParsedEntry::needsConfirmation)
-                ? EntryStatus.NEEDS_INPUT
-                : EntryStatus.PENDING;
-    }
-
-    /**
-     * Troca o que o parser entendeu por uma interpretação nova do mesmo texto, por exemplo depois de
-     * o parser aprender frases compostas.
-     *
-     * <p>Lançamento com resolução não é reprocessado (ADR 0007): as respostas do usuário são alinhadas
-     * aos itens pela posição, e uma interpretação nova pode ter outro número de itens ou outra ordem.
-     * Reprocessar faria a confirmação de um item valer para outro.
-     *
-     * @return {@code true} se a interpretação foi trocada, {@code false} se o lançamento tem resolução
-     *         e ficou como estava
-     */
-    boolean reinterpret(List<ParsedEntry> newItems) {
-        if (newItems.isEmpty()) {
-            throw new IllegalArgumentException("um lançamento precisa de ao menos um item interpretado");
-        }
-        if (hasResolution()) {
-            return false;
-        }
-        applyInterpretation(newItems);
-        return true;
-    }
-
-    /**
-     * O trecho do texto que gerou o item ({@code comprei pão} em {@code fui à academia e comprei pão}),
-     * ou o texto inteiro sem espaços extras quando o item não tem descrição ou não existe.
-     */
-    String itemText(int index) {
-        String description = index >= 0 && index < items.size() ? items.get(index).description() : null;
-        return description != null ? description : rawText.strip().replaceAll("\\s+", " ");
-    }
-
-    /** {@code true} quando o usuário já respondeu por algum item. */
-    boolean hasResolution() {
-        return resolutions != null && resolutions.stream().anyMatch(Objects::nonNull);
     }
 
     static Entry interpreted(UUID id, String rawText, Instant occurredAt, Instant createdAt,
@@ -147,6 +117,28 @@ public class Entry implements Persistable<UUID> {
             throw new IllegalArgumentException("um lançamento precisa de ao menos um item interpretado");
         }
         return new Entry(id, rawText, occurredAt, createdAt, items);
+    }
+
+    /**
+     * Grava os itens do parser: os de confiança suficiente já valem ({@link ItemState#ACCEPTED_AUTO}) e
+     * geram um evento; os outros esperam o usuário.
+     */
+    private void applyInterpretation(List<ParsedEntry> newItems, long[] revisions) {
+        this.items = List.copyOf(newItems);
+        this.detectedType = commonType(newItems);
+        this.confidence = lowestConfidence(newItems);
+        List<ItemStatus> initial = new ArrayList<>();
+        for (int i = 0; i < newItems.size(); i++) {
+            ItemState state = newItems.get(i).needsConfirmation() ? ItemState.PENDING : ItemState.ACCEPTED_AUTO;
+            initial.add(new ItemStatus(state, revisions[i], false));
+        }
+        this.statuses = Collections.unmodifiableList(initial);
+        for (int i = 0; i < newItems.size(); i++) {
+            if (initial.get(i).state().isAccepted()) {
+                events.add(new EntryItemAccepted(id, i, revisions[i], occurredAt, newItems.get(i)));
+            }
+        }
+        updateStatus();
     }
 
     /** O tipo comum a todos os itens, ou {@code null} se forem mistos ou desconhecidos. */
@@ -168,33 +160,147 @@ public class Entry implements Persistable<UUID> {
     }
 
     private EffectiveItem effectiveItem(int index) {
-        ParsedEntry parsed = items.get(index);
+        ItemStatus itemStatus = statusAt(index);
         ItemResolution resolution = resolutionAt(index);
-        if (resolution == null) {
-            return new EffectiveItem(parsed, false, false, parsed.needsConfirmation());
-        }
-        if (resolution.action() == ResolutionAction.DISMISS) {
-            return new EffectiveItem(parsed, true, true, false);
-        }
-        return new EffectiveItem(resolution.item(), true, false, false);
+        boolean confirmed = itemStatus.state() == ItemState.ACCEPTED_BY_USER && resolution != null
+                && resolution.item() != null;
+        return new EffectiveItem(confirmed ? resolution.item() : items.get(index), itemStatus);
     }
 
     private ItemResolution resolutionAt(int index) {
         return resolutions != null && index < resolutions.size() ? resolutions.get(index) : null;
     }
 
+    private ItemStatus statusAt(int index) {
+        if (statuses != null && index < statuses.size() && statuses.get(index) != null) {
+            return statuses.get(index);
+        }
+        // Sem estado gravado (não acontece depois da V4): deduz como a migração.
+        ItemResolution resolution = resolutionAt(index);
+        if (resolution != null) {
+            return ItemStatus.initial(resolution.action() == ResolutionAction.DISMISS
+                    ? ItemState.DISMISSED
+                    : ItemState.ACCEPTED_BY_USER);
+        }
+        return ItemStatus.initial(items.get(index).needsConfirmation() ? ItemState.PENDING : ItemState.ACCEPTED_AUTO);
+    }
+
     /**
-     * Aplica a resposta do usuário a um item que precisava de confirmação. Quando não sobra
-     * nenhum item pendente, o lançamento sai de {@code NEEDS_INPUT} e volta a {@code PENDING}.
+     * Aplica a resposta do usuário a um item pendente: confirmar faz o item valer e gera
+     * {@link EntryItemAccepted}; descartar não gera evento.
      */
     void resolve(int index, ItemResolution resolution) {
-        if (index < 0 || index >= items.size()) {
-            throw new EntryResolutionException(Reason.ITEM_NOT_FOUND, "O lançamento não tem o item " + index + ".");
-        }
-        if (!effectiveItem(index).needsConfirmation()) {
+        requireItem(index);
+        if (statusAt(index).state() != ItemState.PENDING) {
             throw new EntryResolutionException(Reason.NOT_PENDING,
                     "Este item já foi resolvido ou não precisa de confirmação.");
         }
+        ItemState newState = resolution.action() == ResolutionAction.DISMISS
+                ? ItemState.DISMISSED
+                : ItemState.ACCEPTED_BY_USER;
+        ItemStatus next = statusAt(index).next(newState, false);
+        setResolution(index, resolution);
+        setStatus(index, next);
+        if (newState.isAccepted()) {
+            events.add(new EntryItemAccepted(id, index, next.revision(), occurredAt, resolution.item()));
+        }
+        updateStatus();
+    }
+
+    /**
+     * {@code Não foi isso} ou {@code Desfazer}: o item aceito ou descartado volta a esperar confirmação,
+     * e a resposta anterior do usuário é apagada. Se o item valia, gera {@link EntryItemRetracted};
+     * se o parser o tinha aceitado sozinho, ele fica marcado como rejeitado.
+     */
+    void reopen(int index) {
+        requireItem(index);
+        ItemStatus current = statusAt(index);
+        if (current.state() == ItemState.PENDING) {
+            throw new EntryResolutionException(Reason.ALREADY_PENDING, "Este item já está esperando confirmação.");
+        }
+        ItemStatus next = current.next(ItemState.PENDING, current.state() == ItemState.ACCEPTED_AUTO);
+        setResolution(index, null);
+        setStatus(index, next);
+        if (current.state().isAccepted()) {
+            events.add(new EntryItemRetracted(id, index, next.revision()));
+        }
+        updateStatus();
+    }
+
+    /**
+     * Troca o que o parser entendeu por uma interpretação nova do mesmo texto, por exemplo depois de
+     * o parser aprender frases compostas.
+     *
+     * <p>Lançamento em que o usuário já mexeu (confirmou, descartou ou reabriu algum item) não é
+     * reprocessado (ADR 0007): as respostas dele são alinhadas aos itens pela posição, e uma
+     * interpretação nova pode ter outro número de itens ou outra ordem. Os itens que já valiam são
+     * retirados com {@link EntryItemRetracted}, e os novos aceitos geram {@link EntryItemAccepted}
+     * com uma revisão maior, para os consumidores aplicarem na ordem certa.
+     *
+     * @return {@code true} se a interpretação foi trocada, {@code false} se o usuário já tinha mexido
+     *         no lançamento e ele ficou como estava
+     */
+    boolean reinterpret(List<ParsedEntry> newItems) {
+        if (newItems.isEmpty()) {
+            throw new IllegalArgumentException("um lançamento precisa de ao menos um item interpretado");
+        }
+        if (touchedByUser()) {
+            return false;
+        }
+        long[] revisions = new long[newItems.size()];
+        for (int i = 0; i < items.size(); i++) {
+            ItemStatus old = statusAt(i);
+            if (old.state().isAccepted()) {
+                events.add(new EntryItemRetracted(id, i, old.revision() + 1));
+            }
+            if (i < revisions.length) {
+                revisions[i] = old.revision() + 2;
+            }
+        }
+        for (int i = items.size(); i < revisions.length; i++) {
+            revisions[i] = 1;
+        }
+        applyInterpretation(newItems, revisions);
+        return true;
+    }
+
+    /** {@code true} quando o usuário já respondeu, descartou ou reabriu algum item. */
+    boolean touchedByUser() {
+        boolean answered = resolutions != null && resolutions.stream().anyMatch(Objects::nonNull);
+        return answered || IntStream.range(0, items.size()).anyMatch(i -> statusAt(i).revision() > 1);
+    }
+
+    /**
+     * Os itens que valem agora, como eventos: usado para publicar de novo o que já existia antes
+     * dos módulos {@code finance} e {@code routines} (backfill). Repetir é seguro, porque os
+     * consumidores ignoram revisões já aplicadas.
+     */
+    List<EntryItemAccepted> acceptedItems() {
+        List<EntryItemAccepted> accepted = new ArrayList<>();
+        List<EffectiveItem> effective = effectiveItems();
+        for (int i = 0; i < effective.size(); i++) {
+            ItemStatus itemStatus = effective.get(i).status();
+            if (itemStatus.state().isAccepted()) {
+                accepted.add(new EntryItemAccepted(id, i, itemStatus.revision(), occurredAt, effective.get(i).item()));
+            }
+        }
+        return accepted;
+    }
+
+    /** Devolve e esquece os eventos guardados; quem chama publica. */
+    List<Object> pullEvents() {
+        List<Object> pulled = List.copyOf(events);
+        events.clear();
+        return pulled;
+    }
+
+    private void requireItem(int index) {
+        if (index < 0 || index >= items.size()) {
+            throw new EntryResolutionException(Reason.ITEM_NOT_FOUND, "O lançamento não tem o item " + index + ".");
+        }
+    }
+
+    private void setResolution(int index, ItemResolution resolution) {
         List<ItemResolution> updated = new ArrayList<>(Collections.nCopies(items.size(), (ItemResolution) null));
         for (int i = 0; i < items.size(); i++) {
             updated.set(i, resolutionAt(i));
@@ -202,9 +308,27 @@ public class Entry implements Persistable<UUID> {
         updated.set(index, resolution);
         // Uma lista nova faz o Hibernate perceber a mudança na coluna JSON.
         this.resolutions = Collections.unmodifiableList(updated);
-        if (status == EntryStatus.NEEDS_INPUT && effectiveItems().stream().noneMatch(EffectiveItem::needsConfirmation)) {
-            status = EntryStatus.PENDING;
-        }
+    }
+
+    private void setStatus(int index, ItemStatus itemStatus) {
+        List<ItemStatus> updated = new ArrayList<>(IntStream.range(0, items.size()).mapToObj(this::statusAt).toList());
+        updated.set(index, itemStatus);
+        this.statuses = Collections.unmodifiableList(updated);
+    }
+
+    /** Espera o usuário enquanto algum item estiver pendente; senão, está confirmado. */
+    private void updateStatus() {
+        boolean pending = IntStream.range(0, items.size()).anyMatch(i -> statusAt(i).state() == ItemState.PENDING);
+        this.status = pending ? EntryStatus.NEEDS_INPUT : EntryStatus.CONFIRMED;
+    }
+
+    /**
+     * O trecho do texto que gerou o item ({@code comprei pão} em {@code fui à academia e comprei pão}),
+     * ou o texto inteiro sem espaços extras quando o item não tem descrição ou não existe.
+     */
+    String itemText(int index) {
+        String description = index >= 0 && index < items.size() ? items.get(index).description() : null;
+        return description != null ? description : rawText.strip().replaceAll("\\s+", " ");
     }
 
     @PostLoad
