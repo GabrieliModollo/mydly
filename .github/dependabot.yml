@@ -9,6 +9,22 @@ updates:
         patterns:
           - "org.springframework*"
 
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      angular:
+        patterns:
+          - "@angular/*"
+          - "@angular-devkit/*"
+          - "angular-eslint"
+      ionic-capacitor:
+        patterns:
+          - "@ionic/*"
+          - "@capacitor/*"
+          - "ionicons"
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
