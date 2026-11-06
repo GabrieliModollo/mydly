@@ -10,6 +10,9 @@ MyDly é um app web e mobile de **controle de rotinas e finanças com lançament
 
 Leia antes de mudanças relevantes: `README.md`, `docs/arquitetura.md` e os ADRs em `docs/adr/`.
 
+- **O que fazer a seguir**: `docs/backlog.md`, em ordem de prioridade. Ao concluir uma etapa, atualize o backlog no mesmo PR.
+- **Visual do app**: `docs/design.md` (cores, tipografia, chips e telas, extraídos do protótipo).
+
 ## Estrutura
 
 | Pasta | Conteúdo |

@@ -52,6 +52,8 @@ mydly/
 ├── docs/
 │   ├── arquitetura.md  # visão geral, módulos e modelo de dados
 │   ├── parser.md       # regras e confianças do parser de lançamentos
+│   ├── backlog.md      # próximas etapas, em ordem de prioridade
+│   ├── design.md       # identidade visual e telas do app
 │   └── adr/            # Architecture Decision Records
 ├── docker-compose.yml  # infraestrutura local
 └── .env.example
@@ -81,6 +83,8 @@ curl -X POST http://localhost:8080/api/v1/entries \
 ```
 
 ## Roadmap
+
+O detalhamento e a prioridade de cada etapa estão em [`docs/backlog.md`](docs/backlog.md).
 
 - [ ] **MVP** — campo único de lançamento, parser híbrido, finanças e hábitos básicos, streaks, painel simples
 - [ ] **v2** — metas, insights cruzados, escolha de tom (gentil / direto / bronca), notificações, importação de extrato OFX/CSV
