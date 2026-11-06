@@ -262,6 +262,33 @@ class EntryResolutionIntegrationTests {
     }
 
     @Test
+    void fraseCompostaPedeConfirmacaoSoDoItemAmbiguo() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(post("/api/v1/entries").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"id": "%s", "text": "Fui à academia e comprei pão"}""".formatted(id)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("NEEDS_INPUT"))
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].type").value("ROUTINE"))
+                .andExpect(jsonPath("$.items[0].outcome").value("DONE"))
+                .andExpect(jsonPath("$.items[0].description").value("Fui à academia"))
+                .andExpect(jsonPath("$.items[0].needsConfirmation").value(false))
+                .andExpect(jsonPath("$.items[1].type").value("FINANCE"))
+                .andExpect(jsonPath("$.items[1].description").value("comprei pão"))
+                .andExpect(jsonPath("$.items[1].needsConfirmation").value(true));
+
+        resolve(id, 1, "\"0\"", """
+                {"action": "CONFIRM_FINANCE", "amount": 8.50, "category": "FOOD"}""")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.needsConfirmation").value(false))
+                .andExpect(jsonPath("$.items[0].resolvedByUser").value(false))
+                .andExpect(jsonPath("$.items[1].amount").value(8.5))
+                .andExpect(jsonPath("$.items[1].description").value("comprei pão"))
+                .andExpect(jsonPath("$.items[1].resolvedByUser").value(true));
+    }
+
+    @Test
     void buscaPorIdTrazOEtagDaVersaoAtual() throws Exception {
         UUID id = create("Comprei pão");
         resolve(id, 0, "\"0\"", """

@@ -51,6 +51,7 @@ class EntryController {
                     @ExampleObject(name = "Rotina com quantidade", value = "{\"text\": \"Bebi 2 litros de água\"}"),
                     @ExampleObject(name = "Rotina sem número", value = "{\"text\": \"Dormi bem\"}"),
                     @ExampleObject(name = "Precisa de confirmação", value = "{\"text\": \"Comprei pão\"}"),
+                    @ExampleObject(name = "Frase composta", value = "{\"text\": \"Fui à academia e gastei 30 no açaí\"}"),
                     @ExampleObject(name = "Enviado pelo app offline", value = "{\"id\": \"3f1c2a9e-8b7d-4c6a-9e2f-1a2b3c4d5e6f\", "
                             + "\"text\": \"Estudei durante 2 horas\", \"occurredAt\": \"2026-11-05T21:30:00Z\"}")})),
             responses = {

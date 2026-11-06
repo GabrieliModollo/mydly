@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -57,7 +58,7 @@ public class Entry implements Persistable<UUID> {
     @Column(name = "detected_type", length = 20)
     private EntryType detectedType;
 
-    /** O que o parser entendeu; frases compostas vão gerar mais de um item (ADR 0003, item 4). */
+    /** O que o parser entendeu; uma frase composta gera mais de um item (ADR 0003, item 4). */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "parsed_json")
     private List<ParsedEntry> items;
@@ -91,13 +92,53 @@ public class Entry implements Persistable<UUID> {
         this.rawText = rawText;
         this.occurredAt = occurredAt;
         this.createdAt = createdAt;
-        this.items = List.copyOf(items);
-        this.detectedType = commonType(items);
-        this.confidence = lowestConfidence(items);
-        this.status = items.stream().anyMatch(ParsedEntry::needsConfirmation)
+        applyInterpretation(items);
+        this.isNew = true;
+    }
+
+    private void applyInterpretation(List<ParsedEntry> newItems) {
+        this.items = List.copyOf(newItems);
+        this.detectedType = commonType(newItems);
+        this.confidence = lowestConfidence(newItems);
+        this.status = newItems.stream().anyMatch(ParsedEntry::needsConfirmation)
                 ? EntryStatus.NEEDS_INPUT
                 : EntryStatus.PENDING;
-        this.isNew = true;
+    }
+
+    /**
+     * Troca o que o parser entendeu por uma interpretação nova do mesmo texto, por exemplo depois de
+     * o parser aprender frases compostas.
+     *
+     * <p>Lançamento com resolução não é reprocessado (ADR 0007): as respostas do usuário são alinhadas
+     * aos itens pela posição, e uma interpretação nova pode ter outro número de itens ou outra ordem.
+     * Reprocessar faria a confirmação de um item valer para outro.
+     *
+     * @return {@code true} se a interpretação foi trocada, {@code false} se o lançamento tem resolução
+     *         e ficou como estava
+     */
+    boolean reinterpret(List<ParsedEntry> newItems) {
+        if (newItems.isEmpty()) {
+            throw new IllegalArgumentException("um lançamento precisa de ao menos um item interpretado");
+        }
+        if (hasResolution()) {
+            return false;
+        }
+        applyInterpretation(newItems);
+        return true;
+    }
+
+    /**
+     * O trecho do texto que gerou o item ({@code comprei pão} em {@code fui à academia e comprei pão}),
+     * ou o texto inteiro sem espaços extras quando o item não tem descrição ou não existe.
+     */
+    String itemText(int index) {
+        String description = index >= 0 && index < items.size() ? items.get(index).description() : null;
+        return description != null ? description : rawText.strip().replaceAll("\\s+", " ");
+    }
+
+    /** {@code true} quando o usuário já respondeu por algum item. */
+    boolean hasResolution() {
+        return resolutions != null && resolutions.stream().anyMatch(Objects::nonNull);
     }
 
     static Entry interpreted(UUID id, String rawText, Instant occurredAt, Instant createdAt,

@@ -8,6 +8,7 @@ import com.mydly.entries.EntryType;
 import com.mydly.entries.ParsedEntry;
 import com.mydly.entries.RoutineOutcome;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -249,19 +250,191 @@ class RuleBasedEntryParserTests {
         assertThat(RuleBasedEntryParser.toDecimal("1.250,90")).isEqualTo(new BigDecimal("1250.90"));
     }
 
-    /**
-     * Frases compostas devem gerar vários lançamentos (ADR 0003, item 4). O contrato já devolve
-     * lista, mas o parser ainda trata a frase inteira como um lançamento só; fica para a próxima etapa.
-     */
-    @Disabled("Frases compostas ficam para a próxima etapa")
+    /** Frases compostas geram vários itens (ADR 0003, item 4). */
     @Test
     void separaFraseCompostaEmVariosLancamentos() {
         List<ParsedEntry> result = parser.parse("Fui à academia e gastei 30 no açaí");
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).type()).isEqualTo(EntryType.ROUTINE);
+        assertThat(result.get(0).description()).isEqualTo("Fui à academia");
         assertThat(result.get(1).type()).isEqualTo(EntryType.FINANCE);
         assertThat(result.get(1).amount()).isEqualByComparingTo("30");
+        assertThat(result.get(1).category()).isEqualTo(Category.FOOD);
+        assertThat(result.get(1).description()).isEqualTo("gastei 30 no açaí");
+    }
+
+    /**
+     * Cada linha é: frase | tipos dos itens, na ordem. Só vira item a parte com âncora própria
+     * (verbo de ação, ou número quando o item anterior já tem o seu); na dúvida, fica um item só.
+     */
+    @ParameterizedTest(name = "[{index}] \"{0}\" → {1}")
+    @CsvSource(delimiter = '|', textBlock = """
+            # Cada parte com verbo próprio é um item.
+            Fui à academia e gastei 30 no açaí                | ROUTINE FINANCE
+            Bebi 2 litros de água, estudei 1 hora             | ROUTINE ROUTINE
+            Dormi mal e tomei 2 energéticos                   | ROUTINE ROUTINE
+            Recebi 100 reais e gastei 40 no mercado           | FINANCE FINANCE
+            Fui à academia, bebi 2 litros de água e dormi bem | ROUTINE ROUTINE ROUTINE
+            Fui à academia e depois comi pizza                | ROUTINE ROUTINE
+            Fui à academia e também meditei                   | ROUTINE ROUTINE
+            Fui ao mercado aí gastei 200 reais                | ROUTINE FINANCE
+            Bebi 2 litros de água e não fui à academia        | ROUTINE ROUTINE
+            # Parte só com número herda o verbo quando o item anterior já tem valor ou quantidade.
+            Gastei 30 no açaí e 20 no uber                    | FINANCE FINANCE
+            Paguei 25 no uber; 30 no estacionamento           | FINANCE FINANCE
+            Gastei 30 no açaí, 20 no uber e 10 no pão         | FINANCE FINANCE FINANCE
+            Fiz 30 flexões e 20 abdominais                    | ROUTINE ROUTINE
+            Bebi 2 litros de água e 1 de suco                 | ROUTINE ROUTINE
+            Bebi 2 litros de água e 500ml de suco             | ROUTINE ROUTINE
+            Recebi 100 reais e 50 do freela                   | FINANCE FINANCE
+            # Na dúvida, um item só: a parte completa a anterior.
+            Comprei pão e leite por 12 reais                  | FINANCE
+            Comprei 2 pães e 1 leite                          | FINANCE
+            Arroz e feijão                                    | ROUTINE
+            Ontem, fui à academia                             | ROUTINE
+            # A negação em outra oração fala de outra coisa e não é item.
+            Bebi água, não refrigerante                       | ROUTINE
+            Fui à academia, não faltei                        | ROUTINE
+            # "mas" separa a oração principal, mas não cria item.
+            Fui à academia mas não treinei perna              | ROUTINE
+            # A vírgula do decimal não separa.
+            Paguei 12,50 no estacionamento                    | FINANCE
+            # O "aí" de "açaí" não é separador.
+            Gastei 30 reais em 2 litros de açaí               | FINANCE
+            # Gasto negado não tem valor, então a parte seguinte não herda o verbo.
+            Não gastei 30 no açaí e 20 no uber                | UNKNOWN
+            # O "e" dentro de um número composto não separa.
+            Gastei 30 e 50                                    | FINANCE
+            Gastei 10 reais e 50 centavos                     | FINANCE
+            Estudei 1 hora e 30 minutos                       | ROUTINE
+            Estudei 1 hora e meia                             | ROUTINE
+            Bebi 2 litros e meio                              | ROUTINE
+            Gastei 30 e 50 no mercado e 20 no uber            | FINANCE FINANCE
+            """)
+    void divideFraseCompostaSoQuandoCadaParteTemAncora(String text, String types) {
+        List<EntryType> expected = Arrays.stream(types.split(" ")).map(EntryType::valueOf).toList();
+
+        assertThat(parser.parse(text)).extracting(ParsedEntry::type).containsExactlyElementsOf(expected);
+    }
+
+    /**
+     * Número composto com {@code e}: reais e centavos, horas e minutos, {@code e meia} e {@code e meio}.
+     * Cada linha é: frase | tipo | direção | valor | quantidade | unidade | confiança.
+     */
+    @ParameterizedTest(name = "[{index}] \"{0}\" → {1}")
+    @CsvSource(delimiter = '|', textBlock = """
+            Gastei 30 e 50                       | FINANCE | EXPENSE | 30.50 |      |     | MEDIA
+            Gastei 30 e 50 no mercado            | FINANCE | EXPENSE | 30.50 |      |     | MEDIA
+            Gastei 10 reais e 50 centavos        | FINANCE | EXPENSE | 10.50 |      |     | ALTA
+            Paguei 2 reais e 5 centavos          | FINANCE | EXPENSE | 2.05  |      |     | ALTA
+            Estudei 1 hora e 30 minutos          | ROUTINE |         |       | 1.5  | h   | ALTA
+            Corri 1h e 15min                     | ROUTINE |         |       | 1.25 | h   | ALTA
+            Estudei 1 hora e meia                | ROUTINE |         |       | 1.5  | h   | ALTA
+            Bebi 2 litros e meio                 | ROUTINE |         |       | 2.5  | L   | ALTA
+            Corri 5 quilômetros e meio           | ROUTINE |         |       | 5.5  | km  | ALTA
+            """)
+    void juntaNumeroCompostoComE(String text, EntryType type, Direction direction, BigDecimal amount,
+                                 BigDecimal quantity, String unit, Confidence confidence) {
+        ParsedEntry result = single(text);
+
+        assertParsed(result, type, direction, amount, quantity, unit, confidence);
+        assertThat(result.description()).as("a descrição guarda o texto original").isEqualTo(text);
+    }
+
+    @Test
+    void numeroCompostoNaoImpedeDividirAsOutrasPartes() {
+        List<ParsedEntry> result = parser.parse("Gastei 30 e 50 no mercado e 20 no uber");
+
+        assertThat(result).extracting(ParsedEntry::amount)
+                .usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("30.50"), new BigDecimal("20"));
+        assertThat(result).extracting(ParsedEntry::description)
+                .containsExactly("Gastei 30 e 50 no mercado", "20 no uber");
+    }
+
+    @Test
+    void parteSemVerboHerdaOGastoAnteriorComCategoriaPropria() {
+        List<ParsedEntry> result = parser.parse("Gastei 30 no açaí e 20 no uber");
+
+        assertThat(result).extracting(ParsedEntry::direction).containsExactly(Direction.EXPENSE, Direction.EXPENSE);
+        assertThat(result).extracting(ParsedEntry::amount)
+                .usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("30"), new BigDecimal("20"));
+        assertThat(result).extracting(ParsedEntry::category).containsExactly(Category.FOOD, Category.TRANSPORT);
+        assertThat(result).extracting(ParsedEntry::description).containsExactly("Gastei 30 no açaí", "20 no uber");
+        assertThat(result).noneMatch(ParsedEntry::needsConfirmation);
+    }
+
+    @Test
+    void parteSemVerboHerdaAEntradaAnterior() {
+        List<ParsedEntry> result = parser.parse("Recebi 100 reais e 50 do freela");
+
+        assertThat(result).extracting(ParsedEntry::direction).containsExactly(Direction.INCOME, Direction.INCOME);
+        assertThat(result.get(1).amount()).isEqualByComparingTo("50");
+        assertThat(result.get(1).category()).isEqualTo(Category.WORK);
+    }
+
+    @Test
+    void entradaEGastoNaMesmaFraseTemDirecoesProprias() {
+        List<ParsedEntry> result = parser.parse("Recebi 100 reais e gastei 40 no mercado");
+
+        assertThat(result).extracting(ParsedEntry::direction).containsExactly(Direction.INCOME, Direction.EXPENSE);
+        assertThat(result.get(1).category()).isEqualTo(Category.GROCERIES);
+    }
+
+    @Test
+    void parteSemUnidadeHerdaAUnidadeDaRotinaAnterior() {
+        List<ParsedEntry> result = parser.parse("Bebi 2 litros de água e 1 de suco");
+
+        assertThat(result.get(1).quantity()).isEqualByComparingTo("1");
+        assertThat(result.get(1).unit()).isEqualTo("L");
+        assertThat(result.get(1).outcome()).isEqualTo(RoutineOutcome.DONE);
+        assertThat(result.get(1).description()).isEqualTo("1 de suco");
+        assertThat(result.get(1).needsConfirmation()).isFalse();
+    }
+
+    @Test
+    void negacaoValeSoNaSuaOracao() {
+        List<ParsedEntry> result = parser.parse("Dormi mal e tomei 2 energéticos");
+
+        assertThat(result).extracting(ParsedEntry::outcome).containsExactly(RoutineOutcome.MISSED, RoutineOutcome.DONE);
+        assertThat(result.get(1).quantity()).isEqualByComparingTo("2");
+        assertThat(parser.parse("Bebi 2 litros de água e não fui à academia"))
+                .extracting(ParsedEntry::outcome).containsExactly(RoutineOutcome.DONE, RoutineOutcome.MISSED);
+    }
+
+    @Test
+    void valorQueCompletaAParteAnteriorFicaNumItemSo() {
+        ParsedEntry result = single("Comprei pão e leite por 12 reais");
+
+        assertThat(result.amount()).isEqualByComparingTo("12");
+        assertThat(result.description()).isEqualTo("Comprei pão e leite por 12 reais");
+    }
+
+    @Test
+    void soOItemAmbiguoPedeConfirmacao() {
+        List<ParsedEntry> result = parser.parse("Fui à academia e comprei pão");
+
+        assertThat(result).extracting(ParsedEntry::type).containsExactly(EntryType.ROUTINE, EntryType.FINANCE);
+        assertThat(result).extracting(ParsedEntry::needsConfirmation).containsExactly(false, true);
+    }
+
+    @Test
+    void ateCincoItensPorLancamento() {
+        assertThat(parser.parse("Fui à academia, bebi água, li, meditei e dormi bem"))
+                .hasSize(RuleBasedEntryParser.MAX_ITEMS);
+    }
+
+    @Test
+    void maisDeCincoItensViramUmItemDesconhecidoParaConfirmar() {
+        String text = "Fui à academia, bebi água, li, meditei, corri e dormi bem";
+
+        ParsedEntry result = single(text);
+
+        assertThat(result.type()).isEqualTo(EntryType.UNKNOWN);
+        assertThat(result.description()).isEqualTo(text);
+        assertThat(result.needsConfirmation()).isTrue();
     }
 
     private ParsedEntry single(String text) {

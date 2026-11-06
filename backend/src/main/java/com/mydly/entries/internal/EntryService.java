@@ -124,7 +124,7 @@ public class EntryService {
         if (entry.getVersion() != expectedVersion) {
             throw versionMismatch();
         }
-        entry.resolve(index, toResolution(command, normalizeSpaces(entry.getRawText())));
+        entry.resolve(index, toResolution(command, entry.itemText(index)));
         try {
             return repository.saveAndFlush(entry);
         } catch (ObjectOptimisticLockingFailureException concurrentChange) {

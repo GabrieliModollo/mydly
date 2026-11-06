@@ -12,8 +12,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Regras de consolidação dos itens em um lançamento. Hoje o parser só devolve um item, mas
- * frases compostas vão gerar vários, então os casos com mais de um item já ficam garantidos.
+ * Regras de consolidação dos itens em um lançamento. Frases compostas geram vários itens,
+ * e o lançamento resume todos eles.
  */
 class EntryTests {
 
@@ -115,6 +115,34 @@ class EntryTests {
             return e.reason();
         }
         throw new AssertionError("esperava EntryResolutionException");
+    }
+
+    @Test
+    void lancamentoSemResolucaoPodeSerReinterpretado() {
+        Entry entry = entry(LOW_CONFIDENCE);
+
+        boolean changed = entry.reinterpret(List.of(ROUTINE, FINANCE));
+
+        assertThat(changed).isTrue();
+        assertThat(entry.getItems()).containsExactly(ROUTINE, FINANCE);
+        assertThat(entry.getStatus()).isEqualTo(EntryStatus.PENDING);
+        assertThat(entry.getConfidence()).isEqualByComparingTo("0.60");
+    }
+
+    /**
+     * A resolução é alinhada aos itens pela posição (ADR 0007). Uma interpretação nova pode ter
+     * outro número de itens, e a confirmação do usuário passaria a valer para outro item.
+     */
+    @Test
+    void lancamentoComResolucaoNaoEReprocessado() {
+        Entry entry = entry(LOW_CONFIDENCE);
+        entry.resolve(0, ItemResolution.dismissed());
+
+        boolean changed = entry.reinterpret(List.of(ROUTINE, FINANCE));
+
+        assertThat(changed).isFalse();
+        assertThat(entry.getItems()).containsExactly(LOW_CONFIDENCE);
+        assertThat(entry.effectiveItems()).containsExactly(new EffectiveItem(LOW_CONFIDENCE, true, true, false));
     }
 
     @Test
