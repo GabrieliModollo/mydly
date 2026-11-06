@@ -2,8 +2,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { EntriesApi } from './entries-api';
-import { daySummary } from './entry-format';
-import { EntryItemResponse, EntryResponse, ResolveItemRequest } from './entry.models';
+import { dayInSaoPaulo, summaryFrom } from './entry-format';
+import { DaySummaryResponse, EntryItemResponse, EntryResponse, ItemHabit, ResolveItemRequest } from './entry.models';
 import { randomId } from './random-id';
 
 /** Gera o id de um lançamento novo. Substituível nos testes. */
@@ -63,10 +63,40 @@ export class EntriesStore {
     [...this.entries()].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)),
   );
 
-  /** Totais do dia, só com o que a API já interpretou. */
-  readonly summary = computed(() =>
-    daySummary(this.entries().flatMap((item) => (item.entry ? [item.entry] : []))),
+  /** Resumo do dia vindo da API (finance e routines); {@code null} até a primeira resposta. */
+  private readonly daySummary = signal<DaySummaryResponse | null>(null);
+  private summaryRequests = 0;
+
+  /** Totais dos cartões: o que vale em finance e routines, sem os itens retirados com "Não foi isso". */
+  readonly summary = computed(() => summaryFrom(this.daySummary()));
+
+  /** O hábito do catálogo de cada item de rotina, pela chave {@code entryId:itemIndex}. */
+  private readonly habits = computed(
+    () => new Map((this.daySummary()?.items ?? []).map((habit) => [`${habit.entryId}:${habit.itemIndex}`, habit])),
   );
+
+  /** O hábito em que um item de rotina caiu, quando o resumo do dia já chegou. */
+  habitFor(entryId: string, index: number): ItemHabit | undefined {
+    return this.habits().get(`${entryId}:${index}`);
+  }
+
+  /**
+   * Busca de novo o resumo do dia, sem segurar quem chamou. Os módulos são atualizados antes de a API
+   * responder ao lançamento, então basta chamar depois de cada mudança. Numa falha, os cartões ficam
+   * com o último resumo.
+   */
+  async refreshSummary(): Promise<void> {
+    const request = ++this.summaryRequests;
+    try {
+      const summary = await firstValueFrom(this.api.daySummary(dayInSaoPaulo(this.now())));
+      // Uma resposta antiga que chega depois de uma mais nova não sobrescreve os cartões.
+      if (request === this.summaryRequests) {
+        this.daySummary.set(summary);
+      }
+    } catch {
+      // Os cartões mantêm o último valor; a próxima mudança tenta de novo.
+    }
+  }
 
   /** Busca os lançamentos de hoje, preservando os que ainda não chegaram ao servidor. */
   async load(): Promise<void> {
@@ -77,6 +107,7 @@ export class EntriesStore {
       const notYetOnServer = this.entries().filter((entry) => entry.sync !== 'synced' && !serverIds.has(entry.id));
       this.entries.set([...fromServer.map(toSynced), ...notYetOnServer]);
       this.loadState.set('loaded');
+      void this.refreshSummary();
     } catch {
       this.loadState.set('error');
     }
@@ -114,7 +145,7 @@ export class EntriesStore {
   }
 
   /**
-   * Resolve um item que precisava de confirmação. A tela muda na hora (otimista) e é acertada com a
+   * Resolve um item pendente ou o reabre ({@code REOPEN}: "Não foi isso" ou "Desfazer"). A tela muda na hora (otimista) e é acertada com a
    * resposta da API. Se o lançamento mudou desde a leitura (412) ou o item já foi resolvido (409), o
    * lançamento é recarregado e o resultado é {@code stale}, para a tela reabrir com os dados novos.
    * Em outro erro, a mudança é desfeita.
@@ -127,6 +158,7 @@ export class EntriesStore {
     this.replaceEntry(applyResolution(current, index, request));
     try {
       this.replaceEntry(await firstValueFrom(this.api.resolve(entryId, index, current.version, request)));
+      void this.refreshSummary();
       return 'ok';
     } catch (error) {
       if (error instanceof HttpErrorResponse && (error.status === 412 || error.status === 409)) {
@@ -157,6 +189,7 @@ export class EntriesStore {
         this.api.create({ id: entry.id, text: entry.text, occurredAt: entry.occurredAt }),
       );
       this.entries.update((list) => list.map((item) => (item.id === entry.id ? toSynced(saved) : item)));
+      void this.refreshSummary();
     } catch (error) {
       this.patch(entry.id, { sync: isRetryable(error) ? 'failed' : 'rejected' });
     }
@@ -176,10 +209,21 @@ export function applyResolution(entry: EntryResponse, index: number, request: Re
     if (position !== index) {
       return item;
     }
-    const resolved = { ...item, needsConfirmation: false, resolvedByUser: true };
+    if (request.action === 'REOPEN') {
+      return {
+        ...item,
+        needsConfirmation: true,
+        resolvedByUser: false,
+        dismissed: false,
+        state: 'PENDING',
+        revision: item.revision + 1,
+        canReopen: false,
+      };
+    }
+    const resolved = { ...item, needsConfirmation: false, resolvedByUser: true, revision: item.revision + 1, canReopen: true };
     switch (request.action) {
       case 'DISMISS':
-        return { ...resolved, dismissed: true };
+        return { ...resolved, dismissed: true, state: 'DISMISSED' };
       case 'CONFIRM_FINANCE':
         return {
           ...resolved,
@@ -191,13 +235,23 @@ export function applyResolution(entry: EntryResponse, index: number, request: Re
           quantity: null,
           unit: null,
           confidence: 1,
+          state: 'ACCEPTED_BY_USER',
         };
       case 'CONFIRM_ROUTINE':
-        return { ...resolved, type: 'ROUTINE', direction: null, outcome: 'DONE', category: null, amount: null, confidence: 1 };
+        return {
+          ...resolved,
+          type: 'ROUTINE',
+          direction: null,
+          outcome: 'DONE',
+          category: null,
+          amount: null,
+          confidence: 1,
+          state: 'ACCEPTED_BY_USER',
+        };
     }
   });
   const pending = items.some((item) => item.needsConfirmation);
-  const status = !pending && entry.status === 'NEEDS_INPUT' ? 'PENDING' : entry.status;
+  const status = pending ? 'NEEDS_INPUT' : 'CONFIRMED';
   return { ...entry, items, needsConfirmation: pending, status };
 }
 

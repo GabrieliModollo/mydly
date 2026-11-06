@@ -30,6 +30,9 @@ const PENDING: EntryResponse = {
       needsConfirmation: true,
       resolvedByUser: false,
       dismissed: false,
+      state: 'PENDING',
+      revision: 1,
+      canReopen: false,
     },
   ],
 };
@@ -55,6 +58,7 @@ describe('TodayPage', () => {
       },
       resolve: async () => resolveResult,
       find: () => PENDING,
+      habitFor: () => undefined,
     };
     TestBed.configureTestingModule({
       imports: [TodayPage],
@@ -158,6 +162,7 @@ describe('TodayPage · confirmação', () => {
         return resolveResult;
       },
       find: () => PENDING,
+      habitFor: () => undefined,
     };
     TestBed.configureTestingModule({
       imports: [TodayPage],
@@ -249,6 +254,91 @@ describe('TodayPage · confirmação', () => {
     await fixture.whenStable();
 
     expect(confirming()).toEqual({ entry: compound, index: 1 });
+  });
+
+  /** "Gastei 50 reais na farmácia", aceito pelo parser. */
+  const ACCEPTED: EntryResponse = {
+    ...PENDING,
+    id: 'a',
+    text: 'Gastei 50 reais na farmácia',
+    status: 'CONFIRMED',
+    needsConfirmation: false,
+    items: [
+      {
+        ...PENDING.items[0],
+        amount: 50,
+        category: 'PHARMACY',
+        description: 'Gastei 50 reais na farmácia',
+        confidence: 0.95,
+        needsConfirmation: false,
+        state: 'ACCEPTED_AUTO',
+        canReopen: true,
+      },
+    ],
+  };
+
+  function show(entry: EntryResponse): Promise<void> {
+    timeline.set([{ id: entry.id, text: entry.text, occurredAt: entry.occurredAt, sync: 'synced', entry }]);
+    return fixture.whenStable();
+  }
+
+  function button(text: string): HTMLButtonElement | undefined {
+    return [...fixture.nativeElement.querySelectorAll('button')].find(
+      (b: HTMLButtonElement) => b.textContent?.trim() === text,
+    );
+  }
+
+  it('"Não foi isso" reabre o item e abre o painel para corrigir', async () => {
+    await show(ACCEPTED);
+    const reopen = button('Não foi isso');
+    expect(reopen?.getAttribute('aria-label')).toBe('Não foi isso: Gastei 50 reais na farmácia');
+
+    reopen!.click();
+    await fixture.whenStable();
+
+    expect(resolved).toEqual([['a', 0, { action: 'REOPEN' }]]);
+    expect(fixture.nativeElement.querySelector('[role="status"]')?.textContent).toContain('Removido dos seus números');
+    expect(confirming()).toEqual({ entry: PENDING, index: 0 });
+  });
+
+  it('salvar a correção tira o aviso de "Não foi isso"', async () => {
+    await show(ACCEPTED);
+    button('Não foi isso')!.click();
+    await fixture.whenStable();
+    const page = fixture.componentInstance as unknown as {
+      resolve(id: string, index: number, request: unknown): Promise<void>;
+    };
+
+    await page.resolve('a', 0, { action: 'CONFIRM_FINANCE', amount: 35, direction: 'EXPENSE', category: 'PHARMACY' });
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it('"Desfazer" traz de volta o item descartado sem abrir o painel', async () => {
+    const dismissed: EntryResponse = {
+      ...ACCEPTED,
+      items: [{ ...ACCEPTED.items[0], dismissed: true, resolvedByUser: true, state: 'DISMISSED' }],
+    };
+    await show(dismissed);
+    expect(button('Desfazer')?.getAttribute('aria-label')).toBe('Desfazer descarte: Gastei 50 reais na farmácia');
+
+    button('Desfazer')!.click();
+    await fixture.whenStable();
+
+    expect(resolved).toEqual([['a', 0, { action: 'REOPEN' }]]);
+    expect(confirming()).toBeNull();
+  });
+
+  it('falha ao reabrir avisa e não abre o painel', async () => {
+    resolveResult = 'error';
+    await show(ACCEPTED);
+
+    button('Não foi isso')!.click();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('[role="status"]')?.textContent).toContain('Não foi possível desfazer');
+    expect(confirming()).toBeNull();
   });
 
   it('falha ao salvar mostra aviso e mantém o painel fechado', async () => {

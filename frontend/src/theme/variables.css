@@ -38,6 +38,8 @@
   --mydly-missed-text: #2f323a;
   --mydly-attention-bg: #ede9fe;
   --mydly-attention-text: #5b21b6;
+  --mydly-slip-bg: #ffe4e6;
+  --mydly-slip-text: #9f1239;
   --mydly-neutral-bg: #f1f0ea;
   --mydly-neutral-text: #3f434c;
 
@@ -71,6 +73,8 @@
     --mydly-missed-text: #c4c7cf;
     --mydly-attention-bg: #2e1065;
     --mydly-attention-text: #c4b5fd;
+    --mydly-slip-bg: #4c0519;
+    --mydly-slip-text: #fda4af;
     --mydly-neutral-bg: #23252b;
     --mydly-neutral-text: #c4c7cf;
 

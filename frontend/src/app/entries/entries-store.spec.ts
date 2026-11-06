@@ -2,17 +2,22 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { applyResolution, EntriesStore, NEW_ENTRY_ID, NOW } from './entries-store';
-import { EntryResponse } from './entry.models';
+import { DaySummaryResponse, EntryResponse } from './entry.models';
 
 const URL = '/api/v1/entries';
 const NOW_ISO = '2026-11-05T12:00:00.000Z';
+const SUMMARY_URL = '/api/v1/days/2026-11-05/summary';
+
+function summary(spent: number, habitsAchieved = 0, items: DaySummaryResponse['items'] = []): DaySummaryResponse {
+  return { date: '2026-11-05', spent, received: 0, habitsAchieved, slips: 0, spentByCategory: [], items };
+}
 
 function saved(id: string, text: string, occurredAt = NOW_ISO): EntryResponse {
   return {
     id,
     text,
     occurredAt,
-    status: 'PENDING',
+    status: 'CONFIRMED',
     needsConfirmation: false,
     items: [
       {
@@ -28,6 +33,9 @@ function saved(id: string, text: string, occurredAt = NOW_ISO): EntryResponse {
         needsConfirmation: false,
         resolvedByUser: false,
         dismissed: false,
+        state: 'ACCEPTED_AUTO',
+        revision: 1,
+        canReopen: true,
       },
     ],
     version: 0,
@@ -42,7 +50,17 @@ function pending(id: string, version = 0): EntryResponse {
     status: 'NEEDS_INPUT',
     needsConfirmation: true,
     version,
-    items: [{ ...base.items[0], amount: null, category: 'FOOD', confidence: 0.4, needsConfirmation: true }],
+    items: [
+      {
+        ...base.items[0],
+        amount: null,
+        category: 'FOOD',
+        confidence: 0.4,
+        needsConfirmation: true,
+        state: 'PENDING',
+        canReopen: false,
+      },
+    ],
   };
 }
 
@@ -50,9 +68,20 @@ function confirmed(id: string, version: number): EntryResponse {
   const base = pending(id, version);
   return {
     ...base,
-    status: 'PENDING',
+    status: 'CONFIRMED',
     needsConfirmation: false,
-    items: [{ ...base.items[0], amount: 8.5, confidence: 1, needsConfirmation: false, resolvedByUser: true }],
+    items: [
+      {
+        ...base.items[0],
+        amount: 8.5,
+        confidence: 1,
+        needsConfirmation: false,
+        resolvedByUser: true,
+        state: 'ACCEPTED_BY_USER',
+        revision: 2,
+        canReopen: true,
+      },
+    ],
   };
 }
 
@@ -75,7 +104,20 @@ describe('EntriesStore', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  /** Responde os pedidos de resumo que ficaram abertos; cada teste que se importa com eles responde antes. */
+  afterEach(() => {
+    http.match(SUMMARY_URL).forEach((req) => req.flush(summary(0)));
+    http.verify();
+  });
+
+  /** Espera os pedidos de resumo que o store dispara depois de cada mudança, e responde todos. */
+  async function answerSummary(response: DaySummaryResponse): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve));
+    const requests = http.match(SUMMARY_URL);
+    expect(requests.length).toBeGreaterThan(0);
+    requests.forEach((req) => req.flush(response));
+    await new Promise((resolve) => setTimeout(resolve));
+  }
 
   it('mostra o lançamento na hora, como enviando, e troca pela resposta da API', async () => {
     const sending = store.submit('  50 reais  ');
@@ -165,17 +207,55 @@ describe('EntriesStore', () => {
     ]);
   });
 
-  it('o resumo do dia considera só o que a API já interpretou', async () => {
+  it('os cartões vêm do resumo da API do dia em São Paulo e são recarregados depois de cada lançamento', async () => {
+    expect(store.summary()).toEqual({ spent: 0, habitsDone: 0 });
     const loading = store.load();
     http.expectOne(URL).flush([saved('a', 'Gastei 50 reais')]);
     await loading;
+    await answerSummary(summary(50, 2));
+    expect(store.summary()).toEqual({ spent: 50, habitsDone: 2 });
 
     const sending = store.submit('Gastei 30 reais');
-    expect(store.summary()).toEqual({ spent: 50, habitsDone: 0 });
-
     http.expectOne(URL).flush(saved('id-1', 'Gastei 30 reais'));
     await sending;
-    expect(store.summary()).toEqual({ spent: 100, habitsDone: 0 });
+    await answerSummary(summary(80, 2));
+
+    expect(store.summary()).toEqual({ spent: 80, habitsDone: 2 });
+  });
+
+  it('falha no resumo mantém os cartões como estavam', async () => {
+    const loading = store.load();
+    http.expectOne(URL).flush([]);
+    await loading;
+    await answerSummary(summary(50));
+
+    void store.refreshSummary();
+    http.expectOne(SUMMARY_URL).error(new ProgressEvent('error'));
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect(store.summary().spent).toBe(50);
+  });
+
+  it('resposta de resumo antiga não sobrescreve uma mais nova', async () => {
+    const first = store.refreshSummary();
+    const second = store.refreshSummary();
+    const [old, fresh] = http.match(SUMMARY_URL);
+    fresh.flush(summary(80));
+    old.flush(summary(50));
+    await Promise.all([first, second]);
+
+    expect(store.summary().spent).toBe(80);
+  });
+
+  it('diz o hábito de cada item de rotina', async () => {
+    const loading = store.load();
+    http.expectOne(URL).flush([]);
+    await loading;
+    const habit = { entryId: 'a', itemIndex: 1, habit: 'HYDRATION', habitName: 'Hidratação', polarity: 'GOOD', status: 'ACHIEVED' } as const;
+    await answerSummary(summary(0, 1, [habit]));
+
+    expect(store.habitFor('a', 1)).toEqual(habit);
+    expect(store.habitFor('a', 0)).toBeUndefined();
   });
 
   describe('resolução de itens', () => {
@@ -193,9 +273,14 @@ describe('EntriesStore', () => {
 
       const resolving = store.resolve('p', 0, CONFIRM);
       const optimistic = store.find('p');
-      expect(optimistic?.status).toBe('PENDING');
-      expect(optimistic?.items[0]).toMatchObject({ amount: 8.5, needsConfirmation: false, resolvedByUser: true });
-      expect(store.summary().spent).toBe(8.5);
+      expect(optimistic?.status).toBe('CONFIRMED');
+      expect(optimistic?.items[0]).toMatchObject({
+        amount: 8.5,
+        needsConfirmation: false,
+        resolvedByUser: true,
+        state: 'ACCEPTED_BY_USER',
+        canReopen: true,
+      });
 
       const req = http.expectOne(RESOLVE_URL);
       expect(req.request.headers.get('If-Match')).toBe('"0"');
@@ -203,6 +288,31 @@ describe('EntriesStore', () => {
 
       expect(await resolving).toBe('ok');
       expect(store.find('p')?.version).toBe(1);
+      await answerSummary(summary(8.5));
+      expect(store.summary().spent).toBe(8.5);
+    });
+
+    it('"Não foi isso" volta o item a pendente na hora e recarrega o resumo', async () => {
+      const loading = store.load();
+      http.expectOne(URL).flush([saved('s', 'Gastei 50 reais na farmácia')]);
+      await loading;
+      await answerSummary(summary(50));
+
+      const reopening = store.resolve('s', 0, { action: 'REOPEN' });
+      expect(store.find('s')?.status).toBe('NEEDS_INPUT');
+      expect(store.find('s')?.items[0]).toMatchObject({
+        needsConfirmation: true,
+        state: 'PENDING',
+        revision: 2,
+        canReopen: false,
+      });
+      const req = http.expectOne('/api/v1/entries/s/items/0/resolution');
+      expect(req.request.body).toEqual({ action: 'REOPEN' });
+      req.flush(pending('s', 1));
+      expect(await reopening).toBe('ok');
+
+      await answerSummary(summary(0));
+      expect(store.summary().spent).toBe(0);
     });
 
     it('lançamento desatualizado (412) é recarregado e o resultado avisa a tela', async () => {

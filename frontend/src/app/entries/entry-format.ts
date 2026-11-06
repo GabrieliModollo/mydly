@@ -1,4 +1,4 @@
-import { Category, EntryItemResponse, EntryResponse } from './entry.models';
+import { Category, DaySummaryResponse, EntryItemResponse, EntryResponse, ItemHabit } from './entry.models';
 
 /** Nomes das categorias em português, na ordem em que o app as mostra. */
 export const CATEGORY_LABELS: Record<Category, string> = {
@@ -34,7 +34,7 @@ export function parseAmount(text: string): number | null {
 }
 
 /** Tom visual de um chip; cada um tem fundo e texto próprios no tema (docs/design.md). */
-export type ChipTone = 'expense' | 'income' | 'routine' | 'missed' | 'attention' | 'neutral';
+export type ChipTone = 'expense' | 'income' | 'routine' | 'missed' | 'slip' | 'attention' | 'neutral';
 
 export interface Chip {
   label: string;
@@ -43,9 +43,9 @@ export interface Chip {
 
 /** Totais do dia mostrados nos cartões de resumo. */
 export interface DaySummary {
-  /** Soma das saídas com valor conhecido. */
+  /** Soma das saídas que valem (aceitas pelo parser ou confirmadas), calculada pela API. */
   spent: number;
-  /** Quantidade de rotinas cumpridas; as não cumpridas ficam de fora. */
+  /** Hábitos bons cumpridos mais hábitos ruins evitados, calculados pela API. */
   habitsDone: number;
 }
 
@@ -98,18 +98,46 @@ function routineLabel(item: EntryItemResponse): string {
 }
 
 /**
+ * Chip de uma rotina que caiu num hábito do catálogo (docs/design.md). Num hábito ruim, a ação não
+ * acontecer é conquista ("Evitou besteira") e acontecer é deslize, com cor própria.
+ */
+export function habitChip(item: EntryItemResponse, habit: ItemHabit): Chip | null {
+  if (!habit.habitName || !habit.status) {
+    return null;
+  }
+  const name = habit.habitName;
+  switch (habit.status) {
+    case 'SLIPPED':
+      return { label: `Deslize · ${name}`, tone: 'slip' };
+    case 'MISSED':
+      return { label: `${name} · não cumprido`, tone: 'missed' };
+    case 'ACHIEVED':
+      if (habit.polarity === 'BAD') {
+        return { label: `Evitou ${name.toLowerCase()}`, tone: 'routine' };
+      }
+      return { label: item.quantity === null ? name : `${name} · ${quantityLabel(item)}`, tone: 'routine' };
+  }
+}
+
+function quantityLabel(item: EntryItemResponse): string {
+  const quantity = item.quantity ?? 0;
+  return item.unit === null ? `${formatQuantity(quantity, null)}×` : formatQuantity(quantity, item.unit);
+}
+
+/**
  * Chips de um item. Quando ele precisa de confirmação, mostra só esse aviso: a interpretação ainda é
  * incerta, e um chip como "Saída · valor a definir" só repetiria a dúvida. Finanças ganham também o
- * chip da categoria.
+ * chip da categoria, e rotinas mostram o hábito do catálogo quando ele é conhecido.
  */
-export function chipsForItem(item: EntryItemResponse): Chip[] {
+export function chipsForItem(item: EntryItemResponse, habit?: ItemHabit): Chip[] {
   if (item.needsConfirmation) {
     return [{ label: 'Precisa confirmar', tone: 'attention' }];
   }
   if (item.dismissed) {
     return [{ label: 'Descartado', tone: 'neutral' }];
   }
-  const chips = [itemChip(item)];
+  const fromHabit = item.type === 'ROUTINE' && habit ? habitChip(item, habit) : null;
+  const chips = [fromHabit ?? itemChip(item)];
   if (item.type === 'FINANCE' && item.category) {
     chips.push({ label: CATEGORY_LABELS[item.category], tone: 'neutral' });
   }
@@ -118,16 +146,16 @@ export function chipsForItem(item: EntryItemResponse): Chip[] {
 
 /** Chips de todos os itens de um lançamento. */
 export function chipsFor(entry: EntryResponse): Chip[] {
-  return entry.items.flatMap(chipsForItem);
+  return entry.items.flatMap((item) => chipsForItem(item));
 }
 
-/** Soma das saídas e contagem de rotinas cumpridas dos lançamentos do dia; itens descartados ficam de fora. */
-export function daySummary(entries: EntryResponse[]): DaySummary {
-  const items = entries.flatMap((entry) => entry.items).filter((item) => !item.dismissed);
-  return {
-    spent: items
-      .filter((item) => item.type === 'FINANCE' && item.direction === 'EXPENSE' && item.amount !== null)
-      .reduce((total, item) => total + (item.amount ?? 0), 0),
-    habitsDone: items.filter((item) => item.type === 'ROUTINE' && item.outcome !== 'MISSED').length,
-  };
+/** Os cartões de resumo a partir da resposta da API; zerados enquanto ela não chega. */
+export function summaryFrom(response: DaySummaryResponse | null): DaySummary {
+  return response ? { spent: response.spent, habitsDone: response.habitsAchieved } : { spent: 0, habitsDone: 0 };
+}
+
+/** O dia de uma data em São Paulo, no formato {@code AAAA-MM-DD}, que é o fuso dos totais da API. */
+export function dayInSaoPaulo(date: Date): string {
+  // O locale en-CA formata como AAAA-MM-DD.
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(date);
 }

@@ -201,7 +201,7 @@ ion-footer {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 
-  @each $tone in expense, income, routine, missed, attention, neutral {
+  @each $tone in expense, income, routine, missed, slip, attention, neutral {
     &[data-tone='#{$tone}'] {
       background: var(--mydly-#{$tone}-bg);
       color: var(--mydly-#{$tone}-text);
@@ -241,6 +241,12 @@ ion-footer {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 0.2em;
+
+  // Ação secundária ("Não foi isso", "Desfazer"): menos peso que "Quanto foi?", contraste ainda AA.
+  &--quiet {
+    color: var(--mydly-muted);
+    font-weight: 500;
+  }
 }
 
 .composer {

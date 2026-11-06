@@ -25,6 +25,9 @@ function entryWith(item: Partial<EntryItemResponse>): EntryResponse {
         needsConfirmation: true,
         resolvedByUser: false,
         dismissed: false,
+        state: 'PENDING',
+        revision: 1,
+        canReopen: false,
         ...item,
       },
     ],
@@ -88,6 +91,12 @@ describe('ConfirmSheet', () => {
     const root = await open({ ...base, text: 'Fui à academia e comprei pão', items: [routine, base.items[0]] }, 1);
 
     expect(root.querySelector('blockquote')?.textContent?.trim()).toBe('comprei pão');
+  });
+
+  it('item reaberto com "Não foi isso" já vem com o valor para corrigir', async () => {
+    const root = await open(entryWith({ amount: 50, category: 'PHARMACY' }));
+
+    expect(root.querySelector<HTMLInputElement>('#confirm-amount')?.value).toBe('50,00');
   });
 
   it('só deixa salvar com um valor válido e envia valor, direção e categoria', async () => {

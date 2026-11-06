@@ -1,5 +1,5 @@
-import { chipsFor, chipsForItem, daySummary, formatMoney, formatQuantity, itemChip, parseAmount } from './entry-format';
-import { EntryItemResponse, EntryResponse } from './entry.models';
+import { chipsFor, chipsForItem, dayInSaoPaulo, formatMoney, formatQuantity, itemChip, parseAmount, summaryFrom } from './entry-format';
+import { EntryItemResponse, EntryResponse, ItemHabit } from './entry.models';
 
 function item(overrides: Partial<EntryItemResponse>): EntryItemResponse {
   return {
@@ -15,6 +15,9 @@ function item(overrides: Partial<EntryItemResponse>): EntryItemResponse {
     needsConfirmation: false,
     resolvedByUser: false,
     dismissed: false,
+    state: 'ACCEPTED_AUTO',
+    revision: 1,
+    canReopen: true,
     ...overrides,
   };
 }
@@ -24,7 +27,7 @@ function entry(items: EntryItemResponse[], needsConfirmation = false): EntryResp
     id: crypto.randomUUID(),
     text: 'texto',
     occurredAt: '2026-11-05T12:00:00Z',
-    status: needsConfirmation ? 'NEEDS_INPUT' : 'PENDING',
+    status: needsConfirmation ? 'NEEDS_INPUT' : 'CONFIRMED',
     needsConfirmation,
     version: 0,
     items,
@@ -112,43 +115,81 @@ describe('formatação dos chips', () => {
 });
 
 describe('resumo do dia', () => {
-  it('soma só as saídas com valor e conta as rotinas', () => {
-    const summary = daySummary([
-      entry([item({ amount: 50 })]),
-      entry([item({ amount: 12.5 }), item({ type: 'ROUTINE', direction: null })]),
-      entry([item({ direction: 'INCOME', amount: 100 })]),
-      entry([item({ amount: null, needsConfirmation: true })], true),
-      entry([item({ amount: 999, dismissed: true, resolvedByUser: true })]),
-      entry([item({ type: 'ROUTINE', direction: null, quantity: 2, unit: 'L' })]),
-      entry([item({ type: 'UNKNOWN', direction: null })]),
-    ]);
+  it('vem da API: hábitos cumpridos já somam bons cumpridos e ruins evitados', () => {
+    const response = {
+      date: '2026-11-05',
+      spent: 62.5,
+      received: 100,
+      habitsAchieved: 3,
+      slips: 1,
+      spentByCategory: [],
+      items: [],
+    };
 
-    expect(summary).toEqual({ spent: 62.5, habitsDone: 2 });
+    expect(summaryFrom(response)).toEqual({ spent: 62.5, habitsDone: 3 });
   });
 
-  it('hábito não cumprido não conta como cumprido', () => {
-    const summary = daySummary([
-      entry([item({ type: 'ROUTINE', direction: null, outcome: 'DONE' })]),
-      entry([item({ type: 'ROUTINE', direction: null, outcome: 'MISSED' })]),
-    ]);
-
-    expect(summary.habitsDone).toBe(1);
+  it('fica zerado enquanto a API não responde', () => {
+    expect(summaryFrom(null)).toEqual({ spent: 0, habitsDone: 0 });
   });
 
-  it('frase composta conta cada item: "Gastei 30 no açaí e 20 no uber" e "Dormi mal e fui à academia"', () => {
-    const summary = daySummary([
-      entry([item({ amount: 30, category: 'FOOD' }), item({ amount: 20, category: 'TRANSPORT' })]),
-      entry([
-        item({ type: 'ROUTINE', direction: null, outcome: 'MISSED' }),
-        item({ type: 'ROUTINE', direction: null, outcome: 'DONE' }),
-      ]),
-    ]);
+  it('o dia é o de São Paulo, mesmo quando em UTC já é amanhã', () => {
+    // 02:00Z do dia 6 ainda são 23:00 do dia 5 em São Paulo.
+    expect(dayInSaoPaulo(new Date('2026-11-06T02:00:00Z'))).toBe('2026-11-05');
+    expect(dayInSaoPaulo(new Date('2026-11-06T03:00:00Z'))).toBe('2026-11-06');
+  });
+});
 
-    expect(summary).toEqual({ spent: 50, habitsDone: 1 });
+describe('chip do hábito', () => {
+  const routine = item({ type: 'ROUTINE', direction: null, outcome: 'DONE', quantity: 2, unit: 'L' });
+
+  function habit(overrides: Partial<ItemHabit>): ItemHabit {
+    return {
+      entryId: 'e',
+      itemIndex: 0,
+      habit: 'HYDRATION',
+      habitName: 'Hidratação',
+      polarity: 'GOOD',
+      status: 'ACHIEVED',
+      ...overrides,
+    };
+  }
+
+  it('hábito bom cumprido mostra o nome do hábito e a quantidade', () => {
+    expect(chipsForItem(routine, habit({}))).toEqual([{ label: 'Hidratação · 2 L', tone: 'routine' }]);
   });
 
-  it('dia vazio tem tudo zerado', () => {
-    expect(daySummary([])).toEqual({ spent: 0, habitsDone: 0 });
+  it('hábito ruim evitado é conquista: "Não comi besteira"', () => {
+    const chips = chipsForItem(
+      item({ type: 'ROUTINE', direction: null, outcome: 'MISSED' }),
+      habit({ habitName: 'Besteira', polarity: 'BAD', status: 'ACHIEVED' }),
+    );
+
+    expect(chips).toEqual([{ label: 'Evitou besteira', tone: 'routine' }]);
+  });
+
+  it('hábito ruim consumido é deslize, com cor própria', () => {
+    const chips = chipsForItem(
+      item({ type: 'ROUTINE', direction: null, outcome: 'DONE', quantity: 2 }),
+      habit({ habitName: 'Energético', polarity: 'BAD', status: 'SLIPPED' }),
+    );
+
+    expect(chips).toEqual([{ label: 'Deslize · Energético', tone: 'slip' }]);
+  });
+
+  it('hábito bom não cumprido diz qual hábito faltou', () => {
+    const chips = chipsForItem(
+      item({ type: 'ROUTINE', direction: null, outcome: 'MISSED' }),
+      habit({ habitName: 'Academia', status: 'MISSED' }),
+    );
+
+    expect(chips).toEqual([{ label: 'Academia · não cumprido', tone: 'missed' }]);
+  });
+
+  it('rotina fora do catálogo continua com o chip de rotina', () => {
+    expect(chipsForItem(routine, habit({ habit: null, habitName: null, polarity: null, status: null }))).toEqual([
+      { label: 'Rotina · 2 L', tone: 'routine' },
+    ]);
   });
 });
 

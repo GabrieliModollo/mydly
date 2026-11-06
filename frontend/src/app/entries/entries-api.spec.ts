@@ -9,7 +9,7 @@ const RESPONSE: EntryResponse = {
   id: '3f1c2a9e-8b7d-4c6a-9e2f-1a2b3c4d5e6f',
   text: '50 reais',
   occurredAt: '2026-11-05T12:00:00Z',
-  status: 'PENDING',
+  status: 'CONFIRMED',
   needsConfirmation: false,
   version: 0,
   items: [],
@@ -57,6 +57,15 @@ describe('EntriesApi', () => {
     req.flush(RESPONSE);
 
     expect(await result).toEqual(RESPONSE);
+  });
+
+  it('busca o resumo do dia pela data', async () => {
+    const summary = { date: '2026-11-05', spent: 0, received: 0, habitsAchieved: 0, slips: 0, spentByCategory: [], items: [] };
+    const result = firstValueFrom(api.daySummary('2026-11-05'));
+
+    http.expectOne('/api/v1/days/2026-11-05/summary').flush(summary);
+
+    expect(await result).toEqual(summary);
   });
 
   it('lista os lançamentos de hoje sem informar data', async () => {

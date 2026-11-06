@@ -5,7 +5,8 @@
 
 export type EntryType = 'FINANCE' | 'ROUTINE' | 'UNKNOWN';
 export type Direction = 'EXPENSE' | 'INCOME';
-export type EntryStatus = 'PENDING' | 'CONFIRMED' | 'NEEDS_INPUT';
+export type EntryStatus = 'CONFIRMED' | 'NEEDS_INPUT';
+export type ItemState = 'PENDING' | 'ACCEPTED_AUTO' | 'ACCEPTED_BY_USER' | 'DISMISSED';
 export type RoutineOutcome = 'DONE' | 'MISSED';
 export type Category =
   | 'FOOD'
@@ -36,6 +37,9 @@ export interface EntryItemResponse {
   resolvedByUser: boolean;
   /** O usuário disse que não era nada a registrar. */
   dismissed: boolean;
+  state: ItemState;
+  revision: number;
+  canReopen: boolean;
 }
 
 export interface EntryResponse {
@@ -58,4 +62,29 @@ export interface CreateEntryRequest {
 export type ResolveItemRequest =
   | { action: 'CONFIRM_FINANCE'; amount: number; direction: Direction; category: Category | null }
   | { action: 'CONFIRM_ROUTINE' }
-  | { action: 'DISMISS' };
+  | { action: 'DISMISS' }
+  | { action: 'REOPEN' };
+
+export type Polarity = 'GOOD' | 'BAD';
+export type HabitStatus = 'ACHIEVED' | 'SLIPPED' | 'MISSED';
+
+/** Hábito do catálogo em que um item de rotina caiu; {@code habit} nulo = outros. */
+export interface ItemHabit {
+  entryId: string;
+  itemIndex: number;
+  habit: string | null;
+  habitName: string | null;
+  polarity: Polarity | null;
+  status: HabitStatus | null;
+}
+
+/** Espelha o DaySummaryResponse do backend (GET /api/v1/days/{date}/summary). */
+export interface DaySummaryResponse {
+  date: string;
+  spent: number;
+  received: number;
+  habitsAchieved: number;
+  slips: number;
+  spentByCategory: { category: Category | null; amount: number }[];
+  items: ItemHabit[];
+}

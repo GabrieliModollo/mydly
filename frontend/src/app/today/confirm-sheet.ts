@@ -64,7 +64,8 @@ export class ConfirmSheet {
       const item = this.item();
       this.kind.set(item.type === 'FINANCE' ? (item.direction ?? 'EXPENSE') : item.type === 'ROUTINE' ? 'ROUTINE' : null);
       this.category.set(item.category);
-      this.amountText.set('');
+      // Item reaberto com "Não foi isso" já traz o valor, para corrigir em vez de digitar de novo.
+      this.amountText.set(item.amount !== null ? item.amount.toFixed(2).replace('.', ',') : '');
     });
   }
 

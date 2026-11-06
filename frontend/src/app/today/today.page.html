@@ -78,7 +78,7 @@
                         : 'O que o MyDly entendeu'
                     "
                   >
-                    @for (chip of chipsForItem(parsed); track $index) {
+                    @for (chip of chipsForItem(parsed, store.habitFor(saved.id, index)); track $index) {
                       <li class="chip" [attr.data-tone]="chip.tone">{{ chip.label }}</li>
                     }
                   </ul>
@@ -86,6 +86,15 @@
                     <button type="button" class="link-button" (click)="openConfirm(saved, index)">
                       {{ parsed.type === 'UNKNOWN' ? 'O que foi isso?' : 'Quanto foi?' }}
                       <span aria-hidden="true">→</span>
+                    </button>
+                  } @else if (parsed.canReopen) {
+                    <button
+                      type="button"
+                      class="link-button link-button--quiet"
+                      [attr.aria-label]="reopenLabel(parsed)"
+                      (click)="reopen(saved, index)"
+                    >
+                      {{ parsed.dismissed ? 'Desfazer' : 'Não foi isso' }}
                     </button>
                   }
                 </div>

@@ -1,7 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { CreateEntryRequest, EntryResponse, ResolveItemRequest } from './entry.models';
+import { CreateEntryRequest, DaySummaryResponse, EntryResponse, ResolveItemRequest } from './entry.models';
 
 /** Acesso HTTP à API de lançamentos. O caminho é relativo: proxy no ng serve, nginx no Docker. */
 @Injectable({ providedIn: 'root' })
@@ -18,6 +18,11 @@ export class EntriesApi {
   /** Lançamentos de hoje (no fuso de São Paulo, definido pelo servidor), do mais recente ao mais antigo. */
   listToday(): Observable<EntryResponse[]> {
     return this.http.get<EntryResponse[]>(EntriesApi.BASE_URL);
+  }
+
+  /** Resumo de um dia ({@code AAAA-MM-DD}): gasto, hábitos cumpridos, deslizes e o hábito de cada item. */
+  daySummary(date: string): Observable<DaySummaryResponse> {
+    return this.http.get<DaySummaryResponse>(`/api/v1/days/${date}/summary`);
   }
 
   /** Um lançamento, na versão atual. */
