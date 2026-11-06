@@ -66,7 +66,8 @@ class RuleBasedEntryParser implements EntryParser {
 
     /** Alternativas mais longas primeiro, para "ml" não virar "l" e "horas" não virar "h". */
     private static final Pattern QUANTITY_WITH_UNIT = Pattern.compile(
-            NUMBER + "\\s*(mililitros?|litros?|ml|l|horas?|hrs?|h|minutos?|min|quilometros?|km|copos?)\\b");
+            NUMBER + "\\s*(mililitros?|litros?|ml|l|horas?|hrs?|h|minutos?|min|quilometros?|km"
+                    + "|quilogramas?|quilos?|kg|copos?)\\b");
 
     /** Horário do relógio: {@code às 6h}, {@code das 7 horas}, {@code pelas 22h30}. */
     private static final Pattern CLOCK_TIME = Pattern.compile(
@@ -97,6 +98,8 @@ class RuleBasedEntryParser implements EntryParser {
             Map.entry("h", "h"),
             Map.entry("minuto", "min"), Map.entry("minutos", "min"), Map.entry("min", "min"),
             Map.entry("quilometro", "km"), Map.entry("quilometros", "km"), Map.entry("km", "km"),
+            Map.entry("quilograma", "kg"), Map.entry("quilogramas", "kg"), Map.entry("quilo", "kg"),
+            Map.entry("quilos", "kg"), Map.entry("kg", "kg"),
             Map.entry("copo", "copo"), Map.entry("copos", "copo"));
 
     @Override

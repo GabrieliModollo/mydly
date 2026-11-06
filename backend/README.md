@@ -28,7 +28,7 @@ cd backend
 mvn spring-boot:run
 ```
 
-Saúde da aplicação: <http://localhost:8080/actuator/health>.
+Saúde da aplicação: <http://localhost:8080/actuator/health>. API e exemplos: <http://localhost:8080/swagger-ui.html>.
 
 Para subir tudo em containers: `docker compose up --build` na raiz.
 

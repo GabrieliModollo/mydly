@@ -13,7 +13,7 @@ import java.util.Objects;
  * @param quantity    quantidade medida ou contada (2 em {@code 2 litros}, 30 em {@code 30 flexões});
  *                    só em {@link EntryType#ROUTINE}
  * @param unit        unidade normalizada da quantidade ({@code L}, {@code mL}, {@code h}, {@code min},
- *                    {@code km}, {@code copo}), ou {@code null} quando a quantidade é uma contagem
+ *                    {@code km}, {@code kg}, {@code copo}), ou {@code null} quando a quantidade é uma contagem
  * @param description texto do lançamento sem espaços extras, ou {@code null} quando a frase
  *                    é só o valor (ex.: {@code 50 reais}) e a categoria precisa ser perguntada depois
  * @param confidence  confiança da interpretação, de 0 a 1; abaixo de {@link #ASK_THRESHOLD}

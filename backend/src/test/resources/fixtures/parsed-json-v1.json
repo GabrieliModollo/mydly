@@ -1,0 +1,7 @@
+[
+  {"type": "FINANCE", "unit": null, "amount": 50, "quantity": null, "direction": "EXPENSE", "confidence": 0.95, "description": "Gastei 50 reais na farmácia"},
+  {"type": "FINANCE", "unit": null, "amount": 3000, "quantity": null, "direction": "INCOME", "confidence": 0.7, "description": "Caiu o salário de 3.000"},
+  {"type": "ROUTINE", "unit": "L", "amount": null, "quantity": 2, "direction": null, "confidence": 0.9, "description": "Bebi 2 litros de água"},
+  {"type": "ROUTINE", "unit": null, "amount": null, "quantity": 30, "direction": null, "confidence": 0.5, "description": "Fiz 30 flexões"},
+  {"type": "UNKNOWN", "unit": null, "amount": null, "quantity": null, "direction": null, "confidence": 0.3, "description": "Acordei as 6"}
+]

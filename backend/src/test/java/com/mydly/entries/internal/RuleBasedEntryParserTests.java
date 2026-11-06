@@ -84,6 +84,10 @@ class RuleBasedEntryParserTests {
             Corri 5,5km                              | ROUTINE |         |       | 5.5 | km   | ALTA
             Meditei 15 minutos                       | ROUTINE |         |       | 15  | min  | ALTA
             Bebi 3 copos de água                     | ROUTINE |         |       | 3   | copo | ALTA
+            # Peso: unidade vence o sinal de entrada, "ganhei 2 kg" não é dinheiro.
+            Pesei 72,5 kg                            | ROUTINE |         |       | 72.5| kg   | ALTA
+            Ganhei 2 kg                              | ROUTINE |         |       | 2   | kg   | ALTA
+            Perdi 1 quilo                            | ROUTINE |         |       | 1   | kg   | ALTA
             # Ponto decimal também é aceito quando não parece milhar.
             Bebi 2.5 litros                          | ROUTINE |         |       | 2.5 | L    | ALTA
             # Maiúsculas e acentos não mudam a interpretação.
