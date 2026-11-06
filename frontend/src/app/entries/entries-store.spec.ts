@@ -15,7 +15,16 @@ function saved(id: string, text: string, occurredAt = NOW_ISO): EntryResponse {
     status: 'PENDING',
     needsConfirmation: false,
     items: [
-      { type: 'FINANCE', direction: 'EXPENSE', amount: 50, quantity: null, unit: null, description: text, confidence: 0.95 },
+      {
+        type: 'FINANCE',
+        direction: 'EXPENSE',
+        outcome: null,
+        amount: 50,
+        quantity: null,
+        unit: null,
+        description: text,
+        confidence: 0.95,
+      },
     ],
   };
 }

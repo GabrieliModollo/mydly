@@ -1,7 +1,7 @@
 import { EntryItemResponse, EntryResponse } from './entry.models';
 
 /** Tom visual de um chip; cada um tem fundo e texto próprios no tema (docs/design.md). */
-export type ChipTone = 'expense' | 'income' | 'routine' | 'attention' | 'neutral';
+export type ChipTone = 'expense' | 'income' | 'routine' | 'missed' | 'attention' | 'neutral';
 
 export interface Chip {
   label: string;
@@ -12,7 +12,7 @@ export interface Chip {
 export interface DaySummary {
   /** Soma das saídas com valor conhecido. */
   spent: number;
-  /** Quantidade de rotinas registradas. */
+  /** Quantidade de rotinas cumpridas; as não cumpridas ficam de fora. */
   habitsDone: number;
 }
 
@@ -48,7 +48,9 @@ export function itemChip(item: EntryItemResponse): Chip {
       return { label: `${kind} · ${value}`, tone: income ? 'income' : 'expense' };
     }
     case 'ROUTINE':
-      return { label: routineLabel(item), tone: 'routine' };
+      return item.outcome === 'MISSED'
+        ? { label: 'Rotina · não cumprido', tone: 'missed' }
+        : { label: routineLabel(item), tone: 'routine' };
     default:
       return { label: 'Não entendi', tone: 'neutral' };
   }
@@ -73,13 +75,13 @@ export function chipsFor(entry: EntryResponse): Chip[] {
   return entry.items.map(itemChip);
 }
 
-/** Soma das saídas e contagem de rotinas dos lançamentos do dia. */
+/** Soma das saídas e contagem de rotinas cumpridas dos lançamentos do dia. */
 export function daySummary(entries: EntryResponse[]): DaySummary {
   const items = entries.flatMap((entry) => entry.items);
   return {
     spent: items
       .filter((item) => item.type === 'FINANCE' && item.direction === 'EXPENSE' && item.amount !== null)
       .reduce((total, item) => total + (item.amount ?? 0), 0),
-    habitsDone: items.filter((item) => item.type === 'ROUTINE').length,
+    habitsDone: items.filter((item) => item.type === 'ROUTINE' && item.outcome !== 'MISSED').length,
   };
 }

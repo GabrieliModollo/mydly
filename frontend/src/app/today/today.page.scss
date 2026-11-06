@@ -193,11 +193,16 @@ ion-footer {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 
-  @each $tone in expense, income, routine, attention, neutral {
+  @each $tone in expense, income, routine, missed, attention, neutral {
     &[data-tone='#{$tone}'] {
       background: var(--mydly-#{$tone}-bg);
       color: var(--mydly-#{$tone}-text);
     }
+  }
+
+  // O rótulo já diz "não cumprido"; o risco reforça sem depender da cor.
+  &[data-tone='missed'] {
+    text-decoration: line-through;
   }
 }
 

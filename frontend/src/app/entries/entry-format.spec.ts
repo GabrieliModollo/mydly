@@ -5,6 +5,7 @@ function item(overrides: Partial<EntryItemResponse>): EntryItemResponse {
   return {
     type: 'FINANCE',
     direction: 'EXPENSE',
+    outcome: null,
     amount: null,
     quantity: null,
     unit: null,
@@ -65,6 +66,16 @@ describe('formatação dos chips', () => {
     expect(itemChip(item({ type: 'ROUTINE', direction: null, quantity: 30 })).label).toBe('Rotina · 30×');
   });
 
+  it('mostra hábito não cumprido com tom e rótulo próprios, mesmo com quantidade', () => {
+    expect(itemChip(item({ type: 'ROUTINE', direction: null, outcome: 'MISSED' }))).toEqual({
+      label: 'Rotina · não cumprido',
+      tone: 'missed',
+    });
+    expect(
+      itemChip(item({ type: 'ROUTINE', direction: null, outcome: 'MISSED', quantity: 2, unit: 'L' })).label,
+    ).toBe('Rotina · não cumprido');
+  });
+
   it('assume quando não entendeu, em tom neutro', () => {
     expect(itemChip(item({ type: 'UNKNOWN', direction: null }))).toEqual({ label: 'Não entendi', tone: 'neutral' });
   });
@@ -94,6 +105,15 @@ describe('resumo do dia', () => {
     ]);
 
     expect(summary).toEqual({ spent: 62.5, habitsDone: 2 });
+  });
+
+  it('hábito não cumprido não conta como cumprido', () => {
+    const summary = daySummary([
+      entry([item({ type: 'ROUTINE', direction: null, outcome: 'DONE' })]),
+      entry([item({ type: 'ROUTINE', direction: null, outcome: 'MISSED' })]),
+    ]);
+
+    expect(summary.habitsDone).toBe(1);
   });
 
   it('dia vazio tem tudo zerado', () => {
