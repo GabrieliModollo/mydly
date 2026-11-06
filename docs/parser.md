@@ -10,6 +10,7 @@ Como o MyDly interpreta um lançamento em texto livre usando só regras locais, 
 | --- | --- |
 | `type` | `FINANCE`, `ROUTINE` ou `UNKNOWN` |
 | `direction` | `EXPENSE` (padrão) ou `INCOME`. Só existe em `FINANCE` |
+| `outcome` | `DONE` (padrão) ou `MISSED`, se o hábito foi cumprido. Só existe em `ROUTINE`. Itens gravados antes do campo existir são lidos como `DONE` |
 | `amount` | Valor em reais (`BigDecimal`). Só em `FINANCE`, e pode faltar |
 | `quantity` / `unit` | Quantidade em `ROUTINE`. A unidade é normalizada (`L`, `mL`, `h`, `min`, `km`, `kg`, `copo`) ou fica nula quando é uma contagem ("30 flexões") |
 | `description` | Texto original sem espaços extras, ou nulo quando a frase é só o valor ("50 reais") |
@@ -28,6 +29,7 @@ As regras são avaliadas em ordem, e a primeira que casa decide:
 | # | Regra | Exemplo | Resultado | Confiança |
 | --- | --- | --- | --- | --- |
 | 1 | Texto vazio, sem letras nem números ou só com horário | `""`, `?!`, `às 6h` | `UNKNOWN` | 0,00 |
+| 1b | Verbo de finança negado (`não`, `nem` ou `nunca` + gastei, paguei, comprei, recebi...) | `Não gastei nada hoje`, `Não gastei 50 reais` | `UNKNOWN` | 0,30 |
 | 2 | Número com marcador monetário (`R$`, `reais`, `real`, `conto(s)`) | `R$50`, `1 real`, `Recebi 100 reais` | `FINANCE` com valor | 0,95 |
 | 3 | Número com unidade de medida (vence os sinais de finança: `ganhei 2 kg` é peso) | `2 litros`, `500ml`, `2h`, `30min`, `5,5km`, `72,5 kg`, `3 copos` | `ROUTINE` com quantidade e unidade | 0,90 |
 | 4 | Número sozinho | `50`, `1.250,90` | `FINANCE` com valor | 0,80 |
@@ -44,6 +46,24 @@ As regras são avaliadas em ordem, e a primeira que casa decide:
 
 **Números.** O parser aceita o formato brasileiro (`1.250,90` vira 1250,90) e o ponto decimal (`2.5`). Um ponto seguido de exatamente três dígitos é separador de milhar (`1.250` vira 1250).
 
+**Finança negada (regra 1b).** "Não gastei nada hoje" nunca vira um gasto nem uma entrada, com ou sem valor. O parser não modela um "dia sem gastos", então a frase vai para o fallback com confiança baixa. É melhor perguntar do que registrar um gasto que não existiu.
+
+## Hábito cumprido ou não
+
+Toda rotina tem `outcome`. Quem decide é a **oração principal**, o trecho antes da primeira vírgula, ponto e vírgula, "mas" ou "porém":
+
+| Na oração principal | Resultado | Exemplos |
+| --- | --- | --- |
+| Negação: `não`, `nem`, `nunca` | `MISSED` | `Não fui à academia`, `Hoje não fui à academia`, `Nem estudei hoje`, `Não dormi bem` |
+| Verbo de falta: `faltei`, `pulei`, `esqueci de`, `deixei de`, `dormi mal` | `MISSED` | `Faltei na academia`, `Pulei o treino`, `Esqueci de beber água`, `Dormi mal` |
+| Negação **e** verbo de falta (um anula o outro) | `DONE` | `Não faltei na academia`, `Não dormi mal` |
+| Nenhum dos dois | `DONE` | `Fui à academia`, `Bebi 2 litros de água` |
+
+- A negação numa oração seguinte fala de outra coisa: `Bebi água, não refrigerante` e `Fui à academia, não faltei` são `DONE`.
+- "Pulei corda" é exercício, não falta: `Pulei corda 10 minutos` é `DONE`.
+- A quantidade é mantida: `Não bebi 2 litros de água` é `MISSED` com 2 L.
+- No app, o hábito não cumprido aparece como "Rotina · não cumprido" (cinza e riscado) e não conta em "Hábitos cumpridos".
+
 ## Limitações conhecidas
 
 São casos que ficam para o LLM ou para próximas etapas:
@@ -51,6 +71,8 @@ São casos que ficam para o LLM ou para próximas etapas:
 - **Frases compostas** ("fui à academia e gastei 30 no açaí") ainda viram um lançamento só. O teste está escrito e desativado.
 - **Valores por extenso** ("cinquenta reais") viram finança sem valor e com confiança baixa.
 - **Categorias** (farmácia, academia, hidratação) ainda não são inferidas.
+- **Hábitos ruins evitados.** "Não comi besteira" vira `MISSED`, mas evitar um hábito ruim é cumprir a meta. Para acertar, o parser precisa da polaridade do hábito, que vem com o módulo `routines` (etapa 5 do [backlog](backlog.md)). O teste está escrito e desativado.
+- **"Deixei de"** vira `MISSED` mesmo em "deixei de fumar", que é uma conquista. Isso também depende da polaridade.
 
 ## Privacidade
 
