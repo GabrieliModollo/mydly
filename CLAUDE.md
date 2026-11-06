@@ -18,7 +18,7 @@ Leia antes de mudanças relevantes: `README.md`, `docs/arquitetura.md` e os ADRs
 | Pasta | Conteúdo |
 | --- | --- |
 | `backend/` | Java 21 + Spring Boot 3.5, Spring Modulith, JPA, Flyway, PostgreSQL |
-| `frontend/` | Angular + Ionic/Capacitor (ainda não criado) |
+| `frontend/` | Angular 22 + Ionic 9 + Capacitor 8, componentes standalone e signals, sem zone.js |
 | `docs/arquitetura.md` | Visão geral, fluxo de um lançamento, modelo de dados, LGPD |
 | `docs/adr/` | Architecture Decision Records |
 | `.github/` | CI (GitHub Actions) e Dependabot |
@@ -26,7 +26,7 @@ Leia antes de mudanças relevantes: `README.md`, `docs/arquitetura.md` e os ADRs
 ## Comandos
 
 ```bash
-# subir banco e backend em containers (na raiz)
+# subir banco, backend e app em containers (na raiz); app em http://localhost:8100
 cp .env.example .env
 docker compose up --build -d
 
@@ -36,9 +36,16 @@ docker compose up -d postgres
 # backend (dentro de backend/)
 mvn spring-boot:run   # sobe a API em http://localhost:8080
 mvn verify            # build + testes + cobertura (precisa do Docker rodando)
+
+# frontend (dentro de frontend/)
+npm start                    # http://localhost:4200, proxy de /api para localhost:8080
+npm test -- --watch=false    # testes unitários (Vitest)
+npm run lint                 # ESLint, inclusive acessibilidade dos templates
+npm run build
 ```
 
 - Saúde da API: `GET /actuator/health`
+- Swagger: `http://localhost:8080/swagger-ui.html`
 - Cobertura: `backend/target/site/jacoco/index.html`
 - Documentação dos módulos: `backend/target/spring-modulith-docs`
 
@@ -58,6 +65,16 @@ mvn verify            # build + testes + cobertura (precisa do Docker rodando)
 - **Testes**: toda regra do parser ganha caso em teste parametrizado. Testes de integração usam Testcontainers, nunca H2.
 - **Decisões novas** de arquitetura viram um ADR (`docs/adr/NNNN-titulo.md`, com Status, Data, Contexto, Decisão, Consequências). ADR aceito não é editado; uma mudança gera um ADR novo que o substitui.
 - Atualize o `README.md` e o `docs/arquitetura.md` quando uma mudança alterar o que eles descrevem.
+- **Javadoc**: não use vírgula dentro de aspas nem de colchetes sem par (`"1,5"`, `[a, b)`). O Spring Modulith lê os Javadocs com um parser JSON simplificado que quebra com isso, e o `ModularityTests` falha. Para literais, use `{@code ...}`.
+
+### Frontend
+
+- Componentes standalone com `ChangeDetectionStrategy.OnPush` e estado em signals. Não há zone.js.
+- Componentes do Ionic importados de `@ionic/angular`, que no Ionic 9 é o ponto de entrada standalone.
+- Acesso à API só pelos serviços em `src/app/entries/`, com tipos que espelham os DTOs do backend. Formatação de texto em funções puras, com testes.
+- O app gera o id (UUID) e o `occurredAt` de cada lançamento (ADR 0006), e o reenvio usa sempre o mesmo id.
+- Cores só pelas variáveis de `src/theme/variables.css`, com contraste AA nos temas claro e escuro.
+- Acessibilidade: todo campo tem label, ícones decorativos usam `aria-hidden` e o foco é visível. O lint verifica os templates.
 
 ## Privacidade (LGPD)
 
@@ -65,6 +82,8 @@ O app lida com dados financeiros e de saúde (sono, dieta). Nunca registre em lo
 
 ## Ao trabalhar aqui
 
-- Rode `mvn verify` antes de dar uma tarefa de backend por concluída.
-- Não faça commit nem push sem a autora pedir.
+- Rode `mvn verify` antes de dar uma tarefa de backend por concluída, e `npm run lint`, `npm test -- --watch=false` e `npm run build` para o frontend.
+- Ao fim de cada etapa revisada e com os testes passando, faça commit e push no `main` sem precisar pedir. Separe os commits por assunto.
+- Commits só no nome da autora (a configuração do git dela), **sem** a linha `Co-Authored-By` do Claude.
+- Nunca reescreva histórico já enviado (force push, rebase de commits publicados) sem pedir.
 - Não adicione dependências sem explicar o motivo.

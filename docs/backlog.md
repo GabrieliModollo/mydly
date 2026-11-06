@@ -8,13 +8,12 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 
 | # | Etapa | Escopo | Notas |
 | --- | --- | --- | --- |
-| 1 | App v1: tela "Hoje" | `GET /api/v1/entries?date=` no backend; app Angular + Ionic com campo de lançamento, lista do dia com chips de interpretação, reenvio com o mesmo id em erro de rede; Dockerfile com nginx, job de CI e Dependabot do front | Visual conforme [`design.md`](design.md) |
+| 2 | Hábitos não cumpridos (**alta, bug**) | Campo `outcome` (DONE / MISSED) no `ParsedEntry`; negação antes do hábito vira MISSED ("Não fui à academia", "Esqueci de beber água", "Dormi mal"); "Não gastei nada" nunca vira gasto; chip "não cumprido" no app | Hoje uma negação conta como hábito cumprido e infla a sequência de dias |
 
 ## Próximas
 
 | # | Prioridade | Etapa | Escopo | Por que agora |
 | --- | --- | --- | --- | --- |
-| 2 | **Alta (bug)** | Hábitos não cumpridos | Campo `outcome` (DONE / MISSED) no `ParsedEntry`; negação antes do hábito vira MISSED ("Não fui à academia", "Esqueci de beber água", "Dormi mal"); "Não gastei nada" nunca vira gasto; chip "não cumprido" no app | Hoje uma negação conta como hábito cumprido e infla a sequência de dias |
 | 3 | Alta | Confirmação de lançamentos | Endpoint para completar um lançamento `NEEDS_INPUT` (valor e categoria) e tela "Quanto foi?" | Fecha o fluxo que o app já sinaliza |
 | 4 | Alta | Frases compostas | "Fui à academia e gastei 30 no açaí" vira dois itens (o contrato já é uma lista) | Frase comum no uso real |
 | 5 | Média | Módulos `finance` e `routines` | Consomem os lançamentos confirmados por eventos (registro de eventos do Spring Modulith); hábitos com polaridade, resolvendo "Não comi besteira" | Base para estatísticas |
@@ -41,3 +40,4 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 | `CLAUDE.md` | `9e7a3f2` |
 | Parser de lançamentos baseado em regras | `fba5964` |
 | API de lançamentos com persistência e Swagger | `fa7ac85`, `0329479` |
+| App v1: tela "Hoje" (listagem por dia, app Angular + Ionic conforme `design.md`, Docker, CI e Dependabot do front) | `ec31989`, `34f1b25`, `d810da4` e o commit de documentação seguinte |

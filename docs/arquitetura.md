@@ -117,6 +117,23 @@ erDiagram
 - `Habit.polarity` diferencia hábitos bons ("dormi bem") de ruins ("pedi delivery 3x").
 - `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`) e é a base da reconciliação.
 
+## App (frontend)
+
+Angular 22 + Ionic 9 + Capacitor 8 em `frontend/`, com componentes standalone e estado em signals, sem zone.js. Detalhes em [`frontend/README.md`](../frontend/README.md).
+
+```mermaid
+flowchart LR
+    Page["Tela Hoje"] --> Store["EntriesStore<br/>(signals)"]
+    Store --> Api["EntriesApi<br/>(HttpClient)"]
+    Api -->|"/api"| Proxy["proxy do ng serve<br/>ou nginx no Docker"]
+    Proxy --> Backend["API Spring Boot"]
+```
+
+- **Mesma origem.** O app chama `/api/...`. No desenvolvimento, o proxy do `ng serve` encaminha ao `localhost:8080`; no `docker compose`, o nginx que serve o app encaminha ao backend. Não há CORS.
+- **Envio otimista.** O lançamento aparece na lista como "Enviando…" com o id e a data gerados no app. Se a rede falhar, o reenvio usa o mesmo id, e a API não duplica ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)).
+- **Listagem do dia.** O `GET /api/v1/entries?date=AAAA-MM-DD` filtra pelo `occurred_at` no fuso `America/Sao_Paulo`, até existir fuso por usuário. Sem `date`, vale hoje.
+- **Próximo passo:** a fila offline, que guarda os lançamentos no aparelho enquanto não há rede.
+
 ## Privacidade (LGPD)
 
 O app guarda dados financeiros e dados que podem ser de saúde (sono, dieta). Por isso:
@@ -124,4 +141,5 @@ O app guarda dados financeiros e dados que podem ser de saúde (sono, dieta). Po
 - consentimento explícito no cadastro;
 - criptografia dos campos sensíveis em repouso;
 - exportação e exclusão de conta;
-- só o texto do lançamento vai para o LLM, sem identificar o usuário.
+- só o texto do lançamento vai para o LLM, sem identificar o usuário;
+- a fonte do app é servida por ele mesmo, sem chamadas a serviços de terceiros como o Google Fonts.

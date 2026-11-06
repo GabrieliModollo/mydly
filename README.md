@@ -6,7 +6,11 @@
 
 Você escreve como falaria — **"Gastei 50 reais de energético na farmácia"**, **"50 reais"**, **"Fui à academia"**, **"Bebi 2 litros de água"** — e o MyDly entende se é um gasto ou um hábito, organiza os dados e devolve estatísticas, incentivos e, quando necessário, umas broncas.
 
-> **Status:** em arquitetura. Este repositório é um projeto de portfólio e registra as decisões técnicas desde o início em [`docs/adr/`](docs/adr/).
+> **Status:** em desenvolvimento. Já dá para lançar pelo app e ver o que o MyDly entendeu. Este repositório é um projeto de portfólio e registra as decisões técnicas desde o início em [`docs/adr/`](docs/adr/).
+
+<p align="center">
+  <img src="docs/images/tela-hoje.png" alt="Tela Hoje do MyDly no tema escuro: cartões 'Gasto hoje' e 'Hábitos cumpridos', lista de lançamentos do dia com chips como 'Saída · R$ 50,00', 'Entrada · R$ 100,00', 'Rotina · 2 L' e 'Precisa confirmar', e o campo 'O que aconteceu?' embaixo" width="420">
+</p>
 
 ## A ideia
 
@@ -54,6 +58,7 @@ mydly/
 │   ├── parser.md       # regras e confianças do parser de lançamentos
 │   ├── backlog.md      # próximas etapas, em ordem de prioridade
 │   ├── design.md       # identidade visual e telas do app
+│   ├── images/         # prints do app
 │   └── adr/            # Architecture Decision Records
 ├── docker-compose.yml  # infraestrutura local
 └── .env.example
@@ -61,14 +66,16 @@ mydly/
 
 ## Rodando localmente
 
-Requisito: Docker. O `docker-compose` sobe o PostgreSQL e o backend; o frontend entra quando for criado.
+Requisito: Docker. O `docker-compose` sobe o PostgreSQL, o backend e o app.
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-Saúde da API: <http://localhost:8080/actuator/health>. Para desenvolver o backend fora do container, veja [`backend/README.md`](backend/README.md).
+Abra o app em <http://localhost:8100> e escreva, por exemplo, "50 reais" ou "bebi 2 litros de água". O lançamento aparece na lista com o que o MyDly entendeu.
+
+Saúde da API: <http://localhost:8080/actuator/health>. Para desenvolver fora dos containers, veja [`backend/README.md`](backend/README.md) e [`frontend/README.md`](frontend/README.md).
 
 ### Testando a API
 
