@@ -3,6 +3,7 @@ package com.mydly.entries.internal;
 import com.mydly.entries.Direction;
 import com.mydly.entries.EntryParser;
 import com.mydly.entries.ParsedEntry;
+import com.mydly.entries.RoutineOutcome;
 import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.util.List;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Component;
  * <p>Ordem de decisão, da regra mais forte para a mais fraca:
  * <ol>
  *   <li>texto vazio, sem letras nem números ou só com horário → desconhecido, confiança zero;</li>
+ *   <li>verbo de finança negado ({@code não gastei nada hoje}) → desconhecido, confiança baixa:
+ *       nunca vira um gasto ou uma entrada;</li>
  *   <li>número com marcador monetário ({@code R$ 50}, {@code 50 reais}) → finança;</li>
  *   <li>número com unidade de medida ({@code 2 litros}, {@code 500ml}, {@code 2h}) → rotina;</li>
  *   <li>número sozinho ({@code 50}, {@code 1.250,90}) → finança;</li>
@@ -34,6 +37,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>Horários ({@code acordei às 6h}) são ignorados antes das regras: indicam quando algo
  * aconteceu, não uma duração.
+ *
+ * <p>Toda rotina diz se o hábito foi cumprido. A primeira oração decide: uma negação
+ * ({@code não}, {@code nem}, {@code nunca}) ou um verbo de falta ({@code faltei}, {@code pulei},
+ * {@code esqueci de}, {@code deixei de}, {@code dormi mal}) torna o hábito não cumprido, e os dois
+ * juntos se anulam ({@code não faltei na academia}).
  *
  * <p>Por privacidade (LGPD), esta classe não registra em log o texto nem os valores.
  */
@@ -52,6 +60,7 @@ class RuleBasedEntryParser implements EntryParser {
     static final double CONFIDENCE_ROUTINE_COUNT = 0.50;
     static final double CONFIDENCE_FINANCE_WITHOUT_AMOUNT = 0.40;
     static final double CONFIDENCE_NUMBER_WITHOUT_CONTEXT = 0.30;
+    static final double CONFIDENCE_NEGATED_FINANCE = 0.30;
     static final double CONFIDENCE_EMPTY = 0.0;
 
     /**
@@ -87,6 +96,17 @@ class RuleBasedEntryParser implements EntryParser {
     /** "caiu" só indica entrada junto de um número: "o celular caiu" não é finança. */
     private static final Pattern INCOME_SIGNAL_WITH_NUMBER = Pattern.compile("\\bcaiu\\b");
 
+    /** Verbo de finança negado: {@code não gastei nada} não pode virar gasto. */
+    private static final Pattern NEGATED_FINANCE = Pattern.compile(
+            "\\b(?:nao|nem|nunca)\\s+(?:gastei|gastou|paguei|pagou|comprei|comprou|torrei|recebi|recebeu|ganhei)\\b");
+
+    /** Separa a oração principal do resto: em {@code fui à academia, não faltei} só a primeira conta. */
+    private static final Pattern CLAUSE_BREAK = Pattern.compile("[,;]|\\bmas\\b|\\bporem\\b");
+    private static final Pattern NEGATION = Pattern.compile("\\b(?:nao|nem|nunca)\\b");
+    /** Verbos que já dizem que o hábito não aconteceu. {@code pulei corda} é exercício, não falta. */
+    private static final Pattern MISS_SIGNAL = Pattern.compile(
+            "\\b(?:faltei|pulei(?!\\s+corda)|esqueci\\s+de|deixei\\s+de|dormi\\s+mal)\\b");
+
     /** Palavras que, logo depois do número, mostram que ele é valor e não quantidade. */
     private static final Set<String> CONNECTORS = Set.of(
             "no", "na", "nos", "nas", "num", "numa", "em", "de", "do", "da", "dos", "das",
@@ -116,7 +136,12 @@ class RuleBasedEntryParser implements EntryParser {
             return ParsedEntry.unknown(null, CONFIDENCE_EMPTY);
         }
 
+        if (NEGATED_FINANCE.matcher(normalized).find()) {
+            return ParsedEntry.unknown(original, CONFIDENCE_NEGATED_FINANCE);
+        }
+
         Direction direction = direction(normalized);
+        RoutineOutcome outcome = routineOutcome(normalized);
 
         Matcher money = findFirst(normalized, MONEY_BEFORE, MONEY_AFTER);
         if (money != null) {
@@ -126,7 +151,7 @@ class RuleBasedEntryParser implements EntryParser {
 
         Matcher quantity = QUANTITY_WITH_UNIT.matcher(normalized);
         if (quantity.find()) {
-            return ParsedEntry.routine(toDecimal(quantity.group(1)), UNITS.get(quantity.group(2)),
+            return ParsedEntry.routine(outcome, toDecimal(quantity.group(1)), UNITS.get(quantity.group(2)),
                     describe(original, normalized, quantity), CONFIDENCE_UNIT);
         }
 
@@ -145,14 +170,14 @@ class RuleBasedEntryParser implements EntryParser {
                                 CONFIDENCE_FINANCE_VERB_WITH_AMOUNT);
             }
             return followedByNoun
-                    ? ParsedEntry.routine(toDecimal(number.group(1)), null, original, CONFIDENCE_ROUTINE_COUNT)
+                    ? ParsedEntry.routine(outcome, toDecimal(number.group(1)), null, original, CONFIDENCE_ROUTINE_COUNT)
                     : ParsedEntry.unknown(original, CONFIDENCE_NUMBER_WITHOUT_CONTEXT);
         }
 
         if (hasFinanceSignal(normalized) || MONEY_WITHOUT_NUMBER.matcher(normalized).find()) {
             return ParsedEntry.finance(direction, null, original, CONFIDENCE_FINANCE_WITHOUT_AMOUNT);
         }
-        return ParsedEntry.routine(null, null, original, CONFIDENCE_ROUTINE_WITHOUT_NUMBER);
+        return ParsedEntry.routine(outcome, null, null, original, CONFIDENCE_ROUTINE_WITHOUT_NUMBER);
     }
 
     /** Minúsculas e sem acentos, para as regras não dependerem de como o usuário digitou. */
@@ -160,6 +185,18 @@ class RuleBasedEntryParser implements EntryParser {
         return Normalizer.normalize(text, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Cumprido ou não, pela primeira oração: negação ou verbo de falta tornam o hábito não cumprido,
+     * e os dois juntos se anulam. Nas orações seguintes a negação fala de outra coisa, como em
+     * {@code bebi água, não refrigerante}.
+     */
+    static RoutineOutcome routineOutcome(String normalized) {
+        String mainClause = CLAUSE_BREAK.split(normalized, 2)[0];
+        boolean negated = NEGATION.matcher(mainClause).find();
+        boolean missVerb = MISS_SIGNAL.matcher(mainClause).find();
+        return negated != missVerb ? RoutineOutcome.MISSED : RoutineOutcome.DONE;
     }
 
     private static boolean hasFinanceSignal(String text) {

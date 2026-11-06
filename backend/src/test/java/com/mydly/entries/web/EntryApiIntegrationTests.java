@@ -83,6 +83,20 @@ class EntryApiIntegrationTests {
     }
 
     @Test
+    void habitoNaoCumpridoChegaComoMissedEFicaNoBanco() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        postEntry("""
+                {"id": "%s", "text": "Não fui à academia"}""".formatted(id))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.items[0].type").value("ROUTINE"))
+                .andExpect(jsonPath("$.items[0].outcome").value("MISSED"));
+
+        assertThat(jdbc.queryForObject("SELECT parsed_json -> 0 ->> 'outcome' FROM entry WHERE id = ?",
+                String.class, id)).isEqualTo("MISSED");
+    }
+
+    @Test
     void lancamentoDeBaixaConfiancaPrecisaDeConfirmacao() throws Exception {
         UUID id = UUID.randomUUID();
 
@@ -191,7 +205,9 @@ class EntryApiIntegrationTests {
                 .andExpect(jsonPath("$.items[0].confidence").value(0.95))
                 .andExpect(jsonPath("$.items[1].direction").value("INCOME"))
                 .andExpect(jsonPath("$.items[1].amount").value(3000))
+                .andExpect(jsonPath("$.items[0].outcome").doesNotExist())
                 .andExpect(jsonPath("$.items[2].type").value("ROUTINE"))
+                .andExpect(jsonPath("$.items[2].outcome").value("DONE"))
                 .andExpect(jsonPath("$.items[2].quantity").value(2))
                 .andExpect(jsonPath("$.items[2].unit").value("L"))
                 .andExpect(jsonPath("$.items[3].quantity").value(30))

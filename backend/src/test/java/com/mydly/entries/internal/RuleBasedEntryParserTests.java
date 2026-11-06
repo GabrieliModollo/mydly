@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.mydly.entries.Direction;
 import com.mydly.entries.EntryType;
 import com.mydly.entries.ParsedEntry;
+import com.mydly.entries.RoutineOutcome;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Disabled;
@@ -113,6 +114,71 @@ class RuleBasedEntryParserTests {
         assertParsed(single(text), type, direction, amount, quantity, unit, confidence);
     }
 
+    @ParameterizedTest(name = "[{index}] \"{0}\" → {1}")
+    @CsvSource(delimiter = '|', textBlock = """
+            # Negação ou verbo de falta na oração principal: hábito não cumprido.
+            Não fui à academia                       | MISSED
+            Não tomei água                           | MISSED
+            Não bebi água                            | MISSED
+            Nao bebi agua                            | MISSED
+            Faltei na academia                       | MISSED
+            Pulei o treino                           | MISSED
+            Esqueci de beber água                    | MISSED
+            Nem estudei hoje                         | MISSED
+            Nunca medito                             | MISSED
+            Deixei de ir à academia                  | MISSED
+            Não dormi bem                            | MISSED
+            Dormi mal                                | MISSED
+            Não segui a dieta                        | MISSED
+            # A negação não precisa abrir a frase.
+            Hoje não fui à academia                  | MISSED
+            # Com quantidade, continua não cumprido.
+            Não bebi 2 litros de água                | MISSED
+            # Negação em outra oração fala de outra coisa.
+            Bebi água, não refrigerante              | DONE
+            Fui à academia, não faltei               | DONE
+            Fui à academia mas não treinei perna     | DONE
+            # Negação e verbo de falta juntos se anulam.
+            Não faltei na academia                   | DONE
+            Não dormi mal                            | DONE
+            # "Pular corda" é exercício, não falta.
+            Pulei corda 10 minutos                   | DONE
+            # Sem negação, cumprido.
+            Fui à academia                           | DONE
+            Dormi bem                                | DONE
+            """)
+    void distingueHabitoCumpridoDeNaoCumprido(String text, RoutineOutcome expected) {
+        ParsedEntry result = single(text);
+
+        assertThat(result.type()).isEqualTo(EntryType.ROUTINE);
+        assertThat(result.outcome()).isEqualTo(expected);
+    }
+
+    /**
+     * Finança negada não vira gasto nem entrada, com ou sem valor. O parser não modela um dia
+     * sem gastos, então a frase vai para o fallback (LLM ou pergunta ao usuário) com confiança baixa,
+     * em vez de criar um gasto que não existiu.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"Não gastei nada hoje", "Não gastei 50 reais", "Nem paguei a conta", "Não recebi o salário"})
+    void financaNegadaNuncaViraLancamentoComValor(String text) {
+        ParsedEntry result = single(text);
+
+        assertThat(result.type()).isEqualTo(EntryType.UNKNOWN);
+        assertThat(result.amount()).isNull();
+        assertThat(result.needsConfirmation()).isTrue();
+    }
+
+    /**
+     * Evitar um hábito ruim é cumprir a meta, mas para saber disso o parser precisa da polaridade
+     * do hábito ({@code comer besteira} é ruim), que vem com o módulo routines (etapa 5 do backlog).
+     */
+    @Disabled("Depende da polaridade do hábito, etapa 5 do backlog")
+    @Test
+    void evitarHabitoRuimEHabitoCumprido() {
+        assertThat(single("Não comi besteira").outcome()).isEqualTo(RoutineOutcome.DONE);
+    }
+
     @ParameterizedTest
     @NullSource
     void textoNuloViraDesconhecidoSemLancarExcecao(String text) {
@@ -181,6 +247,8 @@ class RuleBasedEntryParserTests {
             assertThat(result.quantity()).as("quantidade").isEqualByComparingTo(quantity);
         }
         assertThat(result.unit()).as("unidade").isEqualTo(unit);
+        assertThat(result.outcome()).as("cumprido")
+                .isEqualTo(type == EntryType.ROUTINE ? RoutineOutcome.DONE : null);
         assertThat(Confidence.of(result.confidence())).as("faixa de confiança (%s)", result.confidence())
                 .isEqualTo(confidence);
     }

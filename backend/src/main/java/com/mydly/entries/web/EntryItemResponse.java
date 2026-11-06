@@ -3,6 +3,7 @@ package com.mydly.entries.web;
 import com.mydly.entries.Direction;
 import com.mydly.entries.EntryType;
 import com.mydly.entries.ParsedEntry;
+import com.mydly.entries.RoutineOutcome;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 
@@ -16,6 +17,7 @@ import java.math.BigDecimal;
 public record EntryItemResponse(
         EntryType type,
         @Schema(description = "Só em FINANCE: EXPENSE (saída) ou INCOME (entrada)") Direction direction,
+        @Schema(description = "Só em ROUTINE: DONE (hábito cumprido) ou MISSED (não cumprido)") RoutineOutcome outcome,
         @Schema(description = "Valor em reais, só em FINANCE; ausente quando a frase não diz quanto") BigDecimal amount,
         @Schema(description = "Quantidade, só em ROUTINE") BigDecimal quantity,
         @Schema(description = "Unidade normalizada da quantidade; ausente em contagens") String unit,
@@ -23,7 +25,7 @@ public record EntryItemResponse(
         @Schema(description = "Confiança da interpretação, de 0 a 1") double confidence) {
 
     static EntryItemResponse from(ParsedEntry item) {
-        return new EntryItemResponse(item.type(), item.direction(), item.amount(), item.quantity(),
+        return new EntryItemResponse(item.type(), item.direction(), item.outcome(), item.amount(), item.quantity(),
                 item.unit(), item.description(), item.confidence());
     }
 }

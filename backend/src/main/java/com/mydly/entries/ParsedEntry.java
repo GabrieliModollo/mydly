@@ -6,8 +6,13 @@ import java.util.Objects;
 /**
  * Um lançamento interpretado a partir de texto livre.
  *
+ * <p>Este record também é o formato gravado no {@code parsed_json}. Campos novos precisam
+ * aceitar ausência (dados antigos), como o {@code outcome}, que vale {@link RoutineOutcome#DONE}
+ * quando falta numa rotina.
+ *
  * @param type        finança, rotina ou desconhecido
  * @param direction   saída ou entrada de dinheiro; presente só em {@link EntryType#FINANCE}
+ * @param outcome     se o hábito foi cumprido; presente só em {@link EntryType#ROUTINE}
  * @param amount      valor monetário em reais; só em {@link EntryType#FINANCE}, e pode faltar
  *                    quando a frase indica uma finança sem dizer quanto
  * @param quantity    quantidade medida ou contada (2 em {@code 2 litros}, 30 em {@code 30 flexões});
@@ -22,6 +27,7 @@ import java.util.Objects;
 public record ParsedEntry(
         EntryType type,
         Direction direction,
+        RoutineOutcome outcome,
         BigDecimal amount,
         BigDecimal quantity,
         String unit,
@@ -33,11 +39,18 @@ public record ParsedEntry(
 
     public ParsedEntry {
         Objects.requireNonNull(type, "type");
+        if (type == EntryType.ROUTINE && outcome == null) {
+            // Itens gravados antes de o campo existir eram todos hábitos cumpridos.
+            outcome = RoutineOutcome.DONE;
+        }
         if (confidence < 0.0 || confidence > 1.0) {
             throw new IllegalArgumentException("confidence deve estar entre 0 e 1: " + confidence);
         }
         if ((type == EntryType.FINANCE) != (direction != null)) {
             throw new IllegalArgumentException("direction é obrigatória em FINANCE e proibida nos outros tipos");
+        }
+        if (type != EntryType.ROUTINE && outcome != null) {
+            throw new IllegalArgumentException("outcome só existe em ROUTINE");
         }
         if (unit != null && quantity == null) {
             throw new IllegalArgumentException("unit exige quantity");
@@ -45,15 +58,22 @@ public record ParsedEntry(
     }
 
     public static ParsedEntry finance(Direction direction, BigDecimal amount, String description, double confidence) {
-        return new ParsedEntry(EntryType.FINANCE, direction, amount, null, null, description, confidence);
+        return new ParsedEntry(EntryType.FINANCE, direction, null, amount, null, null, description, confidence);
     }
 
+    /** Rotina cumprida. */
     public static ParsedEntry routine(BigDecimal quantity, String unit, String description, double confidence) {
-        return new ParsedEntry(EntryType.ROUTINE, null, null, quantity, unit, description, confidence);
+        return routine(RoutineOutcome.DONE, quantity, unit, description, confidence);
+    }
+
+    public static ParsedEntry routine(RoutineOutcome outcome, BigDecimal quantity, String unit, String description,
+                                      double confidence) {
+        return new ParsedEntry(EntryType.ROUTINE, null, Objects.requireNonNull(outcome, "outcome"), null, quantity,
+                unit, description, confidence);
     }
 
     public static ParsedEntry unknown(String description, double confidence) {
-        return new ParsedEntry(EntryType.UNKNOWN, null, null, null, null, description, confidence);
+        return new ParsedEntry(EntryType.UNKNOWN, null, null, null, null, null, description, confidence);
     }
 
     /** {@code true} quando o app deve confirmar com o usuário antes de registrar. */
