@@ -8,13 +8,12 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 
 | # | Etapa | Escopo | Notas |
 | --- | --- | --- | --- |
-| — | Nenhuma | A próxima é a etapa 3 | |
+| — | Nenhuma | A próxima é a etapa 4 | |
 
 ## Próximas
 
 | # | Prioridade | Etapa | Escopo | Por que agora |
 | --- | --- | --- | --- | --- |
-| 3 | Alta | Confirmação de lançamentos | Endpoint para completar um lançamento `NEEDS_INPUT` (valor e categoria) e tela "Quanto foi?" | Fecha o fluxo que o app já sinaliza |
 | 4 | Alta | Frases compostas | "Fui à academia e gastei 30 no açaí" vira dois itens (o contrato já é uma lista) | Frase comum no uso real |
 | 5 | Média | Módulos `finance` e `routines` | Consomem os lançamentos confirmados por eventos (registro de eventos do Spring Modulith); hábitos com polaridade, resolvendo "Não comi besteira" | Base para estatísticas |
 | 6 | Média | Resumo da semana | Módulo `insights`: hábitos por dia, gastos por categoria, mensagem da semana com tom gentil / direto / bronca, cruzamento rotina × dinheiro | O diferencial do produto |
@@ -41,4 +40,5 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 | Parser de lançamentos baseado em regras | `fba5964` |
 | API de lançamentos com persistência e Swagger | `fa7ac85`, `0329479` |
 | App v1: tela "Hoje" (listagem por dia, app Angular + Ionic conforme `design.md`, Docker, CI e Dependabot do front) | `ec31989`, `34f1b25`, `d810da4`, `ab4e69d` |
-| Hábitos não cumpridos (`outcome` DONE/MISSED, finança negada, chip "não cumprido") | `9042a9c`, `489f7ee` e o commit de documentação seguinte |
+| Hábitos não cumpridos (`outcome` DONE/MISSED, finança negada, chip "não cumprido") | `9042a9c`, `489f7ee`, `c013cf3` |
+| Confirmação de lançamentos (resolução à parte do parser, ETag/If-Match, categorias fixas, painel "Quanto foi?", ADR 0007) | `675dbf2`, `38fcaaf` e o commit de documentação seguinte |

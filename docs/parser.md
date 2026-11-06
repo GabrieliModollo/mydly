@@ -11,6 +11,7 @@ Como o MyDly interpreta um lançamento em texto livre usando só regras locais, 
 | `type` | `FINANCE`, `ROUTINE` ou `UNKNOWN` |
 | `direction` | `EXPENSE` (padrão) ou `INCOME`. Só existe em `FINANCE` |
 | `outcome` | `DONE` (padrão) ou `MISSED`, se o hábito foi cumprido. Só existe em `ROUTINE`. Itens gravados antes do campo existir são lidos como `DONE` |
+| `category` | Categoria sugerida para a finança (veja abaixo). Só existe em `FINANCE`, e pode faltar |
 | `amount` | Valor em reais (`BigDecimal`). Só em `FINANCE`, e pode faltar |
 | `quantity` / `unit` | Quantidade em `ROUTINE`. A unidade é normalizada (`L`, `mL`, `h`, `min`, `km`, `kg`, `copo`) ou fica nula quando é uma contagem ("30 flexões") |
 | `description` | Texto original sem espaços extras, ou nulo quando a frase é só o valor ("50 reais") |
@@ -64,13 +65,30 @@ Toda rotina tem `outcome`. Quem decide é a **oração principal**, o trecho ant
 - A quantidade é mantida: `Não bebi 2 litros de água` é `MISSED` com 2 L.
 - No app, o hábito não cumprido aparece como "Rotina · não cumprido" (cinza e riscado) e não conta em "Hábitos cumpridos".
 
+## Categoria sugerida
+
+Toda finança ganha uma categoria sugerida pelas palavras da frase, que o usuário pode trocar ao confirmar ([ADR 0007](adr/0007-parse-e-resolucao-separados.md)). A lista é fixa por enquanto, e categorias personalizadas entram com o módulo `finance`. A busca segue a ordem da tabela: **o lugar vem antes do produto**, então "energético na farmácia" fica em Farmácia.
+
+| Categoria | Palavras |
+| --- | --- |
+| Farmácia (`PHARMACY`) | farmácia, drogaria, remédio(s), drogasil |
+| Mercado (`GROCERIES`) | mercado, supermercado, feira, hortifrúti, atacadão, sacolão |
+| Transporte (`TRANSPORT`) | uber, ônibus, metrô, gasolina, combustível, estacionamento, pedágio, táxi, passagem |
+| Moradia (`HOUSING`) | aluguel, condomínio, luz, internet, IPTU, gás |
+| Saúde (`HEALTH`) | médico, consulta, dentista, exame(s), academia, terapia, plano de saúde |
+| Trabalho (`WORK`) | salário, freela, freelance, curso, coworking |
+| Lazer (`LEISURE`) | cinema, show, bar, cerveja, netflix, spotify, viagem, ingresso, jogo |
+| Alimentação (`FOOD`) | pão, padaria, açaí, lanche(s), lanchonete, ifood, restaurante, almoço, jantar, café, pizza, delivery, hambúrguer, energético, sorvete, comida |
+
+Sem palavra conhecida, a categoria fica vazia, e quem escolhe é o usuário. Outros (`OTHER`) só aparece por escolha dele.
+
 ## Limitações conhecidas
 
 São casos que ficam para o LLM ou para próximas etapas:
 
 - **Frases compostas** ("fui à academia e gastei 30 no açaí") ainda viram um lançamento só. O teste está escrito e desativado.
 - **Valores por extenso** ("cinquenta reais") viram finança sem valor e com confiança baixa.
-- **Categorias** (farmácia, academia, hidratação) ainda não são inferidas.
+- **Categorias de rotina** (academia, hidratação, sono) ainda não são inferidas; só as de finança.
 - **Hábitos ruins evitados.** "Não comi besteira" vira `MISSED`, mas evitar um hábito ruim é cumprir a meta. Para acertar, o parser precisa da polaridade do hábito, que vem com o módulo `routines` (etapa 5 do [backlog](backlog.md)). O teste está escrito e desativado.
 - **"Deixei de"** vira `MISSED` mesmo em "deixei de fumar", que é uma conquista. Isso também depende da polaridade.
 

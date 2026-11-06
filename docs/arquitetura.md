@@ -41,7 +41,7 @@ sequenceDiagram
 
 As regras locais do parser, com as faixas de confiança e o limiar a partir do qual o app pergunta ao usuário, estão em [`parser.md`](parser.md).
 
-**O que já está implementado.** O `POST /api/v1/entries` recebe o lançamento, interpreta com as regras locais e grava na tabela `entry`. Ele é idempotente pelo id enviado pelo app: o reenvio do mesmo conteúdo devolve o original, e o mesmo id com outro conteúdo devolve 409 ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)). A resposta da API usa DTOs próprios, separados do formato gravado no `parsed_json`. O status fica `NEEDS_INPUT` quando algum item tem confiança abaixo de 0,50, e `PENDING` nos outros casos. O fallback para o LLM e os eventos para `finance` e `routines` entram nas próximas etapas. Os eventos vão entrar junto com o módulo `finance`, quando houver quem os consuma. A API pode ser testada pelo Swagger UI em `/swagger-ui.html`.
+**O que já está implementado.** O `POST /api/v1/entries` recebe o lançamento, interpreta com as regras locais e grava na tabela `entry`. Ele é idempotente pelo id enviado pelo app: o reenvio do mesmo conteúdo devolve o original, e o mesmo id com outro conteúdo devolve 409 ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)). A resposta da API usa DTOs próprios, separados do formato gravado no `parsed_json`. O status fica `NEEDS_INPUT` quando algum item tem confiança abaixo de 0,50, e `PENDING` nos outros casos. O usuário completa esses itens pelo painel "Quanto foi?" (`POST /api/v1/entries/{id}/items/{index}/resolution`, com `If-Match`): confirma como gasto ou entrada (valor e categoria), como rotina, ou descarta. A resposta fica na coluna `resolution`, sem sobrescrever o que o parser entendeu, e quando não sobra item pendente o lançamento volta a `PENDING` ([ADR 0007](adr/0007-parse-e-resolucao-separados.md)). O fallback para o LLM e os eventos para `finance` e `routines` entram nas próximas etapas. Os eventos vão entrar junto com o módulo `finance`, quando houver quem os consuma. A API pode ser testada pelo Swagger UI em `/swagger-ui.html`.
 
 ## Módulos
 
@@ -114,6 +114,7 @@ erDiagram
 - `Entry.raw_text` nunca é descartado: quando o parser melhorar, os lançamentos antigos podem ser reprocessados.
 - `Entry.occurred_at` é quando o usuário escreveu, informado pelo app; `created_at` é quando o servidor gravou ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)).
 - `Entry.parsed_json` guarda a lista de itens interpretados; `detected_type` é o tipo comum a todos (ou vazio se forem mistos ou desconhecidos) e `confidence` é a menor entre eles.
+- `Entry.resolution` guarda as respostas do usuário, alinhadas com os itens, e `Entry.version` faz o controle de concorrência (ETag). O valor efetivo de um item é a resolução, quando existe ([ADR 0007](adr/0007-parse-e-resolucao-separados.md)).
 - `Habit.polarity` diferencia hábitos bons ("dormi bem") de ruins ("pedi delivery 3x").
 - `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`) e é a base da reconciliação.
 
