@@ -40,7 +40,7 @@ flowchart LR
     API_MOD --> DB[("PostgreSQL")]
 ```
 
-Detalhes em [`docs/arquitetura.md`](docs/arquitetura.md).
+Detalhes em [`docs/arquitetura.md`](docs/arquitetura.md). As regras de interpretação dos lançamentos estão em [`docs/parser.md`](docs/parser.md).
 
 ## Estrutura do repositório
 
@@ -51,6 +51,7 @@ mydly/
 ├── .github/            # CI (GitHub Actions) e Dependabot
 ├── docs/
 │   ├── arquitetura.md  # visão geral, módulos e modelo de dados
+│   ├── parser.md       # regras e confianças do parser de lançamentos
 │   └── adr/            # Architecture Decision Records
 ├── docker-compose.yml  # infraestrutura local
 └── .env.example

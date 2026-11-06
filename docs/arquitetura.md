@@ -34,6 +34,8 @@ sequenceDiagram
     end
 ```
 
+As regras locais do parser, com as faixas de confiança e o limiar a partir do qual o app pergunta ao usuário, estão em [`parser.md`](parser.md).
+
 ## Módulos
 
 | Módulo | Responsabilidade |
