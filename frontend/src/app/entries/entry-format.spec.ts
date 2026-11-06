@@ -135,6 +135,18 @@ describe('resumo do dia', () => {
     expect(summary.habitsDone).toBe(1);
   });
 
+  it('frase composta conta cada item: "Gastei 30 no açaí e 20 no uber" e "Dormi mal e fui à academia"', () => {
+    const summary = daySummary([
+      entry([item({ amount: 30, category: 'FOOD' }), item({ amount: 20, category: 'TRANSPORT' })]),
+      entry([
+        item({ type: 'ROUTINE', direction: null, outcome: 'MISSED' }),
+        item({ type: 'ROUTINE', direction: null, outcome: 'DONE' }),
+      ]),
+    ]);
+
+    expect(summary).toEqual({ spent: 50, habitsDone: 1 });
+  });
+
   it('dia vazio tem tudo zerado', () => {
     expect(daySummary([])).toEqual({ spent: 0, habitsDone: 0 });
   });

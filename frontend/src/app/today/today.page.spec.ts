@@ -140,15 +140,17 @@ describe('TodayPage · confirmação', () => {
   let fixture: ComponentFixture<TodayPage>;
   let resolveResult: ResolveResult;
   let resolved: unknown[];
+  let timeline: WritableSignal<TimelineEntry[]>;
 
   beforeEach(async () => {
     resolveResult = 'ok';
     resolved = [];
+    timeline = signal<TimelineEntry[]>([
+      { id: 'p', text: PENDING.text, occurredAt: PENDING.occurredAt, sync: 'synced', entry: PENDING },
+    ]);
     const store: Partial<EntriesStore> = {
       loadState: signal('loaded'),
-      timeline: signal<TimelineEntry[]>([
-        { id: 'p', text: PENDING.text, occurredAt: PENDING.occurredAt, sync: 'synced', entry: PENDING },
-      ]),
+      timeline,
       summary: signal({ spent: 0, habitsDone: 0 }),
       load: async () => undefined,
       resolve: async (...args: unknown[]) => {
@@ -210,6 +212,43 @@ describe('TodayPage · confirmação', () => {
     expect(resolved).toEqual([['p', 0, { action: 'DISMISS' }]]);
     expect(fixture.nativeElement.querySelector('[role="status"]')?.textContent).toContain('mudou');
     expect(confirming()).toEqual({ entry: PENDING, index: 0 });
+  });
+
+  it('lançamento com vários itens mostra uma linha de chips por item e o link só no pendente', async () => {
+    const routine = {
+      ...PENDING.items[0],
+      type: 'ROUTINE' as const,
+      direction: null,
+      outcome: 'DONE' as const,
+      category: null,
+      description: 'Fui à academia',
+      confidence: 0.6,
+      needsConfirmation: false,
+    };
+    const compound: EntryResponse = {
+      ...PENDING,
+      id: 'c',
+      text: 'Fui à academia e comprei pão',
+      items: [routine, { ...PENDING.items[0], description: 'comprei pão' }],
+    };
+    timeline.set([{ id: 'c', text: compound.text, occurredAt: compound.occurredAt, sync: 'synced', entry: compound }]);
+    await fixture.whenStable();
+
+    const rows = [...fixture.nativeElement.querySelectorAll('.item')] as HTMLElement[];
+    expect(rows.map((row) => [...row.querySelectorAll('.chip')].map((c) => c.textContent?.trim()))).toEqual([
+      ['Rotina'],
+      ['Precisa confirmar'],
+    ]);
+    expect(rows.map((row) => row.querySelector('.chips')?.getAttribute('aria-label'))).toEqual([
+      'O que o MyDly entendeu de: Fui à academia',
+      'O que o MyDly entendeu de: comprei pão',
+    ]);
+    expect(rows[0].querySelector('button')).toBeNull();
+
+    rows[1].querySelector('button')!.click();
+    await fixture.whenStable();
+
+    expect(confirming()).toEqual({ entry: compound, index: 1 });
   });
 
   it('falha ao salvar mostra aviso e mantém o painel fechado', async () => {

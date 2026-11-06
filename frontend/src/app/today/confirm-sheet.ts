@@ -30,6 +30,10 @@ export class ConfirmSheet {
   protected readonly categories = Object.entries(CATEGORY_LABELS) as [Category, string][];
   protected readonly item = computed(() => this.entry().items[this.index()]);
   protected readonly unknown = computed(() => this.item().type === 'UNKNOWN');
+  /** A frase citada no painel: num lançamento com vários itens, só o trecho do item. */
+  protected readonly quote = computed(() =>
+    this.entry().items.length > 1 && this.item().description ? this.item().description : this.entry().text,
+  );
 
   protected readonly kind = signal<ConfirmKind | null>(null);
   protected readonly amountText = signal('');

@@ -36,11 +36,11 @@ describe('ConfirmSheet', () => {
   let emitted: ResolveItemRequest[];
   let closed: number;
 
-  async function open(entry: EntryResponse): Promise<HTMLElement> {
+  async function open(entry: EntryResponse, index = 0): Promise<HTMLElement> {
     TestBed.configureTestingModule({ imports: [ConfirmSheet], providers: [provideIonicAngular({ mode: 'md' })] });
     fixture = TestBed.createComponent(ConfirmSheet);
     fixture.componentRef.setInput('entry', entry);
-    fixture.componentRef.setInput('index', 0);
+    fixture.componentRef.setInput('index', index);
     emitted = [];
     closed = 0;
     fixture.componentInstance.resolved.subscribe((request) => emitted.push(request));
@@ -71,6 +71,23 @@ describe('ConfirmSheet', () => {
     expect(root.querySelector('blockquote')?.textContent).toContain('Comprei pão');
     expect(button(root, 'Alimentação').getAttribute('aria-pressed')).toBe('true');
     expect(button(root, 'Mercado').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('num lançamento com vários itens mostra só o trecho do item', async () => {
+    const base = entryWith({ description: 'comprei pão' });
+    const routine = {
+      ...base.items[0],
+      type: 'ROUTINE' as const,
+      direction: null,
+      outcome: 'DONE' as const,
+      category: null,
+      description: 'Fui à academia',
+      confidence: 0.6,
+      needsConfirmation: false,
+    };
+    const root = await open({ ...base, text: 'Fui à academia e comprei pão', items: [routine, base.items[0]] }, 1);
+
+    expect(root.querySelector('blockquote')?.textContent?.trim()).toBe('comprei pão');
   });
 
   it('só deixa salvar com um valor válido e envia valor, direção e categoria', async () => {

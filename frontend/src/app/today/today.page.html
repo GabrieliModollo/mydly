@@ -70,7 +70,14 @@
             @if (item.entry; as saved) {
               @for (parsed of saved.items; track $index; let index = $index) {
                 <div class="item">
-                  <ul class="chips" aria-label="O que o MyDly entendeu">
+                  <ul
+                    class="chips"
+                    [attr.aria-label]="
+                      saved.items.length > 1 && parsed.description
+                        ? 'O que o MyDly entendeu de: ' + parsed.description
+                        : 'O que o MyDly entendeu'
+                    "
+                  >
                     @for (chip of chipsForItem(parsed); track $index) {
                       <li class="chip" [attr.data-tone]="chip.tone">{{ chip.label }}</li>
                     }
