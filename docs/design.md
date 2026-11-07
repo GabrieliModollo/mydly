@@ -53,7 +53,7 @@ Cada tipo tem fundo e texto próprios; as cores diferem também em luminosidade,
 2. Dois cartões de resumo, vindos do `GET /api/v1/days/{date}/summary`: "Gasto hoje" (soma das saídas que valem) e "Hábitos cumpridos" (hábitos bons cumpridos mais hábitos ruins evitados).
 3. Lista do dia, mais recente primeiro: texto original do lançamento, horário à direita e uma linha de chips por item. Um item pendente mostra o link "Quanto foi? →". Um item aceito mostra a ação discreta "Não foi isso" (cinza, peso 500), que o tira dos números e abre o painel para corrigir; um item descartado mostra "Desfazer".
 4. Campo de lançamento fixo embaixo, estilo chat ("O que aconteceu?"), com botão redondo no acento; envio também com Enter.
-5. Barra de navegação: Hoje, Resumo, Metas.
+5. Barra de navegação: Hoje e Resumo (Metas entra quando a tela existir).
 
 ### Confirmar lançamento (painel inferior sobre "Hoje")
 
@@ -61,10 +61,12 @@ Chip "Precisa confirmar", título "Quanto foi?", a frase original, campo de valo
 
 ### Resumo da semana
 
-1. Cartão escuro com a mensagem da semana e seletor de tom (Gentil / Direto / Bronca).
-2. Hábitos: uma linha por hábito com 7 pontos (dias cumpridos preenchidos, não cumpridos só contorno) e placar "5/7".
-3. Gastos por categoria com barras horizontais e total.
-4. Cartão no acento com o cruzamento rotina × dinheiro ("Nos dias em que você dormiu mal, gastou 40% mais com energético e delivery").
+1. Cabeçalho com o período ("2 a 8 de novembro"), setas para a semana anterior e a próxima (a próxima fica desativada na semana atual) e o título "Sua semana" ou, nas anteriores, "Resumo da semana".
+2. Cartão escuro (`--mydly-hero-bg`, texto `--mydly-hero-text`; `#15171C` no claro e `#2C2F36` no escuro, contraste acima de 11:1) com o seletor de tom (Gentil / Direto / Bronca, o escolhido no acento) e a mensagem principal. O tom fica guardado no aparelho.
+3. Cartão no acento com o cruzamento de sono e gastos, quando ele existe e não é a mensagem principal; as outras mensagens vêm em cartões simples.
+4. Hábitos: uma linha por hábito com 7 pontos sob as iniciais dos dias ("S T Q Q S S D" quando a semana começa na segunda; as iniciais seguem o dia de início configurado) e o placar "cumpridos/dias decorridos". Cumprido (ou ruim evitado) é ponto cheio verde-água; deslize é ponto cheio rosa; não cumprido é só contorno; sem registro e dias que não chegaram têm contorno tracejado. Cada linha tem uma descrição para leitor de tela ("Hidratação, 2 de 3 dias. segunda: cumprido...").
+5. Gastos por categoria com barras horizontais proporcionais à maior categoria, total, entradas e a linha da semana anterior, comparada nos mesmos dias ("Semana anterior, até quarta: ...").
+6. A barra de navegação inferior tem Hoje e Resumo; Metas entra quando a tela existir.
 
 ## Acessibilidade
 

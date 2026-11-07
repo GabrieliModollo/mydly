@@ -91,6 +91,10 @@ sequenceDiagram
 - **Histórico.** Os lançamentos anteriores à etapa 5 entraram por um backfill que roda uma vez só e pode ser repetido sem duplicar.
 - **Falhas.** Se um consumidor falhar, uma nova tentativa agendada reenvia o evento em cerca de um minuto, e o `/actuator/health` fica `OUT_OF_SERVICE` se um evento passar de dez minutos sem concluir.
 
+## Resumo da semana
+
+O `GET /api/v1/weeks/{inicio}/summary?tone=gentle|direct|scold` (ou `/weeks/current/summary`), no módulo `insights`, monta a semana de 7 dias a partir do dia configurado (`mydly.week.first-day-of-week`, segunda por padrão) no fuso `America/Sao_Paulo`. Ele traz os hábitos com os 7 dias (`ACHIEVED`, `SLIPPED`, `MISSED`, `NONE` ou `FUTURE`) e o placar `{ achieved, elapsedDays, target }`, os gastos por categoria, a comparação com os mesmos dias decorridos da semana anterior e até três mensagens no tom pedido. As mensagens saem de regras locais com limiar fixo, sem LLM ([ADR 0009](adr/0009-mensagens-da-semana-por-regras.md)). Como no resumo do dia, `insights` só lê as APIs públicas de `finance` (`FinanceTotals`, inclusive o gasto por dia) e `routines` (`HabitOutcomes`).
+
 ## Módulos
 
 | Módulo | Responsabilidade |

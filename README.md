@@ -9,7 +9,8 @@ Você escreve como falaria — **"Gastei 50 reais de energético na farmácia"**
 > **Status:** em desenvolvimento. Já dá para lançar pelo app e ver o que o MyDly entendeu. Este repositório é um projeto de portfólio e registra as decisões técnicas desde o início em [`docs/adr/`](docs/adr/).
 
 <p align="center">
-  <img src="docs/images/tela-hoje.png" alt="Tela Hoje do MyDly no tema escuro: cartões 'Gasto hoje' e 'Hábitos cumpridos', lista de lançamentos do dia com chips como 'Saída · R$ 50,00', 'Entrada · R$ 100,00', 'Rotina · 2 L' e 'Precisa confirmar', e o campo 'O que aconteceu?' embaixo" width="420">
+  <img src="docs/images/tela-hoje.png" alt="Tela Hoje do MyDly no tema escuro: cartões 'Gasto hoje' e 'Hábitos cumpridos', lista de lançamentos do dia com chips como 'Saída · R$ 50,00', 'Entrada · R$ 100,00', 'Rotina · 2 L' e 'Precisa confirmar', e o campo 'O que aconteceu?' embaixo" width="360">
+  <img src="docs/images/tela-resumo.png" alt="Tela Resumo do MyDly no tema escuro: semana de 19 a 25 de outubro, cartão escuro com o seletor de tom Gentil, Direto e Bronca e a mensagem 'Dias de sono ruim: R$ 60,00 de gasto médio (3 dias). Nos outros 4 dias: R$ 30,00', hábitos Sono e Hidratação com 7 pontos e placar 4/7, e gastos por categoria com barras" width="360">
 </p>
 
 ## A ideia
@@ -73,7 +74,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Abra o app em <http://localhost:8100> e escreva, por exemplo, "50 reais" ou "bebi 2 litros de água". O lançamento aparece na lista com o que o MyDly entendeu. Quando ele não tem certeza ("Comprei pão", sem valor), o item mostra "Quanto foi? →", que abre um painel para você informar o valor e a categoria ou dizer que não foi um gasto. Uma frase como "Fui à academia e gastei 30 no açaí" vira dois itens, cada um na sua linha. Os cartões "Gasto hoje" e "Hábitos cumpridos" vêm dos módulos de finanças e hábitos: "Não comi besteira" conta como hábito cumprido, e "Tomei 2 energéticos" aparece como deslize. Se o MyDly entender algo errado, toque em "Não foi isso" para tirar o item dos números e corrigir.
+Abra o app em <http://localhost:8100> e escreva, por exemplo, "50 reais" ou "bebi 2 litros de água". O lançamento aparece na lista com o que o MyDly entendeu. Quando ele não tem certeza ("Comprei pão", sem valor), o item mostra "Quanto foi? →", que abre um painel para você informar o valor e a categoria ou dizer que não foi um gasto. Uma frase como "Fui à academia e gastei 30 no açaí" vira dois itens, cada um na sua linha. Os cartões "Gasto hoje" e "Hábitos cumpridos" vêm dos módulos de finanças e hábitos: "Não comi besteira" conta como hábito cumprido, e "Tomei 2 energéticos" aparece como deslize. Se o MyDly entender algo errado, toque em "Não foi isso" para tirar o item dos números e corrigir. Na aba **Resumo**, a semana aparece com os hábitos dia a dia, os gastos por categoria e uma mensagem no tom que você escolher (Gentil, Direto ou Bronca), inclusive o cruzamento de sono e gastos quando há dias suficientes para ele não ser acaso.
 
 Saúde da API: <http://localhost:8080/actuator/health>. Para desenvolver fora dos containers, veja [`backend/README.md`](backend/README.md) e [`frontend/README.md`](frontend/README.md).
 
@@ -109,3 +110,4 @@ O detalhamento e a prioridade de cada etapa estão em [`docs/backlog.md`](docs/b
 | [0006](docs/adr/0006-id-do-cliente-e-occurred-at.md) | Id gerado pelo cliente e data do lançamento |
 | [0007](docs/adr/0007-parse-e-resolucao-separados.md) | Interpretação do parser e resolução do usuário guardadas separadamente |
 | [0008](docs/adr/0008-eventos-com-registro-e-revisao-por-item.md) | Eventos entre módulos com registro de publicação, revisão por item e reabertura |
+| [0009](docs/adr/0009-mensagens-da-semana-por-regras.md) | Mensagens da semana por regras locais, com limiar contra o acaso |
