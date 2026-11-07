@@ -1,0 +1,136 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <div class="header">
+      <div class="week-nav">
+        <button type="button" class="icon-button" aria-label="Semana anterior" (click)="previousWeek()" [disabled]="!week()">
+          <ion-icon name="chevron-back-outline" aria-hidden="true" />
+        </button>
+        <p class="header__date" aria-live="polite">{{ range() }}</p>
+        <button
+          type="button"
+          class="icon-button"
+          aria-label="Próxima semana"
+          (click)="nextWeek()"
+          [disabled]="!week() || isCurrentWeek()"
+        >
+          <ion-icon name="chevron-forward-outline" aria-hidden="true" />
+        </button>
+      </div>
+      <h1 class="header__title">{{ isCurrentWeek() || !week() ? 'Sua semana' : 'Resumo da semana' }}</h1>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <main class="page">
+    @if (loadState() === 'error') {
+      <div class="banner" role="alert">
+        <ion-icon name="cloud-offline-outline" aria-hidden="true" />
+        <span>Não foi possível carregar o resumo.</span>
+        <button type="button" class="link-button" (click)="load()">Tentar de novo</button>
+      </div>
+    }
+
+    @if (week(); as summary) {
+      <section class="message" aria-labelledby="message-title">
+        <h2 id="message-title" class="sr-only">Mensagem da semana</h2>
+        <div class="tones" role="group" aria-label="Tom das mensagens">
+          @for (option of toneOptions; track option.tone) {
+            <button
+              type="button"
+              class="tone"
+              [attr.aria-pressed]="tone() === option.tone"
+              (click)="chooseTone(option.tone)"
+            >
+              {{ option.label }}
+            </button>
+          }
+        </div>
+        @if (main(); as insight) {
+          <p class="message__text" aria-live="polite">{{ insight.text }}</p>
+        }
+      </section>
+
+      @if (crossing(); as insight) {
+        <section class="card card--accent" aria-label="Sono e gastos">
+          <p class="card__label">Sono e gastos</p>
+          <p class="card__text">{{ insight.text }}</p>
+        </section>
+      }
+
+      @for (insight of secondary(); track insight.kind) {
+        <section class="card" aria-label="Outra mensagem da semana">
+          <p class="card__text">{{ insight.text }}</p>
+        </section>
+      }
+
+      <section class="card" aria-labelledby="habits-title">
+        <h2 id="habits-title" class="card__title">Hábitos</h2>
+        @if (summary.habits.length === 0) {
+          <p class="card__empty">Nenhum hábito registrado nesta semana.</p>
+        } @else {
+          <div class="days" aria-hidden="true">
+            <span></span>
+            <span class="dots">
+              @for (initial of initials(); track $index) {
+                <span>{{ initial }}</span>
+              }
+            </span>
+            <span></span>
+          </div>
+          <ul class="habits">
+            @for (habit of summary.habits; track habit.code) {
+              <li class="habit">
+                <span class="habit__name" aria-hidden="true">{{ habit.name }}</span>
+                <span class="sr-only">{{ habitDescription(habit, summary.weekStart) }}</span>
+                <span class="dots" aria-hidden="true">
+                  @for (mark of habit.days; track $index) {
+                    <span class="dot" [attr.data-mark]="mark" [attr.title]="markLabel(mark, habit.polarity)"></span>
+                  }
+                </span>
+                <span class="habit__score" aria-hidden="true">{{ habit.score.achieved }}/{{ habit.score.elapsedDays }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      <section class="card" aria-labelledby="money-title">
+        <div class="card__head">
+          <h2 id="money-title" class="card__title">Gastos</h2>
+          <p class="card__total">{{ formatMoney(summary.money.spent) }}</p>
+        </div>
+        @if (bars().length === 0) {
+          <p class="card__empty">Nenhum gasto nesta semana.</p>
+        } @else {
+          <ul class="bars">
+            @for (bar of bars(); track bar.label) {
+              <li class="bar">
+                <span class="bar__label">{{ bar.label }}</span>
+                <span class="bar__track" aria-hidden="true">
+                  <span class="bar__fill" [style.width.%]="bar.percent"></span>
+                </span>
+                <span class="bar__amount">{{ bar.amount }}</span>
+              </li>
+            }
+          </ul>
+        }
+        @if (summary.money.received > 0) {
+          <p class="card__note">Entradas: {{ formatMoney(summary.money.received) }}</p>
+        }
+        @if (previous(); as line) {
+          <p class="card__note">{{ line }}</p>
+        }
+      </section>
+    } @else if (loadState() === 'loading') {
+      <div class="loading">
+        <ion-spinner name="dots" aria-hidden="true" />
+        <span class="sr-only" role="status">Carregando o resumo</span>
+      </div>
+    }
+  </main>
+</ion-content>
+
+<ion-footer class="ion-no-border">
+  <app-nav />
+</ion-footer>

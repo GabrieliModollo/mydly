@@ -22,6 +22,10 @@
   --mydly-field-border: #858993;
   --mydly-accent: #d4f25c;
   --mydly-accent-ink: #15171c;
+  /* Cartão escuro da mensagem da semana (tela Resumo). */
+  --mydly-hero-bg: #15171c;
+  --mydly-hero-text: #f2f1ec;
+  --mydly-hero-muted: #c4c7cf;
   /* O acento verde-limão quase não contrasta com o fundo claro; o foco usa a tinta. */
   --mydly-focus: #15171c;
 
@@ -75,6 +79,9 @@
     --mydly-attention-text: #c4b5fd;
     --mydly-slip-bg: #4c0519;
     --mydly-slip-text: #fda4af;
+    --mydly-hero-bg: #2c2f36;
+    --mydly-hero-text: #f2f1ec;
+    --mydly-hero-muted: #c4c7cf;
     --mydly-neutral-bg: #23252b;
     --mydly-neutral-text: #c4c7cf;
 

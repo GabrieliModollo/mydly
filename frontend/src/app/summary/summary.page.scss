@@ -1,0 +1,331 @@
+// Medidas e cores conforme docs/design.md (Resumo da semana).
+:host {
+  --page-width: 40rem;
+  --gutter: 20px;
+}
+
+ion-toolbar {
+  --background: var(--mydly-bg);
+  --border-width: 0;
+}
+
+ion-content,
+ion-footer {
+  --background: var(--mydly-bg);
+  background: var(--mydly-bg);
+}
+
+.header {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 8px var(--gutter) 8px;
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: -10px;
+}
+
+.header__date {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mydly-muted);
+}
+
+.header__title {
+  margin: 2px 0 0;
+  font-family: var(--mydly-font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--mydly-ink);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--mydly-ink);
+  font-size: 18px;
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--mydly-field-border);
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mydly-focus);
+    outline-offset: 2px;
+  }
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 8px var(--gutter) 24px;
+}
+
+.message {
+  padding: 18px;
+  border-radius: var(--mydly-radius-summary);
+  background: var(--mydly-hero-bg);
+  color: var(--mydly-hero-text);
+}
+
+.tones {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.tone {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--mydly-hero-muted);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--mydly-hero-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &[aria-pressed='true'] {
+    border-color: var(--mydly-accent);
+    background: var(--mydly-accent);
+    color: var(--mydly-accent-ink);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mydly-accent);
+    outline-offset: 2px;
+  }
+}
+
+.message__text {
+  margin: 0;
+  font-family: var(--mydly-font-display);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.card {
+  padding: 16px;
+  border-radius: var(--mydly-radius);
+  background: var(--mydly-surface);
+  color: var(--mydly-ink);
+}
+
+.card--accent {
+  background: var(--mydly-accent);
+  color: var(--mydly-accent-ink);
+}
+
+.card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.card__title {
+  margin: 0 0 10px;
+  font-family: var(--mydly-font-display);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.card__label {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.card__text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.card__total {
+  margin: 0;
+  font-family: var(--mydly-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.card__empty,
+.card__note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--mydly-muted);
+}
+
+// Hábitos: nome, 7 pontos alinhados com as iniciais dos dias e o placar.
+.days,
+.habit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 154px 36px;
+  align-items: center;
+  gap: 8px;
+}
+
+.days {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mydly-muted);
+
+  .dots span {
+    text-align: center;
+  }
+}
+
+.habits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.habit {
+  min-height: 36px;
+}
+
+.habit__name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.habit__score {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.dots {
+  display: grid;
+  grid-template-columns: repeat(7, 18px);
+  gap: 4px;
+}
+
+.dot {
+  width: 14px;
+  height: 14px;
+  margin: 0 auto;
+  border: 2px solid var(--mydly-field-border);
+  border-radius: 999px;
+
+  &[data-mark='ACHIEVED'] {
+    border-color: var(--mydly-routine-text);
+    background: var(--mydly-routine-text);
+  }
+
+  &[data-mark='SLIPPED'] {
+    border-color: var(--mydly-slip-text);
+    background: var(--mydly-slip-text);
+  }
+
+  // Não cumprido: só contorno, como no design.
+  &[data-mark='MISSED'] {
+    background: transparent;
+  }
+
+  // Sem registro e dias que não chegaram ficam mais discretos, com o contorno tracejado.
+  &[data-mark='NONE'],
+  &[data-mark='FUTURE'] {
+    border-style: dashed;
+  }
+
+  &[data-mark='FUTURE'] {
+    opacity: 0.6;
+  }
+}
+
+// Gastos por categoria com barras horizontais.
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.bar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar__track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--mydly-line);
+}
+
+.bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--mydly-expense-text);
+}
+
+.bar__amount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--mydly-radius);
+  background: var(--mydly-surface);
+  color: var(--mydly-ink);
+  font-size: 14px;
+}
+
+.link-button {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--mydly-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}

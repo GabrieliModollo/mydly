@@ -254,7 +254,8 @@ ion-footer {
   gap: 8px;
   max-width: var(--page-width);
   margin: 0 auto;
-  padding: 10px var(--gutter) calc(10px + var(--ion-safe-area-bottom, 0px));
+  // A margem da área segura fica com a barra de navegação, logo abaixo.
+  padding: 10px var(--gutter) 4px;
 }
 
 .composer__input {

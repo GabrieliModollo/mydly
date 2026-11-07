@@ -26,6 +26,7 @@ import { arrowUp, cloudOfflineOutline, refreshOutline } from 'ionicons/icons';
 import { EntriesStore, NOW } from '../entries/entries-store';
 import { chipsForItem, formatMoney } from '../entries/entry-format';
 import { EntryItemResponse, EntryResponse, ResolveItemRequest } from '../entries/entry.models';
+import { AppNav } from '../nav/app-nav';
 import { ConfirmSheet } from './confirm-sheet';
 import { formatDayLabel } from './day-label';
 
@@ -52,6 +53,7 @@ const EXAMPLES = [
     IonRefresherContent,
     IonSpinner,
     IonToolbar,
+    AppNav,
   ],
   templateUrl: './today.page.html',
   styleUrl: './today.page.scss',

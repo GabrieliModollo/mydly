@@ -2,6 +2,7 @@ import { registerLocaleData } from '@angular/common';
 import localePt from '@angular/common/locales/pt';
 import { LOCALE_ID, signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { provideIonicAngular } from '@ionic/angular';
 import { EntriesStore, NOW, ResolveResult, TimelineEntry } from '../entries/entries-store';
 import { EntryResponse } from '../entries/entry.models';
@@ -64,6 +65,7 @@ describe('TodayPage', () => {
       imports: [TodayPage],
       providers: [
         provideIonicAngular({ mode: 'md' }),
+        provideRouter([]),
         { provide: LOCALE_ID, useValue: 'pt-BR' },
         { provide: EntriesStore, useValue: store },
         { provide: NOW, useValue: () => new Date('2026-11-05T12:00:00Z') },
@@ -168,6 +170,7 @@ describe('TodayPage · confirmação', () => {
       imports: [TodayPage],
       providers: [
         provideIonicAngular({ mode: 'md' }),
+        provideRouter([]),
         { provide: LOCALE_ID, useValue: 'pt-BR' },
         { provide: EntriesStore, useValue: store },
         { provide: NOW, useValue: () => new Date('2026-11-05T12:00:00Z') },
