@@ -32,6 +32,7 @@ O diferencial é **cruzar rotina e finanças**: "nos dias em que você dormiu ma
 flowchart LR
     App["App web/mobile<br/>(offline-first)"] --> API["API<br/>Spring Boot"]
     subgraph API_MOD["Monólito modular"]
+        accounts["accounts<br/>login e JWT"]
         entries["entries<br/>parser híbrido"]
         finance["finance"]
         routines["routines"]
@@ -74,18 +75,23 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Abra o app em <http://localhost:8100> e escreva, por exemplo, "50 reais" ou "bebi 2 litros de água". O lançamento aparece na lista com o que o MyDly entendeu. Quando ele não tem certeza ("Comprei pão", sem valor), o item mostra "Quanto foi? →", que abre um painel para você informar o valor e a categoria ou dizer que não foi um gasto. Uma frase como "Fui à academia e gastei 30 no açaí" vira dois itens, cada um na sua linha. Os cartões "Gasto hoje" e "Hábitos cumpridos" vêm dos módulos de finanças e hábitos: "Não comi besteira" conta como hábito cumprido, e "Tomei 2 energéticos" aparece como deslize. Se o MyDly entender algo errado, toque em "Não foi isso" para tirar o item dos números e corrigir. Na aba **Resumo**, a semana aparece com os hábitos dia a dia, os gastos por categoria e uma mensagem no tom que você escolher (Gentil, Direto ou Bronca), inclusive o cruzamento de sono e gastos quando há dias suficientes para ele não ser acaso. Na aba **Metas**, você define uma meta por hábito (2 L de água por dia, academia 4 dias por semana ou, num hábito para evitar, delivery no máximo 2 dias), um limite de gasto por categoria (por semana ou por mês) e o dia em que a sua semana começa. O Hoje mostra o progresso das metas do dia ("Hidratação 1,5 / 2 L") e avisa quando uma categoria chega a 80% do limite; o Resumo compara a semana com a meta ("3 de 4") e marca o limite nas barras de gasto. Mudar uma meta vale de hoje em diante: os dias que já passaram continuam com a meta que valia neles. Sem internet, o lançamento fica guardado no aparelho ("Guardado no aparelho.") e é enviado sozinho quando a conexão volta, com a data e a hora em que você escreveu, mesmo que o app tenha sido fechado no meio.
+Abra o app em <http://localhost:8100> e toque em **Entrar na demonstração** (usuário `demo`, senha `demo`). Os dados da demonstração são compartilhados, então não escreva nada pessoal. Depois escreva, por exemplo, "50 reais" ou "bebi 2 litros de água". O lançamento aparece na lista com o que o MyDly entendeu. Quando ele não tem certeza ("Comprei pão", sem valor), o item mostra "Quanto foi? →", que abre um painel para você informar o valor e a categoria ou dizer que não foi um gasto. Uma frase como "Fui à academia e gastei 30 no açaí" vira dois itens, cada um na sua linha. Os cartões "Gasto hoje" e "Hábitos cumpridos" vêm dos módulos de finanças e hábitos: "Não comi besteira" conta como hábito cumprido, e "Tomei 2 energéticos" aparece como deslize. Se o MyDly entender algo errado, toque em "Não foi isso" para tirar o item dos números e corrigir. Na aba **Resumo**, a semana aparece com os hábitos dia a dia, os gastos por categoria e uma mensagem no tom que você escolher (Gentil, Direto ou Bronca), inclusive o cruzamento de sono e gastos quando há dias suficientes para ele não ser acaso. Na aba **Metas**, você define uma meta por hábito (2 L de água por dia, academia 4 dias por semana ou, num hábito para evitar, delivery no máximo 2 dias), um limite de gasto por categoria (por semana ou por mês) e o dia em que a sua semana começa. O Hoje mostra o progresso das metas do dia ("Hidratação 1,5 / 2 L") e avisa quando uma categoria chega a 80% do limite; o Resumo compara a semana com a meta ("3 de 4") e marca o limite nas barras de gasto. Mudar uma meta vale de hoje em diante: os dias que já passaram continuam com a meta que valia neles. Sem internet, o lançamento fica guardado no aparelho ("Guardado no aparelho.") e é enviado sozinho quando a conexão volta, com a data e a hora em que você escreveu, mesmo que o app tenha sido fechado no meio.
 
 Saúde da API: <http://localhost:8080/actuator/health>. Para desenvolver fora dos containers, veja [`backend/README.md`](backend/README.md) e [`frontend/README.md`](frontend/README.md).
 
 ### Testando a API
 
-Com a aplicação rodando, abra o Swagger UI em <http://localhost:8080/swagger-ui.html>. Em **Lançamentos → POST /api/v1/entries**, clique em *Try it out*, escolha um dos exemplos ("Gasto", "Rotina com quantidade", "Precisa de confirmação"...) e envie. A resposta traz o que o parser entendeu e se o app precisa confirmar com o usuário.
+Com a aplicação rodando, abra o Swagger UI em <http://localhost:8080/swagger-ui.html>. A API pede login: em **Login → POST /api/v1/auth/login**, envie o exemplo "Demonstração", copie o `accessToken` da resposta e cole no botão **Authorize**. Depois, em **Lançamentos → POST /api/v1/entries**, clique em *Try it out*, escolha um dos exemplos ("Gasto", "Rotina com quantidade", "Precisa de confirmação"...) e envie. A resposta traz o que o parser entendeu e se o app precisa confirmar com o usuário.
 
 Pelo terminal:
 
 ```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "demo", "password": "demo"}' | sed 's/.*"accessToken":"\([^"]*\)".*/\1/')
+
 curl -X POST http://localhost:8080/api/v1/entries \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"text": "Gastei 50 reais na farmácia"}'
 ```
@@ -113,3 +119,4 @@ O detalhamento e a prioridade de cada etapa estão em [`docs/backlog.md`](docs/b
 | [0009](docs/adr/0009-mensagens-da-semana-por-regras.md) | Mensagens da semana por regras locais, com limiar contra o acaso |
 | [0010](docs/adr/0010-metas-e-orcamentos-versionados.md) | Metas e orçamentos versionados com `valid_from`, avaliados no dia de referência |
 | [0011](docs/adr/0011-fila-offline-no-aparelho.md) | Fila offline no aparelho, com envio em ordem e sem interpretação local |
+| [0012](docs/adr/0012-login-com-jwt-e-dados-por-usuario.md) | Login com JWT emitido pela própria API e dados separados por usuário |

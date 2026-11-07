@@ -4,6 +4,8 @@
 
 O MyDly é um **monólito modular** em Java + Spring Boot, com um app web e mobile que funciona offline e sincroniza depois. Cada módulo tem fronteira própria e se comunica com os outros por eventos de domínio, o que permite extrair um módulo para um serviço separado no futuro sem reescrever o resto.
 
+Toda a API, menos o login, exige um token de acesso (JWT) emitido pela própria API, e cada dado tem dono: um usuário só vê e muda o que é seu ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)).
+
 ## Fluxo de um lançamento
 
 ```mermaid
@@ -128,6 +130,7 @@ flowchart LR
 
 | Módulo | Responsabilidade |
 | --- | --- |
+| `accounts` | Usuários, login com senha e o token de acesso; diz aos controladores quem fez o pedido (`CurrentUser`) |
 | `entries` | Recebe o texto bruto, guarda sempre o original e coordena a interpretação |
 | `finance` | Transações, categorias, orçamentos |
 | `routines` | Hábitos, registros diários, metas |
@@ -140,18 +143,24 @@ flowchart LR
 
 ```mermaid
 erDiagram
-    USER ||--o{ ENTRY : escreve
+    APP_USER ||--o{ ENTRY : escreve
     ENTRY ||--o{ TRANSACTION : gera
     ENTRY ||--o{ HABIT_LOG : gera
-    USER ||--o{ HABIT : define
+    APP_USER ||--o{ HABIT_GOAL : define
     HABIT ||--o{ HABIT_LOG : registra
     HABIT ||--o{ HABIT_GOAL : "tem versões de meta"
-    USER ||--o{ BUDGET : define
-    USER ||--|| PREFERENCES : tem
-    USER ||--o{ INSIGHT : recebe
+    APP_USER ||--o{ BUDGET : define
+    APP_USER ||--o| PREFERENCES : tem
+    APP_USER ||--o{ INSIGHT : recebe
 
+    APP_USER {
+        uuid id
+        string username
+        text password_hash
+    }
     ENTRY {
         uuid id
+        uuid user_id
         text raw_text
         timestamp created_at
         timestamp occurred_at
@@ -166,6 +175,7 @@ erDiagram
     TRANSACTION {
         uuid entry_id
         int item_index
+        uuid user_id
         bigint revision
         boolean active
         decimal amount
@@ -184,6 +194,7 @@ erDiagram
     HABIT_LOG {
         uuid entry_id
         int item_index
+        uuid user_id
         bigint revision
         boolean active
         string habit_code
@@ -193,6 +204,7 @@ erDiagram
         timestamp occurred_at
     }
     HABIT_GOAL {
+        uuid user_id
         string habit_code
         date valid_from
         string kind
@@ -201,13 +213,14 @@ erDiagram
         smallint days_per_week
     }
     BUDGET {
+        uuid user_id
         string category
         date valid_from
         string period
         decimal limit_amount
     }
     PREFERENCES {
-        smallint id
+        uuid user_id
         string first_day_of_week
     }
     INSIGHT {
@@ -226,8 +239,9 @@ erDiagram
 - `Entry.item_state` guarda o estado e a revisão de cada item ([ADR 0008](adr/0008-eventos-com-registro-e-revisao-por-item.md)).
 - `TRANSACTION` é a tabela `finance_transaction`, e ela e `HABIT_LOG` têm uma linha por item de lançamento (`entry_id` + `item_index`), com `revision` e `active` para aplicar os eventos na ordem certa.
 - `Habit.polarity` diferencia hábitos bons ("dormi bem") de ruins ("pedi delivery 3x"), e `Habit.measure` diz se o hábito se mede em volume, em duração ou não se mede. Por enquanto o catálogo é fixo, criado por migração; hábitos do usuário (`USER`) entram depois.
-- `HABIT_GOAL` e `BUDGET` são versões: a chave é `(habit_code, valid_from)` e `(category, valid_from)`, e a versão vigente num dia é a de maior `valid_from` até ele. A versão de remoção tem `kind = NONE` na meta e período e limite nulos no orçamento ([ADR 0010](adr/0010-metas-e-orcamentos-versionados.md)).
-- `PREFERENCES` tem uma linha só (`id = 1`) até a etapa de usuário, quando ganha `user_id`; `HABIT_GOAL` e `BUDGET` ganham o usuário na chave na mesma etapa.
+- `APP_USER` é do módulo `accounts`, e as outras tabelas guardam o dono em `user_id`, sem chave estrangeira entre módulos. Os dados que existiam antes do login são do usuário `demo`, criado pela migração ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)).
+- `HABIT_GOAL` e `BUDGET` são versões: a chave é `(user_id, habit_code, valid_from)` e `(user_id, category, valid_from)`, e a versão vigente num dia é a de maior `valid_from` até ele. A versão de remoção tem `kind = NONE` na meta e período e limite nulos no orçamento ([ADR 0010](adr/0010-metas-e-orcamentos-versionados.md)).
+- `PREFERENCES` tem uma linha por usuário, criada quando ele muda algo; sem linha, a semana começa na segunda.
 - `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`) e é a base da reconciliação.
 
 ## App (frontend)
@@ -246,6 +260,7 @@ flowchart LR
     Proxy --> Backend["API Spring Boot"]
 ```
 
+- **Login.** A tela de login troca usuário e senha por um token, guardado no aparelho com a validade. Um interceptador põe o token em todo pedido à API, e um 401 encerra a sessão e leva ao login ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)).
 - **Mesma origem.** O app chama `/api/...`. No desenvolvimento, o proxy do `ng serve` encaminha ao `localhost:8080`; no `docker compose`, o nginx que serve o app encaminha ao backend. Não há CORS.
 - **Envio otimista.** O lançamento aparece na lista como "Enviando…" com o id e a data gerados no app. Se a rede falhar, o reenvio usa o mesmo id, e a API não duplica ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)).
 - **Fila offline.** Sem rede, ou com o servidor fora, o lançamento fica no `localStorage` do aparelho (`mydly.outbox.v1`) e é enviado quando a conexão volta, ao abrir o app e 30 segundos depois de uma falha, um por vez e do mais antigo ao mais novo. O parser continua só no servidor: um lançamento guardado aparece sem chips até ser enviado ([ADR 0011](adr/0011-fila-offline-no-aparelho.md)).
@@ -259,5 +274,6 @@ O app guarda dados financeiros e dados que podem ser de saúde (sono, dieta). Po
 - criptografia dos campos sensíveis em repouso;
 - exportação e exclusão de conta;
 - só o texto do lançamento vai para o LLM, sem identificar o usuário;
-- o texto de um lançamento fica no aparelho só até ser enviado, e sair da conta (etapa 9) precisa apagar a fila;
+- o texto de um lançamento fica no aparelho só até ser enviado, e "Sair" apaga a fila de quem sai;
+- só o hash BCrypt da senha fica no banco, e nem o nome de login nem a senha vão para log;
 - a fonte do app é servida por ele mesmo, sem chamadas a serviços de terceiros como o Google Fonts.

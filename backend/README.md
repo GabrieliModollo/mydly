@@ -6,9 +6,11 @@ API do MyDly em Java 21 + Spring Boot, organizada como monólito modular com Spr
 
 | Pacote | Responsabilidade |
 | --- | --- |
+| `com.mydly.accounts` | Usuários, login e token de acesso (JWT) |
 | `com.mydly.entries` | Lançamentos em texto livre e interpretação |
 | `com.mydly.finance` | Transações, categorias, orçamentos |
 | `com.mydly.routines` | Hábitos, registros diários, metas |
+| `com.mydly.preferences` | Preferências do usuário e o calendário dele |
 | `com.mydly.insights` | Estatísticas, streaks, mensagens |
 | `com.mydly.integrations` | Extrato, Open Finance, reconciliação |
 | `com.mydly.notifications` | Push e lembretes |
@@ -30,6 +32,8 @@ mvn spring-boot:run
 
 Saúde da aplicação: <http://localhost:8080/actuator/health>. API e exemplos: <http://localhost:8080/swagger-ui.html>.
 
+A API pede login ([ADR 0012](../docs/adr/0012-login-com-jwt-e-dados-por-usuario.md)). Entre com `POST /api/v1/auth/login` (usuário `demo`, senha `demo`) e mande o `accessToken` no header `Authorization: Bearer`; no Swagger, pelo botão Authorize. Sem `MYDLY_JWT_SECRET`, a API gera um segredo a cada subida, e os tokens deixam de valer quando ela reinicia.
+
 Para subir tudo em containers: `docker compose up --build` na raiz.
 
 ## Testes
@@ -38,4 +42,4 @@ Para subir tudo em containers: `docker compose up --build` na raiz.
 mvn verify
 ```
 
-Os testes de integração usam Testcontainers (PostgreSQL real), então o Docker precisa estar rodando. O relatório de cobertura fica em `target/site/jacoco/index.html`.
+Os testes de integração usam Testcontainers (PostgreSQL real), então o Docker precisa estar rodando. Os pedidos do MockMvc saem autenticados como o usuário demo (`TestSecurityConfiguration`); um teste escolhe outro usuário com `.with(TestUsers.as(id))`. O relatório de cobertura fica em `target/site/jacoco/index.html`.

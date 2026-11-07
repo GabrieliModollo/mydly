@@ -51,10 +51,11 @@ npm run build
 
 ## Regras de arquitetura
 
-- **Monólito modular** (ADR 0002). Módulos em `com.mydly.<modulo>`: `entries`, `finance`, `routines`, `insights`, `integrations`, `notifications`.
+- **Monólito modular** (ADR 0002). Módulos em `com.mydly.<modulo>`: `accounts`, `entries`, `finance`, `routines`, `preferences`, `insights`, `integrations`, `notifications`.
 - Um módulo **não acessa classes internas nem tabelas de outro**. Comunicação por eventos de domínio ou pela API pública do módulo (classes no pacote raiz dele). Tipos internos ficam em subpacotes (ex.: `com.mydly.finance.internal`).
 - O teste `ModularityTests` verifica as fronteiras; ele precisa continuar passando.
 - **Parser híbrido** (ADR 0003): regras locais primeiro, LLM só como fallback, pergunta ao usuário quando a confiança for baixa. O texto original (`entry.raw_text`) nunca é descartado. O app precisa funcionar sem chave de LLM.
+- **Dados por usuário** (ADR 0012): toda tabela de dados do usuário tem `user_id`, e toda consulta filtra por ele. Só os controladores leem o usuário (`CurrentUser`, do módulo `accounts`); serviços, APIs públicas e eventos recebem o `userId` como parâmetro. Testes da API saem como o usuário demo; para outro, `.with(TestUsers.as(id))`.
 - **Integrações via porta/adaptador** (ADR 0005): toda fonte externa de transação implementa `TransactionSource`; Open Finance só pelo sandbox do agregador.
 - Schema do banco muda **somente por migração Flyway** (`backend/src/main/resources/db/migration/V<n>__<descricao>.sql`); nunca edite uma migração já enviada ao `main`. O Hibernate roda com `ddl-auto: validate`.
 

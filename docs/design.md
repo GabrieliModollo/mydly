@@ -70,13 +70,20 @@ Chip "Precisa confirmar", título "Quanto foi?", a frase original, campo de valo
 5. Gastos por categoria com barras horizontais proporcionais à maior categoria (ou ao maior limite semanal), total, entradas e a linha da semana anterior, comparada nos mesmos dias ("Semana anterior, até quarta: ..."). Uma categoria com limite semanal ganha a **marca do limite**: um traço de 2 × 16 px na tinta, mais alto que a barra, com um contorno de 2 px na cor do cartão para se separar do preenchimento laranja. Sob a barra, uma linha diz o mesmo por escrito ("Limite da semana: R$ 100,00 (85%, perto do limite)"); a marca nunca é a única pista. O limite mensal não vira marca, porque a barra é da semana: a linha diz "No mês: R$ 300,00 de R$ 1.000,00 (30%)".
 6. A barra de navegação inferior tem Hoje, Resumo e Metas.
 
+### Entrar
+
+1. Marca "MyDly" (Space Grotesk 40 px 700) e a frase "Escreva como falaria. O MyDly entende se é um gasto ou um hábito."
+2. Cartão branco "Entrar" com os campos "Usuário" e "Senha", com label visível, e o botão principal "Entrar" no acento. O erro ("Usuário ou senha incorretos.", "Sem conexão. Para entrar, o MyDly precisa de internet.") aparece no topo do cartão no laranja das saídas, numa região `role="alert"`, e os campos ganham a borda laranja e `aria-invalid`.
+3. Cartão tracejado "Só quer conhecer?" com o usuário e a senha da demonstração por escrito, o aviso de que os dados dela são compartilhados e o botão de contorno "Entrar na demonstração".
+
 ### Metas
 
 1. Cabeçalho "Metas e limites" e título "Metas".
 2. Cartão "Hábitos": os hábitos do catálogo, primeiro os para cumprir e depois os para evitar, com a explicação de que neles a meta é um limite. Cada linha tem o nome (15 px 500), a meta atual por escrito (13 px 600 no `--mydly-subtle`: "2 L por dia", "4 dias por semana", "No máximo 2 dias por semana") ou "Sem meta" e "Sem limite" no `--mydly-muted`, e um botão em pílula "Definir" ou "Editar" (44 px), com o nome do hábito no `aria-label` ("Editar meta de Hidratação").
 3. Cartão "Orçamentos": as categorias fixas com o limite ("R$ 100,00 por semana") ou "Sem limite", uma barra de 8 px (verde-água abaixo de 80%, laranja a partir dele) com `role="progressbar"` e o gasto por escrito ("R$ 85,00 de R$ 100,00 · 85%, perto do limite").
 4. Cartão "Semana": `select` com label "Início da semana" e a nota de que as semanas passadas também passam a ser contadas assim.
-5. Estados vazios explicativos ("Nenhuma meta ainda. Escolha um hábito, como 2 L de água por dia ...", "Nenhum limite ainda. ... o MyDly avisa quando o gasto chega a 80%"). Depois de salvar, uma região `role="status"` anuncia "Meta de Hidratação salva.".
+5. Cartão "Conta", sempre presente: "Você entrou como demo." e o link "Sair". Com lançamentos guardados no aparelho, "Sair" mostra antes o aviso no laranja das saídas ("2 lançamentos ainda não foram enviados. Sair apaga esses lançamentos deste aparelho.", `role="alert"`) com "Sair mesmo assim" e "Cancelar".
+6. Estados vazios explicativos ("Nenhuma meta ainda. Escolha um hábito, como 2 L de água por dia ...", "Nenhum limite ainda. ... o MyDly avisa quando o gasto chega a 80%"). Depois de salvar, uma região `role="status"` anuncia "Meta de Hidratação salva.".
 
 ### Painéis de meta e de limite (sobre "Metas")
 
