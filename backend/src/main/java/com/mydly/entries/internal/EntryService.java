@@ -29,6 +29,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>A criação é idempotente pelo id (ADR 0006): o app offline pode reenviar o mesmo
  * lançamento depois de uma falha de rede sem duplicá-lo. Por privacidade (LGPD), nada
  * aqui registra em log o texto nem os valores.
+ *
+ * <p>Todo método recebe o dono dos dados (ADR 0012). O lançamento de outro usuário é tratado como
+ * inexistente: ninguém lê nem resolve o que não é seu.
  */
 @Service
 public class EntryService {
@@ -61,7 +64,10 @@ public class EntryService {
         CONFLICT
     }
 
-    /** Resultado da criação: o desfecho e o lançamento gravado (o novo ou o que já existia). */
+    /**
+     * Resultado da criação: o desfecho e o lançamento gravado (o novo ou o que já existia). Num conflito
+     * com o lançamento de outro usuário, {@code entry} é nulo, para nada dele vazar.
+     */
     public record CreateResult(Outcome outcome, Entry entry) {
     }
 
@@ -72,20 +78,21 @@ public class EntryService {
      * {@code occurredAt}, a data também é igual. Qualquer outra diferença é conflito: editar
      * um lançamento será uma operação própria.
      *
+     * @param userId     o dono do lançamento
      * @param id         id gerado pelo cliente, ou {@code null} para o servidor gerar
      * @param text       texto do lançamento, guardado como veio
      * @param occurredAt quando o usuário escreveu, ou {@code null} para usar o momento atual
      */
-    public CreateResult create(UUID id, String text, Instant occurredAt) {
+    public CreateResult create(UUID userId, UUID id, String text, Instant occurredAt) {
         UUID entryId = id != null ? id : UUID.randomUUID();
         Instant requestedOccurredAt = toDatabasePrecision(occurredAt);
         Optional<Entry> existing = repository.findById(entryId);
         if (existing.isPresent()) {
-            return compareWithExisting(existing.get(), text, requestedOccurredAt);
+            return compareWithExisting(userId, existing.get(), text, requestedOccurredAt);
         }
 
         Instant now = toDatabasePrecision(clock.instant());
-        Entry entry = Entry.interpreted(entryId, text, requestedOccurredAt != null ? requestedOccurredAt : now,
+        Entry entry = Entry.interpreted(userId, entryId, text, requestedOccurredAt != null ? requestedOccurredAt : now,
                 now, parser.parse(text));
         try {
             // Gravação e eventos na mesma transação: o registro de publicação só guarda o evento se o
@@ -99,14 +106,15 @@ public class EntryService {
         } catch (DataIntegrityViolationException concurrentInsert) {
             // Dois envios simultâneos com o mesmo id: o outro gravou primeiro, então comparamos com o dele.
             return repository.findById(entryId)
-                    .map(saved -> compareWithExisting(saved, text, requestedOccurredAt))
+                    .map(saved -> compareWithExisting(userId, saved, text, requestedOccurredAt))
                     .orElseThrow(() -> concurrentInsert);
         }
     }
 
+    /** O lançamento do usuário; o de outro usuário fica vazio, como se não existisse. */
     @Transactional(readOnly = true)
-    public Optional<Entry> find(UUID id) {
-        return repository.findById(id);
+    public Optional<Entry> find(UUID userId, UUID id) {
+        return repository.findByIdAndUserId(id, userId);
     }
 
     /**
@@ -133,8 +141,8 @@ public class EntryService {
      *                                  o item não está pendente ou os dados são inválidos
      */
     @Transactional
-    public Entry resolve(UUID id, int index, long expectedVersion, ResolveCommand command) {
-        Entry entry = repository.findById(id).orElseThrow(() -> new EntryResolutionException(
+    public Entry resolve(UUID userId, UUID id, int index, long expectedVersion, ResolveCommand command) {
+        Entry entry = repository.findByIdAndUserId(id, userId).orElseThrow(() -> new EntryResolutionException(
                 EntryResolutionException.Reason.ENTRY_NOT_FOUND, "Lançamento não encontrado."));
         if (entry.getVersion() != expectedVersion) {
             throw versionMismatch();
@@ -202,17 +210,22 @@ public class EntryService {
      * Lançamentos de um dia no fuso do usuário, pela data em que foram escritos, do mais recente
      * para o mais antigo. Enquanto não há usuários (e fuso por usuário), vale {@link #USER_ZONE}.
      *
-     * @param day o dia, ou {@code null} para hoje
+     * @param userId o dono dos lançamentos
+     * @param day    o dia, ou {@code null} para hoje
      */
     @Transactional(readOnly = true)
-    public List<Entry> listByDay(LocalDate day) {
+    public List<Entry> listByDay(UUID userId, LocalDate day) {
         LocalDate date = day != null ? day : LocalDate.now(clock.withZone(USER_ZONE));
         Instant start = date.atStartOfDay(USER_ZONE).toInstant();
         Instant end = date.plusDays(1).atStartOfDay(USER_ZONE).toInstant();
-        return repository.findByOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtDesc(start, end);
+        return repository.findByUserIdAndOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtDesc(userId,
+                start, end);
     }
 
-    private static CreateResult compareWithExisting(Entry existing, String text, Instant occurredAt) {
+    private static CreateResult compareWithExisting(UUID userId, Entry existing, String text, Instant occurredAt) {
+        if (!existing.getUserId().equals(userId)) {
+            return new CreateResult(Outcome.CONFLICT, null);
+        }
         boolean sameText = normalizeSpaces(existing.getRawText()).equals(normalizeSpaces(text));
         boolean sameOccurredAt = occurredAt == null || Objects.equals(existing.getOccurredAt(), occurredAt);
         return new CreateResult(sameText && sameOccurredAt ? Outcome.ALREADY_EXISTS : Outcome.CONFLICT, existing);

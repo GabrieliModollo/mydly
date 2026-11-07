@@ -1,5 +1,6 @@
 package com.mydly.finance.web;
 
+import com.mydly.accounts.CurrentUser;
 import com.mydly.entries.Category;
 import com.mydly.finance.BudgetPeriod;
 import com.mydly.finance.BudgetProgress;
@@ -28,6 +29,7 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -54,19 +56,24 @@ class BudgetController {
     private final Budgets budgets;
     private final WeekPreferences weeks;
     private final UserCalendar calendar;
+    private final CurrentUser currentUser;
 
-    BudgetController(BudgetService service, Budgets budgets, WeekPreferences weeks, UserCalendar calendar) {
+    BudgetController(BudgetService service, Budgets budgets, WeekPreferences weeks, UserCalendar calendar,
+                     CurrentUser currentUser) {
         this.service = service;
         this.budgets = budgets;
         this.weeks = weeks;
         this.calendar = calendar;
+        this.currentUser = currentUser;
     }
 
     @GetMapping
     @Operation(summary = "Categorias com o orçamento e o gasto do período atual",
             description = "Todas as categorias fixas, na ordem do app. As sem orçamento vêm só com a categoria.")
     List<BudgetResponse> all() {
-        Map<Category, BudgetProgress> progress = budgets.progress(currentWindow(), calendar.zone()).stream()
+        UUID userId = currentUser.id();
+        Map<Category, BudgetProgress> progress = budgets.progress(userId, currentWindow(userId), calendar.zone())
+                .stream()
                 .collect(Collectors.toMap(BudgetProgress::category, Function.identity()));
         return Arrays.stream(Category.values())
                 .map(category -> progress.containsKey(category)
@@ -97,7 +104,7 @@ class BudgetController {
                     @ApiResponse(responseCode = "404", description = "Categoria desconhecida")})
     BudgetResponse put(@CategoryParameter @PathVariable String category, @Valid @RequestBody BudgetRequest request) {
         Category parsed = parse(category);
-        service.set(parsed, request.period(), request.limit());
+        service.set(currentUser.id(), parsed, request.period(), request.limit());
         return response(parsed);
     }
 
@@ -109,20 +116,21 @@ class BudgetController {
                     @ApiResponse(responseCode = "204", description = "A categoria fica sem limite a partir de hoje"),
                     @ApiResponse(responseCode = "404", description = "Categoria desconhecida")})
     ResponseEntity<Void> delete(@CategoryParameter @PathVariable String category) {
-        service.remove(parse(category));
+        service.remove(currentUser.id(), parse(category));
         return ResponseEntity.noContent().build();
     }
 
     private BudgetResponse response(Category category) {
-        return budgets.progress(category, currentWindow(), calendar.zone())
+        UUID userId = currentUser.id();
+        return budgets.progress(userId, category, currentWindow(userId), calendar.zone())
                 .map(BudgetResponse::of)
                 .orElseGet(() -> BudgetResponse.empty(category));
     }
 
     /** O período atual: a semana de hoje nas preferências e o mês de hoje inteiro. */
-    private BudgetWindow currentWindow() {
+    private BudgetWindow currentWindow(UUID userId) {
         LocalDate today = calendar.today();
-        return BudgetWindow.wholePeriods(today, weeks.weekContaining(today).start());
+        return BudgetWindow.wholePeriods(today, weeks.weekContaining(userId, today).start());
     }
 
     private static Category parse(String category) {

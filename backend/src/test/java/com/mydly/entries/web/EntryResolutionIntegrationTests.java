@@ -241,8 +241,8 @@ class EntryResolutionIntegrationTests {
     void statusSoViraConfirmedQuandoOUltimoItemPendenteEResolvido() throws Exception {
         UUID id = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO entry (id, raw_text, occurred_at, detected_type, parsed_json, confidence, status)
-                VALUES (?, 'Comprei pão e acordei as 6', now(), NULL, ?::jsonb, 0.30, 'NEEDS_INPUT')""", id, """
+                INSERT INTO entry (user_id, id, raw_text, occurred_at, detected_type, parsed_json, confidence, status)
+                VALUES ('d3d3d3d3-0000-4000-8000-000000000001', ?, 'Comprei pão e acordei as 6', now(), NULL, ?::jsonb, 0.30, 'NEEDS_INPUT')""", id, """
                 [{"type": "FINANCE", "direction": "EXPENSE", "amount": null, "confidence": 0.4, "description": "Comprei pão"},
                  {"type": "UNKNOWN", "confidence": 0.3, "description": "acordei as 6"}]""");
 

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,9 +37,9 @@ public class HabitGoalService {
 
     /** Todos os hábitos do catálogo com a meta de hoje. */
     @Transactional(readOnly = true)
-    public List<CurrentGoal> all() {
+    public List<CurrentGoal> all(UUID userId) {
         LocalDate today = calendar.today();
-        Map<String, List<HabitGoal>> versions = repository.allVersions(today);
+        Map<String, List<HabitGoal>> versions = repository.allVersions(userId, today);
         return catalog.all().stream()
                 .map(habit -> new CurrentGoal(habit,
                         GoalRules.goalOn(versions.getOrDefault(habit.code(), List.of()), today)))
@@ -47,10 +48,10 @@ public class HabitGoalService {
 
     /** O hábito e a meta de hoje, ou vazio quando o código não é do catálogo. */
     @Transactional(readOnly = true)
-    public Optional<CurrentGoal> find(String habitCode) {
+    public Optional<CurrentGoal> find(UUID userId, String habitCode) {
         LocalDate today = calendar.today();
         return catalog.find(habitCode).map(habit -> new CurrentGoal(habit,
-                GoalRules.goalOn(repository.versions(habit.code(), today), today)));
+                GoalRules.goalOn(repository.versions(userId, habit.code(), today), today)));
     }
 
     /**
@@ -60,7 +61,7 @@ public class HabitGoalService {
      * @throws InvalidGoalException quando a meta não combina com o hábito
      */
     @Transactional
-    public Optional<CurrentGoal> set(String habitCode, GoalKind kind, BigDecimal targetQuantity, String unit,
+    public Optional<CurrentGoal> set(UUID userId, String habitCode, GoalKind kind, BigDecimal targetQuantity, String unit,
                                      Integer daysPerWeek) {
         Optional<HabitCatalog.Habit> found = catalog.find(habitCode);
         if (found.isEmpty()) {
@@ -70,11 +71,11 @@ public class HabitGoalService {
         GoalRules.validate(habit, kind, targetQuantity, unit, daysPerWeek);
         LocalDate today = calendar.today();
         HabitGoal goal = new HabitGoal(habit.code(), today, kind, targetQuantity, unit, daysPerWeek);
-        Optional<HabitGoal> current = GoalRules.goalOn(repository.versions(habit.code(), today), today);
+        Optional<HabitGoal> current = GoalRules.goalOn(repository.versions(userId, habit.code(), today), today);
         if (current.isEmpty() || !sameGoal(current.get(), goal)) {
-            repository.upsert(goal);
+            repository.upsert(userId, goal);
         }
-        return find(habit.code());
+        return find(userId, habit.code());
     }
 
     /**
@@ -83,14 +84,14 @@ public class HabitGoalService {
      * @return {@code false} quando o código não é do catálogo
      */
     @Transactional
-    public boolean remove(String habitCode) {
+    public boolean remove(UUID userId, String habitCode) {
         Optional<HabitCatalog.Habit> found = catalog.find(habitCode);
         if (found.isEmpty()) {
             return false;
         }
         LocalDate today = calendar.today();
-        if (GoalRules.goalOn(repository.versions(habitCode, today), today).isPresent()) {
-            repository.upsert(new HabitGoal(habitCode, today, GoalKind.NONE, null, null, null));
+        if (GoalRules.goalOn(repository.versions(userId, habitCode, today), today).isPresent()) {
+            repository.upsert(userId, new HabitGoal(habitCode, today, GoalKind.NONE, null, null, null));
         }
         return true;
     }

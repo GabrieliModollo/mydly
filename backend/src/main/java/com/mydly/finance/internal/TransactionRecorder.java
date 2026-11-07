@@ -28,8 +28,9 @@ class TransactionRecorder {
 
     private static final String UPSERT = """
             INSERT INTO finance_transaction
-                (entry_id, item_index, revision, active, amount, direction, category, occurred_at, updated_at)
-            VALUES (:entryId, :itemIndex, :revision, :active, :amount, :direction, :category, :occurredAt, now())
+                (entry_id, item_index, user_id, revision, active, amount, direction, category, occurred_at, updated_at)
+            VALUES (:entryId, :itemIndex, :userId, :revision, :active, :amount, :direction, :category, :occurredAt,
+                    now())
             ON CONFLICT (entry_id, item_index) DO UPDATE SET
                 revision = EXCLUDED.revision,
                 active = EXCLUDED.active,
@@ -55,6 +56,7 @@ class TransactionRecorder {
         jdbc.sql(UPSERT)
                 .param("entryId", event.entryId())
                 .param("itemIndex", event.itemIndex())
+                .param("userId", event.userId())
                 .param("revision", event.revision())
                 .param("active", transaction)
                 .param("amount", transaction ? item.amount() : null)
@@ -70,6 +72,7 @@ class TransactionRecorder {
         jdbc.sql(UPSERT)
                 .param("entryId", event.entryId())
                 .param("itemIndex", event.itemIndex())
+                .param("userId", event.userId())
                 .param("revision", event.revision())
                 .param("active", false)
                 .param("amount", null)

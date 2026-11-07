@@ -21,8 +21,10 @@ class HabitRecorder {
 
     private static final String UPSERT = """
             INSERT INTO habit_log
-                (entry_id, item_index, revision, active, habit_code, outcome, quantity, unit, occurred_at, updated_at)
-            VALUES (:entryId, :itemIndex, :revision, :active, :habitCode, :outcome, :quantity, :unit, :occurredAt, now())
+                (entry_id, item_index, user_id, revision, active, habit_code, outcome, quantity, unit, occurred_at,
+                 updated_at)
+            VALUES (:entryId, :itemIndex, :userId, :revision, :active, :habitCode, :outcome, :quantity, :unit,
+                    :occurredAt, now())
             ON CONFLICT (entry_id, item_index) DO UPDATE SET
                 revision = EXCLUDED.revision,
                 active = EXCLUDED.active,
@@ -54,6 +56,7 @@ class HabitRecorder {
         jdbc.sql(UPSERT)
                 .param("entryId", event.entryId())
                 .param("itemIndex", event.itemIndex())
+                .param("userId", event.userId())
                 .param("revision", event.revision())
                 .param("active", routine)
                 .param("habitCode", habitCode)
@@ -70,6 +73,7 @@ class HabitRecorder {
         jdbc.sql(UPSERT)
                 .param("entryId", event.entryId())
                 .param("itemIndex", event.itemIndex())
+                .param("userId", event.userId())
                 .param("revision", event.revision())
                 .param("active", false)
                 .param("habitCode", null)

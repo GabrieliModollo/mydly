@@ -1,5 +1,6 @@
 package com.mydly.entries.internal;
 
+import static com.mydly.TestUsers.DEMO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
@@ -154,7 +155,7 @@ class EntryTests {
         assertThat(entry.effectiveItems()).extracting(item -> item.status().state())
                 .containsExactly(ItemState.ACCEPTED_AUTO, ItemState.PENDING);
         assertThat(entry.getStatus()).isEqualTo(EntryStatus.NEEDS_INPUT);
-        assertThat(entry.pullEvents()).containsExactly(new EntryItemAccepted(entry.getId(), 0, 1, NOW, FINANCE));
+        assertThat(entry.pullEvents()).containsExactly(new EntryItemAccepted(DEMO, entry.getId(), 0, 1, NOW, FINANCE));
         assertThat(entry.pullEvents()).as("os eventos saem uma vez só").isEmpty();
     }
 
@@ -166,7 +167,7 @@ class EntryTests {
 
         entry.resolve(0, ItemResolution.confirmed(confirmed));
 
-        assertThat(entry.pullEvents()).containsExactly(new EntryItemAccepted(entry.getId(), 0, 2, NOW, confirmed));
+        assertThat(entry.pullEvents()).containsExactly(new EntryItemAccepted(DEMO, entry.getId(), 0, 2, NOW, confirmed));
         assertThat(entry.getStatus()).isEqualTo(EntryStatus.CONFIRMED);
     }
 
@@ -186,7 +187,7 @@ class EntryTests {
 
         entry.reopen(0);
 
-        assertThat(entry.pullEvents()).containsExactly(new EntryItemRetracted(entry.getId(), 0, 2));
+        assertThat(entry.pullEvents()).containsExactly(new EntryItemRetracted(DEMO, entry.getId(), 0, 2));
         assertThat(entry.effectiveItems()).containsExactly(
                 new EffectiveItem(FINANCE, new ItemStatus(ItemState.PENDING, 2, true)));
         assertThat(entry.getStatus()).isEqualTo(EntryStatus.NEEDS_INPUT);
@@ -201,7 +202,7 @@ class EntryTests {
 
         entry.resolve(0, ItemResolution.confirmed(corrected));
 
-        assertThat(entry.pullEvents()).containsExactly(new EntryItemAccepted(entry.getId(), 0, 3, NOW, corrected));
+        assertThat(entry.pullEvents()).containsExactly(new EntryItemAccepted(DEMO, entry.getId(), 0, 3, NOW, corrected));
         assertThat(entry.effectiveItems().getFirst().item()).isEqualTo(corrected);
         assertThat(entry.effectiveItems().getFirst().status().parserRejected()).isTrue();
         assertThat(entry.getStatus()).isEqualTo(EntryStatus.CONFIRMED);
@@ -235,9 +236,9 @@ class EntryTests {
         entry.reinterpret(List.of(ROUTINE, FINANCE));
 
         assertThat(entry.pullEvents()).containsExactly(
-                new EntryItemRetracted(entry.getId(), 0, 2),
-                new EntryItemAccepted(entry.getId(), 0, 3, NOW, ROUTINE),
-                new EntryItemAccepted(entry.getId(), 1, 1, NOW, FINANCE));
+                new EntryItemRetracted(DEMO, entry.getId(), 0, 2),
+                new EntryItemAccepted(DEMO, entry.getId(), 0, 3, NOW, ROUTINE),
+                new EntryItemAccepted(DEMO, entry.getId(), 1, 1, NOW, FINANCE));
     }
 
     @Test
@@ -253,17 +254,17 @@ class EntryTests {
         Entry entry = entry(FINANCE, LOW_CONFIDENCE, ROUTINE);
 
         assertThat(entry.acceptedItems()).containsExactly(
-                new EntryItemAccepted(entry.getId(), 0, 1, NOW, FINANCE),
-                new EntryItemAccepted(entry.getId(), 2, 1, NOW, ROUTINE));
+                new EntryItemAccepted(DEMO, entry.getId(), 0, 1, NOW, FINANCE),
+                new EntryItemAccepted(DEMO, entry.getId(), 2, 1, NOW, ROUTINE));
     }
 
     @Test
     void exigeAoMenosUmItem() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> Entry.interpreted(UUID.randomUUID(), "x", NOW, NOW, List.of()));
+                .isThrownBy(() -> Entry.interpreted(DEMO, UUID.randomUUID(), "x", NOW, NOW, List.of()));
     }
 
     private static Entry entry(ParsedEntry... items) {
-        return Entry.interpreted(UUID.randomUUID(), "texto", NOW, NOW, List.of(items));
+        return Entry.interpreted(DEMO, UUID.randomUUID(), "texto", NOW, NOW, List.of(items));
     }
 }

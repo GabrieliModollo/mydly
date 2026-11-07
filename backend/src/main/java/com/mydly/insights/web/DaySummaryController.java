@@ -1,5 +1,6 @@
 package com.mydly.insights.web;
 
+import com.mydly.accounts.CurrentUser;
 import com.mydly.finance.BudgetStatus;
 import com.mydly.finance.BudgetWindow;
 import com.mydly.finance.Budgets;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,14 +43,16 @@ class DaySummaryController {
     private final HabitOutcomes habits;
     private final HabitGoals goals;
     private final WeekPreferences weeks;
+    private final CurrentUser currentUser;
 
     DaySummaryController(FinanceTotals finance, Budgets budgets, HabitOutcomes habits, HabitGoals goals,
-                         WeekPreferences weeks) {
+                         WeekPreferences weeks, CurrentUser currentUser) {
         this.finance = finance;
         this.budgets = budgets;
         this.habits = habits;
         this.goals = goals;
         this.weeks = weeks;
+        this.currentUser = currentUser;
     }
 
     @GetMapping("/{date}/summary")
@@ -60,11 +64,12 @@ class DaySummaryController {
     DaySummaryResponse summary(
             @Parameter(description = "Dia no formato AAAA-MM-DD", example = "2026-11-06")
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        PeriodTotals totals = finance.on(date, USER_ZONE);
-        DayHabits day = habits.on(date, USER_ZONE);
-        BudgetWindow window = BudgetWindow.wholePeriods(date, weeks.weekContaining(date).start());
-        return DaySummaryResponse.of(date, totals, day, goals.daily(date, USER_ZONE),
-                budgets.progress(window, USER_ZONE).stream()
+        UUID userId = currentUser.id();
+        PeriodTotals totals = finance.on(userId, date, USER_ZONE);
+        DayHabits day = habits.on(userId, date, USER_ZONE);
+        BudgetWindow window = BudgetWindow.wholePeriods(date, weeks.weekContaining(userId, date).start());
+        return DaySummaryResponse.of(date, totals, day, goals.daily(userId, date, USER_ZONE),
+                budgets.progress(userId, window, USER_ZONE).stream()
                         .filter(progress -> progress.status() != BudgetStatus.OK)
                         .toList());
     }

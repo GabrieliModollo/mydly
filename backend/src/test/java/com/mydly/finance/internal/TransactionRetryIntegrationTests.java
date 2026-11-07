@@ -1,5 +1,6 @@
 package com.mydly.finance.internal;
 
+import static com.mydly.TestUsers.DEMO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -73,16 +74,16 @@ class TransactionRetryIntegrationTests {
                         .formatted(UUID.randomUUID(), DAY)))
                 .andExpect(status().isCreated());
 
-        assertThat(totals.on(DAY, ZONE).spent()).as("o consumidor falhou").isZero();
+        assertThat(totals.on(DEMO, DAY, ZONE).spent()).as("o consumidor falhou").isZero();
         assertThat(health.health().getStatus()).isEqualTo(Status.OUT_OF_SERVICE);
 
         retry.retry();
 
-        assertThat(totals.on(DAY, ZONE).spent()).isEqualByComparingTo("50");
+        assertThat(totals.on(DEMO, DAY, ZONE).spent()).isEqualByComparingTo("50");
         assertThat(health.health().getStatus()).isEqualTo(Status.UP);
 
         retry.retry();
 
-        assertThat(totals.on(DAY, ZONE).spent()).as("repetir não duplica").isEqualByComparingTo("50");
+        assertThat(totals.on(DEMO, DAY, ZONE).spent()).as("repetir não duplica").isEqualByComparingTo("50");
     }
 }

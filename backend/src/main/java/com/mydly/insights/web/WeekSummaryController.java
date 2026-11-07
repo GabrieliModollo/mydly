@@ -1,5 +1,6 @@
 package com.mydly.insights.web;
 
+import com.mydly.accounts.CurrentUser;
 import com.mydly.insights.internal.Tone;
 import com.mydly.insights.internal.WeekSummaries;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,6 +12,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,7 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Resumo da semana para a tela Resumo: hábitos dia a dia, gastos por categoria, comparação com a
- * semana anterior e as mensagens no tom escolhido. Até existir usuário, o tom vem do aparelho.
+ * semana anterior e as mensagens no tom escolhido. O tom ainda vem do aparelho, a cada pedido.
  */
 @RestController
 @RequestMapping("/api/v1/weeks")
@@ -30,9 +32,11 @@ import org.springframework.web.server.ResponseStatusException;
 class WeekSummaryController {
 
     private final WeekSummaries weeks;
+    private final CurrentUser currentUser;
 
-    WeekSummaryController(WeekSummaries weeks) {
+    WeekSummaryController(WeekSummaries weeks, CurrentUser currentUser) {
         this.weeks = weeks;
+        this.currentUser = currentUser;
     }
 
     @GetMapping("/current/summary")
@@ -41,7 +45,8 @@ class WeekSummaryController {
                     + "(segunda por padrão), no fuso America/Sao_Paulo. Depois de trocar o dia de início, é por "
                     + "aqui que o app acha a semana atual.")
     WeekSummaryResponse current(@ToneParameter @RequestParam(required = false) String tone) {
-        return summary(weeks.currentWeekStart(), tone);
+        UUID userId = currentUser.id();
+        return summary(userId, weeks.currentWeekStart(userId), tone);
     }
 
     @GetMapping("/{start}/summary")
@@ -55,17 +60,18 @@ class WeekSummaryController {
             @Parameter(description = "O primeiro dia da semana, no formato AAAA-MM-DD", example = "2026-11-02")
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @ToneParameter @RequestParam(required = false) String tone) {
-        DayOfWeek firstDay = weeks.firstDayOfWeek();
+        UUID userId = currentUser.id();
+        DayOfWeek firstDay = weeks.firstDayOfWeek(userId);
         if (start.getDayOfWeek() != firstDay) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A semana começa em " + firstDay + ".");
         }
-        return summary(start, tone);
+        return summary(userId, start, tone);
     }
 
-    private WeekSummaryResponse summary(LocalDate start, String toneParameter) {
+    private WeekSummaryResponse summary(UUID userId, LocalDate start, String toneParameter) {
         Tone tone = Tone.fromParameter(toneParameter).orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.BAD_REQUEST, "Tom desconhecido; use gentle, direct ou scold."));
-        return WeekSummaryResponse.of(weeks.of(start, tone), tone);
+        return WeekSummaryResponse.of(weeks.of(userId, start, tone), tone);
     }
 
     /** Documentação comum do parâmetro {@code tone}. */

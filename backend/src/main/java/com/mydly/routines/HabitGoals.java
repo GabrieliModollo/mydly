@@ -8,6 +8,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,9 +33,9 @@ public class HabitGoals {
      * não tiveram registro no dia, na ordem do catálogo.
      */
     @Transactional(readOnly = true)
-    public List<DailyGoalProgress> daily(LocalDate day, ZoneId zone) {
-        Map<String, List<HabitGoal>> versions = repository.allVersions(day);
-        Map<String, Map<LocalDate, List<GoalRules.DayLog>>> logs = repository.logs(day, day.plusDays(1), zone);
+    public List<DailyGoalProgress> daily(UUID userId, LocalDate day, ZoneId zone) {
+        Map<String, List<HabitGoal>> versions = repository.allVersions(userId, day);
+        Map<String, Map<LocalDate, List<GoalRules.DayLog>>> logs = repository.logs(userId, day, day.plusDays(1), zone);
         List<DailyGoalProgress> progress = new ArrayList<>();
         for (HabitCatalog.Habit habit : catalog.all()) {
             GoalRules.goalOn(versions.getOrDefault(habit.code(), List.of()), day)
@@ -50,10 +51,12 @@ public class HabitGoals {
      * semana é a vigente em {@code referenceDay}; hábito sem meta nesse dia fica de fora.
      */
     @Transactional(readOnly = true)
-    public List<WeekGoalScore> week(LocalDate start, LocalDate end, LocalDate referenceDay, ZoneId zone) {
+    public List<WeekGoalScore> week(UUID userId, LocalDate start, LocalDate end, LocalDate referenceDay,
+                                    ZoneId zone) {
         LocalDate until = end.isAfter(referenceDay) ? end : referenceDay;
-        Map<String, List<HabitGoal>> versions = repository.allVersions(until);
-        Map<String, Map<LocalDate, List<GoalRules.DayLog>>> logs = repository.logs(start, end.plusDays(1), zone);
+        Map<String, List<HabitGoal>> versions = repository.allVersions(userId, until);
+        Map<String, Map<LocalDate, List<GoalRules.DayLog>>> logs = repository.logs(userId, start, end.plusDays(1),
+                zone);
         List<LocalDate> days = start.datesUntil(end.plusDays(1)).toList();
         List<WeekGoalScore> scores = new ArrayList<>();
         for (HabitCatalog.Habit habit : catalog.all()) {

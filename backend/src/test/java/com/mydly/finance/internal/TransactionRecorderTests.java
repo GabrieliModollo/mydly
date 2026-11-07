@@ -1,5 +1,6 @@
 package com.mydly.finance.internal;
 
+import static com.mydly.TestUsers.DEMO;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mydly.TestcontainersConfiguration;
@@ -28,7 +29,7 @@ import org.springframework.modulith.test.Scenario;
  * Os eventos podem chegar repetidos ou fora de ordem quando o registro de publicação reenvia.
  */
 // O módulo usa a API pública de preferences (dia de hoje e semana), que entra junto (ADR 0010).
-@ApplicationModuleTest(extraIncludes = "preferences")
+@ApplicationModuleTest(extraIncludes = {"preferences", "accounts"})
 @Import(TestcontainersConfiguration.class)
 class TransactionRecorderTests {
 
@@ -60,7 +61,7 @@ class TransactionRecorderTests {
                 .andWaitForStateChange(() -> spent(), total -> total.signum() > 0)
                 .andVerify(total -> assertThat(total).isEqualByComparingTo("50"));
 
-        PeriodTotals day = totals.on(this.day, ZONE);
+        PeriodTotals day = totals.on(DEMO, this.day, ZONE);
         assertThat(day.spentByCategory()).containsExactly(
                 new PeriodTotals.CategoryTotal(Category.PHARMACY, new BigDecimal("50.00")));
     }
@@ -75,7 +76,7 @@ class TransactionRecorderTests {
 
     @Test
     void retiradaQueChegaAntesDaAceitacaoDeixaOItemDeFora() {
-        recorder.on(new EntryItemRetracted(entryId, 0, 2));
+        recorder.on(new EntryItemRetracted(DEMO, entryId, 0, 2));
         recorder.on(accepted(1, "50", null));
 
         assertThat(spent()).isZero();
@@ -84,7 +85,7 @@ class TransactionRecorderTests {
     @Test
     void aceitacaoAntigaAtrasadaNaoRessuscitaOItemRetirado() {
         recorder.on(accepted(1, "50", null));
-        recorder.on(new EntryItemRetracted(entryId, 0, 2));
+        recorder.on(new EntryItemRetracted(DEMO, entryId, 0, 2));
         recorder.on(accepted(1, "50", null));
 
         assertThat(spent()).isZero();
@@ -93,7 +94,7 @@ class TransactionRecorderTests {
     @Test
     void itemReaceitoVoltaAContarComOValorNovo() {
         recorder.on(accepted(1, "50", null));
-        recorder.on(new EntryItemRetracted(entryId, 0, 2));
+        recorder.on(new EntryItemRetracted(DEMO, entryId, 0, 2));
         recorder.on(accepted(3, "35", null));
 
         assertThat(spent()).isEqualByComparingTo("35");
@@ -101,10 +102,10 @@ class TransactionRecorderTests {
 
     @Test
     void entradaContaSeparadaDoGasto() {
-        recorder.on(new EntryItemAccepted(entryId, 0, 1, noon,
+        recorder.on(new EntryItemAccepted(DEMO, entryId, 0, 1, noon,
                 ParsedEntry.finance(Direction.INCOME, new BigDecimal("100"), "Recebi 100 reais", 0.95)));
 
-        PeriodTotals day = totals.on(this.day, ZONE);
+        PeriodTotals day = totals.on(DEMO, this.day, ZONE);
         assertThat(day.received()).isEqualByComparingTo("100");
         assertThat(day.spent()).isZero();
     }
@@ -112,7 +113,7 @@ class TransactionRecorderTests {
     @Test
     void itemQueDeixouDeSerFinancaSaiDosTotais() {
         recorder.on(accepted(1, "50", null));
-        recorder.on(new EntryItemAccepted(entryId, 0, 3, noon,
+        recorder.on(new EntryItemAccepted(DEMO, entryId, 0, 3, noon,
                 ParsedEntry.routine(null, null, "Fui à academia", 1.0)));
 
         assertThat(spent()).isZero();
@@ -122,19 +123,19 @@ class TransactionRecorderTests {
     void diaSegueOFusoDeSaoPaulo() {
         // 02:30Z do dia seguinte ainda são 23:30 deste dia em São Paulo.
         Instant lateNight = day.plusDays(1).atStartOfDay(ZoneId.of("UTC")).plusMinutes(150).toInstant();
-        recorder.on(new EntryItemAccepted(entryId, 0, 1, lateNight,
+        recorder.on(new EntryItemAccepted(DEMO, entryId, 0, 1, lateNight,
                 ParsedEntry.finance(Direction.EXPENSE, BigDecimal.TEN, "x", 0.95)));
 
         assertThat(spent()).isEqualByComparingTo("10");
-        assertThat(totals.on(day.plusDays(1), ZONE).spent()).isZero();
+        assertThat(totals.on(DEMO, day.plusDays(1), ZONE).spent()).isZero();
     }
 
     private EntryItemAccepted accepted(long revision, String amount, Category category) {
-        return new EntryItemAccepted(entryId, 0, revision, noon,
+        return new EntryItemAccepted(DEMO, entryId, 0, revision, noon,
                 ParsedEntry.finance(Direction.EXPENSE, new BigDecimal(amount), category, "Gastei " + amount, 0.95));
     }
 
     private BigDecimal spent() {
-        return totals.on(day, ZONE).spent();
+        return totals.on(DEMO, day, ZONE).spent();
     }
 }

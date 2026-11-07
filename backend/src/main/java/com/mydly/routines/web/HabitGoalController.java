@@ -1,5 +1,6 @@
 package com.mydly.routines.web;
 
+import com.mydly.accounts.CurrentUser;
 import com.mydly.routines.GoalKind;
 import com.mydly.routines.internal.HabitGoalService;
 import com.mydly.routines.internal.InvalidGoalException;
@@ -37,9 +38,11 @@ class HabitGoalController {
     private static final String NOT_FOUND = "Hábito fora do catálogo.";
 
     private final HabitGoalService service;
+    private final CurrentUser currentUser;
 
-    HabitGoalController(HabitGoalService service) {
+    HabitGoalController(HabitGoalService service, CurrentUser currentUser) {
         this.service = service;
+        this.currentUser = currentUser;
     }
 
     @GetMapping
@@ -47,7 +50,7 @@ class HabitGoalController {
             description = "Todos os hábitos do catálogo, com a polaridade, a medida, os tipos de meta aceitos e a "
                     + "meta vigente hoje (ausente quando o hábito está sem meta).")
     List<HabitGoalResponse> all() {
-        return service.all().stream().map(HabitGoalResponse::of).toList();
+        return service.all(currentUser.id()).stream().map(HabitGoalResponse::of).toList();
     }
 
     @GetMapping("/{habitId}")
@@ -55,7 +58,7 @@ class HabitGoalController {
             @ApiResponse(responseCode = "200", description = "O hábito e a meta vigente hoje"),
             @ApiResponse(responseCode = "404", description = "Hábito fora do catálogo")})
     HabitGoalResponse get(@HabitParameter @PathVariable String habitId) {
-        return service.find(habitId).map(HabitGoalResponse::of)
+        return service.find(currentUser.id(), habitId).map(HabitGoalResponse::of)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND));
     }
 
@@ -80,7 +83,7 @@ class HabitGoalController {
                     @ApiResponse(responseCode = "404", description = "Hábito fora do catálogo")})
     HabitGoalResponse put(@HabitParameter @PathVariable String habitId, @Valid @RequestBody GoalRequest request) {
         try {
-            return service.set(habitId, request.kind(), request.targetQuantity(), request.unit(), request.daysPerWeek())
+            return service.set(currentUser.id(), habitId, request.kind(), request.targetQuantity(), request.unit(), request.daysPerWeek())
                     .map(HabitGoalResponse::of)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND));
         } catch (InvalidGoalException e) {
@@ -96,7 +99,7 @@ class HabitGoalController {
                     @ApiResponse(responseCode = "204", description = "O hábito fica sem meta a partir de hoje"),
                     @ApiResponse(responseCode = "404", description = "Hábito fora do catálogo")})
     ResponseEntity<Void> delete(@HabitParameter @PathVariable String habitId) {
-        if (!service.remove(habitId)) {
+        if (!service.remove(currentUser.id(), habitId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
         }
         return ResponseEntity.noContent().build();

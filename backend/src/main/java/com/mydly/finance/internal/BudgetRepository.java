@@ -8,21 +8,22 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 /**
- * Versões dos orçamentos ({@code budget}). Uma versão nunca é apagada; a do mesmo dia é substituída
- * pela gravação nova.
+ * Versões dos orçamentos ({@code budget}), sempre de um usuário. Uma versão nunca é apagada; a do
+ * mesmo dia é substituída pela gravação nova.
  */
 @Repository
 public class BudgetRepository {
 
     private static final String UPSERT = """
-            INSERT INTO budget (category, valid_from, period, limit_amount)
-            VALUES (:category, :validFrom, :period, :limit)
-            ON CONFLICT (category, valid_from) DO UPDATE SET
+            INSERT INTO budget (user_id, category, valid_from, period, limit_amount)
+            VALUES (:userId, :category, :validFrom, :period, :limit)
+            ON CONFLICT (user_id, category, valid_from) DO UPDATE SET
                 period = EXCLUDED.period,
                 limit_amount = EXCLUDED.limit_amount,
                 updated_at = now()
@@ -35,8 +36,9 @@ public class BudgetRepository {
     }
 
     /** Grava a versão; se já existe uma no mesmo dia para a categoria, ela é substituída. */
-    public void upsert(Budget budget) {
+    public void upsert(UUID userId, Budget budget) {
         jdbc.sql(UPSERT)
+                .param("userId", userId)
                 .param("category", budget.category().name())
                 .param("validFrom", budget.validFrom())
                 .param("period", budget.period() == null ? null : budget.period().name())
@@ -44,11 +46,12 @@ public class BudgetRepository {
                 .update();
     }
 
-    /** As versões de todas as categorias que começam até {@code until}, por categoria. */
-    public Map<Category, List<Budget>> allVersions(LocalDate until) {
+    /** As versões de todas as categorias do usuário que começam até {@code until}, por categoria. */
+    public Map<Category, List<Budget>> allVersions(UUID userId, LocalDate until) {
         return jdbc.sql("""
                         SELECT category, valid_from, period, limit_amount FROM budget
-                        WHERE valid_from <= :until ORDER BY category, valid_from""")
+                        WHERE user_id = :userId AND valid_from <= :until ORDER BY category, valid_from""")
+                .param("userId", userId)
                 .param("until", until)
                 .query((rs, n) -> new Budget(Category.valueOf(rs.getString("category")),
                         rs.getObject("valid_from", LocalDate.class),
@@ -67,7 +70,7 @@ public class BudgetRepository {
     }
 
     /** O orçamento com efeito em {@code day}: a versão vigente, se ela não for a de remoção. */
-    public Optional<Budget> budgetOn(Category category, LocalDate day) {
-        return versionOn(allVersions(day).getOrDefault(category, List.of()), day).filter(Budget::active);
+    public Optional<Budget> budgetOn(UUID userId, Category category, LocalDate day) {
+        return versionOn(allVersions(userId, day).getOrDefault(category, List.of()), day).filter(Budget::active);
     }
 }

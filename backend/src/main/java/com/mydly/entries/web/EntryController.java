@@ -1,5 +1,6 @@
 package com.mydly.entries.web;
 
+import com.mydly.accounts.CurrentUser;
 import com.mydly.entries.internal.EntryResolutionException;
 import com.mydly.entries.internal.EntryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,9 +35,11 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 class EntryController {
 
     private final EntryService service;
+    private final CurrentUser currentUser;
 
-    EntryController(EntryService service) {
+    EntryController(EntryService service, CurrentUser currentUser) {
         this.service = service;
+        this.currentUser = currentUser;
     }
 
     @PostMapping
@@ -60,7 +63,8 @@ class EntryController {
                     @ApiResponse(responseCode = "400", description = "Texto vazio, longo demais ou JSON inválido"),
                     @ApiResponse(responseCode = "409", description = "O id já existe com outro texto ou outra data")})
     ResponseEntity<EntryResponse> create(@Valid @RequestBody CreateEntryRequest request) {
-        EntryService.CreateResult result = service.create(request.id(), request.text(), request.occurredAt());
+        EntryService.CreateResult result = service.create(currentUser.id(), request.id(), request.text(),
+                request.occurredAt());
         return switch (result.outcome()) {
             case CREATED -> {
                 EntryResponse body = EntryResponse.from(result.entry());
@@ -87,7 +91,7 @@ class EntryController {
     List<EntryResponse> listByDay(
             @Parameter(description = "Dia no formato AAAA-MM-DD; se omitido, hoje", example = "2026-11-05")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return service.listByDay(date).stream().map(EntryResponse::from).toList();
+        return service.listByDay(currentUser.id(), date).stream().map(EntryResponse::from).toList();
     }
 
     @GetMapping("/{id}")
@@ -95,7 +99,7 @@ class EntryController {
             @ApiResponse(responseCode = "200", description = "Lançamento encontrado"),
             @ApiResponse(responseCode = "404", description = "Não existe lançamento com esse id")})
     ResponseEntity<EntryResponse> find(@PathVariable UUID id) {
-        EntryResponse body = service.find(id)
+        EntryResponse body = service.find(currentUser.id(), id)
                 .map(EntryResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lançamento não encontrado"));
         return ResponseEntity.ok().eTag(body.etag()).body(body);
@@ -133,7 +137,8 @@ class EntryController {
             @Valid @RequestBody ResolveItemRequest request) {
         long expectedVersion = parseVersion(ifMatch);
         try {
-            EntryResponse body = EntryResponse.from(service.resolve(id, index, expectedVersion, request.toCommand()));
+            EntryResponse body = EntryResponse.from(service.resolve(currentUser.id(), id, index, expectedVersion,
+                    request.toCommand()));
             return ResponseEntity.ok().eTag(body.etag()).body(body);
         } catch (EntryResolutionException e) {
             throw new ResponseStatusException(statusFor(e.reason()), e.getMessage());

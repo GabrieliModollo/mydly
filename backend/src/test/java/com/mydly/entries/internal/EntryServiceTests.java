@@ -1,5 +1,6 @@
 package com.mydly.entries.internal;
 
+import static com.mydly.TestUsers.DEMO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,14 +42,14 @@ class EntryServiceTests {
             events, mock(PlatformTransactionManager.class));
 
     private final UUID id = UUID.randomUUID();
-    private final Entry saved = Entry.interpreted(id, "Gastei 50 reais", NOW_IN_MICROS, NOW_IN_MICROS,
+    private final Entry saved = Entry.interpreted(DEMO, id, "Gastei 50 reais", NOW_IN_MICROS, NOW_IN_MICROS,
             List.of(ParsedEntry.finance(Direction.EXPENSE, BigDecimal.valueOf(50), "Gastei 50 reais", 0.95)));
 
     @Test
     void envioSimultaneoDoMesmoLancamentoDevolveOQueGravouPrimeiro() {
         simulateConcurrentInsert();
 
-        EntryService.CreateResult result = service.create(id, "Gastei 50 reais", null);
+        EntryService.CreateResult result = service.create(DEMO, id, "Gastei 50 reais", null);
 
         assertThat(result.outcome()).isEqualTo(Outcome.ALREADY_EXISTS);
         assertThat(result.entry()).isSameAs(saved);
@@ -58,7 +59,7 @@ class EntryServiceTests {
     void envioSimultaneoComOutroTextoEConflito() {
         simulateConcurrentInsert();
 
-        assertThat(service.create(id, "Gastei 60 reais", null).outcome()).isEqualTo(Outcome.CONFLICT);
+        assertThat(service.create(DEMO, id, "Gastei 60 reais", null).outcome()).isEqualTo(Outcome.CONFLICT);
     }
 
     @Test
@@ -68,7 +69,7 @@ class EntryServiceTests {
         when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("outra restrição"));
 
         assertThatExceptionOfType(DataIntegrityViolationException.class)
-                .isThrownBy(() -> service.create(id, "Gastei 50 reais", null));
+                .isThrownBy(() -> service.create(DEMO, id, "Gastei 50 reais", null));
     }
 
     @Test
@@ -77,7 +78,7 @@ class EntryServiceTests {
         when(repository.findById(id)).thenReturn(Optional.empty());
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        EntryService.CreateResult result = service.create(id, "Gastei 50 reais", null);
+        EntryService.CreateResult result = service.create(DEMO, id, "Gastei 50 reais", null);
 
         assertThat(result.outcome()).isEqualTo(Outcome.CREATED);
         assertThat(result.entry().getOccurredAt()).isEqualTo(NOW_IN_MICROS);
@@ -88,7 +89,7 @@ class EntryServiceTests {
     void dataComNanossegundosNoReenvioNaoViraConflito() {
         when(repository.findById(id)).thenReturn(Optional.of(saved));
 
-        assertThat(service.create(id, "Gastei 50 reais", NOW).outcome()).isEqualTo(Outcome.ALREADY_EXISTS);
+        assertThat(service.create(DEMO, id, "Gastei 50 reais", NOW).outcome()).isEqualTo(Outcome.ALREADY_EXISTS);
     }
 
     @Test
@@ -98,9 +99,9 @@ class EntryServiceTests {
         EntryService lateService = new EntryService(repository, parser, lateNight, events,
                 mock(PlatformTransactionManager.class));
 
-        lateService.listByDay(null);
+        lateService.listByDay(DEMO, null);
 
-        verify(repository).findByOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtDesc(
+        verify(repository).findByUserIdAndOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtDesc(DEMO,
                 Instant.parse("2026-11-05T03:00:00Z"), Instant.parse("2026-11-06T03:00:00Z"));
     }
 
@@ -108,22 +109,22 @@ class EntryServiceTests {
             new EntryService.ResolveCommand(ResolutionAction.DISMISS, null, null, null, null, null, null);
 
     private Entry pendingEntry() {
-        return Entry.interpreted(id, "Comprei  pão ", NOW_IN_MICROS, NOW_IN_MICROS,
+        return Entry.interpreted(DEMO, id, "Comprei  pão ", NOW_IN_MICROS, NOW_IN_MICROS,
                 List.of(ParsedEntry.finance(Direction.EXPENSE, null, "Comprei pão", 0.4)));
     }
 
     @Test
     void resolverLancamentoInexistenteOuDeOutraVersaoFalha() {
-        when(repository.findById(id)).thenReturn(Optional.empty());
+        when(repository.findByIdAndUserId(id, DEMO)).thenReturn(Optional.empty());
         assertThat(resolveReason(0, DISMISS)).isEqualTo(EntryResolutionException.Reason.ENTRY_NOT_FOUND);
 
-        when(repository.findById(id)).thenReturn(Optional.of(pendingEntry()));
+        when(repository.findByIdAndUserId(id, DEMO)).thenReturn(Optional.of(pendingEntry()));
         assertThat(resolveReason(7, DISMISS)).isEqualTo(EntryResolutionException.Reason.VERSION_MISMATCH);
     }
 
     @Test
     void alteracaoConcorrenteNoMomentoDeGravarViraVersaoDesatualizada() {
-        when(repository.findById(id)).thenReturn(Optional.of(pendingEntry()));
+        when(repository.findByIdAndUserId(id, DEMO)).thenReturn(Optional.of(pendingEntry()));
         when(repository.saveAndFlush(any())).thenThrow(new ObjectOptimisticLockingFailureException(Entry.class, id));
 
         assertThat(resolveReason(0, DISMISS)).isEqualTo(EntryResolutionException.Reason.VERSION_MISMATCH);
@@ -131,10 +132,10 @@ class EntryServiceTests {
 
     @Test
     void gastoConfirmadoESaidaPorPadraoComODescricaoDoTexto() {
-        when(repository.findById(id)).thenReturn(Optional.of(pendingEntry()));
+        when(repository.findByIdAndUserId(id, DEMO)).thenReturn(Optional.of(pendingEntry()));
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Entry entry = service.resolve(id, 0, 0, new EntryService.ResolveCommand(ResolutionAction.CONFIRM_FINANCE,
+        Entry entry = service.resolve(DEMO, id, 0, 0, new EntryService.ResolveCommand(ResolutionAction.CONFIRM_FINANCE,
                 new BigDecimal("8.50"), null, Category.FOOD, null, null, null));
 
         ParsedEntry item = entry.effectiveItems().getFirst().item();
@@ -146,10 +147,10 @@ class EntryServiceTests {
 
     @Test
     void rotinaConfirmadaECumpridaPorPadrao() {
-        when(repository.findById(id)).thenReturn(Optional.of(pendingEntry()));
+        when(repository.findByIdAndUserId(id, DEMO)).thenReturn(Optional.of(pendingEntry()));
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Entry entry = service.resolve(id, 0, 0,
+        Entry entry = service.resolve(DEMO, id, 0, 0,
                 new EntryService.ResolveCommand(ResolutionAction.CONFIRM_ROUTINE, null, null, null, null, null, null));
 
         assertThat(entry.effectiveItems().getFirst().item().outcome()).isEqualTo(RoutineOutcome.DONE);
@@ -157,10 +158,10 @@ class EntryServiceTests {
 
     @Test
     void rotinaPodeSerConfirmadaComoNaoCumprida() {
-        when(repository.findById(id)).thenReturn(Optional.of(pendingEntry()));
+        when(repository.findByIdAndUserId(id, DEMO)).thenReturn(Optional.of(pendingEntry()));
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Entry entry = service.resolve(id, 0, 0, new EntryService.ResolveCommand(ResolutionAction.CONFIRM_ROUTINE,
+        Entry entry = service.resolve(DEMO, id, 0, 0, new EntryService.ResolveCommand(ResolutionAction.CONFIRM_ROUTINE,
                 null, null, null, null, null, RoutineOutcome.MISSED));
 
         assertThat(entry.effectiveItems().getFirst().item().outcome()).isEqualTo(RoutineOutcome.MISSED);
@@ -168,7 +169,7 @@ class EntryServiceTests {
 
     private EntryResolutionException.Reason resolveReason(long version, EntryService.ResolveCommand command) {
         try {
-            service.resolve(id, 0, version, command);
+            service.resolve(DEMO, id, 0, version, command);
         } catch (EntryResolutionException e) {
             return e.reason();
         }

@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * API pública do módulo routines: como ficou cada hábito num dia, com a polaridade aplicada.
+ * API pública do módulo routines: como ficou cada hábito de um usuário num dia, com a polaridade aplicada.
  * Só contam os registros ativos; itens retirados com {@code Não foi isso} ficam de fora.
  */
 @Service
@@ -28,12 +28,13 @@ public class HabitOutcomes {
 
     /** Hábitos do dia no fuso informado. */
     @Transactional(readOnly = true)
-    public DayHabits on(LocalDate day, ZoneId zone) {
+    public DayHabits on(UUID userId, LocalDate day, ZoneId zone) {
         List<Row> rows = jdbc.sql("""
                         SELECT l.entry_id, l.item_index, l.outcome, h.code, h.name, h.polarity
                         FROM habit_log l LEFT JOIN habit h ON h.code = l.habit_code
-                        WHERE l.active AND l.occurred_at >= :start AND l.occurred_at < :end
+                        WHERE l.user_id = :userId AND l.active AND l.occurred_at >= :start AND l.occurred_at < :end
                         ORDER BY l.occurred_at, l.item_index""")
+                .param("userId", userId)
                 .param("start", Timestamp.from(day.atStartOfDay(zone).toInstant()))
                 .param("end", Timestamp.from(day.plusDays(1).atStartOfDay(zone).toInstant()))
                 .query((rs, n) -> new Row(rs.getObject("entry_id", UUID.class), rs.getInt("item_index"),

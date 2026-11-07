@@ -191,8 +191,8 @@ class EntryApiIntegrationTests {
         UUID id = UUID.randomUUID();
         String fixture = new ClassPathResource("fixtures/parsed-json-v1.json").getContentAsString(StandardCharsets.UTF_8);
         jdbc.update("""
-                INSERT INTO entry (id, raw_text, occurred_at, detected_type, parsed_json, confidence, status)
-                VALUES (?, 'lançamento antigo', '2026-11-01T10:00:00Z', NULL, ?::jsonb, 0.30, 'NEEDS_INPUT')""",
+                INSERT INTO entry (user_id, id, raw_text, occurred_at, detected_type, parsed_json, confidence, status)
+                VALUES ('d3d3d3d3-0000-4000-8000-000000000001', ?, 'lançamento antigo', '2026-11-01T10:00:00Z', NULL, ?::jsonb, 0.30, 'NEEDS_INPUT')""",
                 id, fixture);
 
         mvc.perform(get("/api/v1/entries/{id}", id))

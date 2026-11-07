@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,8 +31,8 @@ public class Budgets {
 
     /** O progresso de toda categoria com orçamento no dia de referência, na ordem das categorias. */
     @Transactional(readOnly = true)
-    public List<BudgetProgress> progress(BudgetWindow window, ZoneId zone) {
-        Map<Category, List<Budget>> versions = repository.allVersions(window.referenceDay());
+    public List<BudgetProgress> progress(UUID userId, BudgetWindow window, ZoneId zone) {
+        Map<Category, List<Budget>> versions = repository.allVersions(userId, window.referenceDay());
         List<Budget> active = new ArrayList<>();
         for (Category category : Category.values()) {
             BudgetRepository.versionOn(versions.getOrDefault(category, List.of()), window.referenceDay())
@@ -49,9 +50,9 @@ public class Budgets {
             LocalDate from = weekly ? window.weekStart() : window.monthStart();
             LocalDate to = weekly ? window.weekEnd() : window.monthEnd();
             if (weekly && week == null) {
-                week = totals(from, to, zone);
+                week = totals(userId, from, to, zone);
             } else if (!weekly && month == null) {
-                month = totals(from, to, zone);
+                month = totals(userId, from, to, zone);
             }
             BigDecimal spent = spentIn(weekly ? week : month, budget.category());
             progress.add(BudgetProgress.of(budget, from, to, spent));
@@ -61,12 +62,12 @@ public class Budgets {
 
     /** O progresso de uma categoria, ou vazio quando ela não tem orçamento no dia de referência. */
     @Transactional(readOnly = true)
-    public Optional<BudgetProgress> progress(Category category, BudgetWindow window, ZoneId zone) {
-        return progress(window, zone).stream().filter(item -> item.category() == category).findFirst();
+    public Optional<BudgetProgress> progress(UUID userId, Category category, BudgetWindow window, ZoneId zone) {
+        return progress(userId, window, zone).stream().filter(item -> item.category() == category).findFirst();
     }
 
-    private PeriodTotals totals(LocalDate from, LocalDate to, ZoneId zone) {
-        return totals.between(from.atStartOfDay(zone).toInstant(), to.plusDays(1).atStartOfDay(zone).toInstant());
+    private PeriodTotals totals(UUID userId, LocalDate from, LocalDate to, ZoneId zone) {
+        return totals.between(userId, from.atStartOfDay(zone).toInstant(), to.plusDays(1).atStartOfDay(zone).toInstant());
     }
 
     private static BigDecimal spentIn(PeriodTotals totals, Category category) {

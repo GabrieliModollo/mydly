@@ -1,5 +1,6 @@
 package com.mydly.routines.internal;
 
+import static com.mydly.TestUsers.DEMO;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mydly.TestcontainersConfiguration;
@@ -31,7 +32,7 @@ import org.springframework.modulith.test.Scenario;
  * de revisão e lápide do módulo finance (ADR 0008).
  */
 // O módulo usa a API pública de preferences (dia de hoje e semana), que entra junto (ADR 0010).
-@ApplicationModuleTest(extraIncludes = "preferences")
+@ApplicationModuleTest(extraIncludes = {"preferences", "accounts"})
 @Import(TestcontainersConfiguration.class)
 class HabitRecorderTests {
 
@@ -102,7 +103,7 @@ class HabitRecorderTests {
     @Test
     void naoComiBesteiraContaComoConquistaPorEvento(Scenario scenario) {
         scenario.publish(routine(UUID.randomUUID(), 1, RoutineOutcome.MISSED, "Não comi besteira"))
-                .andWaitForStateChange(() -> outcomes.on(day, ZONE), habits -> !habits.habits().isEmpty())
+                .andWaitForStateChange(() -> outcomes.on(DEMO, day, ZONE), habits -> !habits.habits().isEmpty())
                 .andVerify(habits -> {
                     assertThat(habits.achieved()).isEqualTo(1);
                     assertThat(habits.habits().getFirst().status()).isEqualTo(HabitStatus.ACHIEVED);
@@ -113,14 +114,14 @@ class HabitRecorderTests {
     void deixeiDeFumarContaComoConquista() {
         recorder.on(routine(UUID.randomUUID(), 1, RoutineOutcome.MISSED, "Deixei de fumar"));
 
-        assertThat(outcomes.on(day, ZONE).achieved()).isEqualTo(1);
+        assertThat(outcomes.on(DEMO, day, ZONE).achieved()).isEqualTo(1);
     }
 
     @Test
     void consumirHabitoRuimEDeslize() {
         recorder.on(routine(UUID.randomUUID(), 1, RoutineOutcome.DONE, "Tomei 2 energéticos"));
 
-        DayHabits habits = outcomes.on(day, ZONE);
+        DayHabits habits = outcomes.on(DEMO, day, ZONE);
         assertThat(habits.slipped()).isEqualTo(1);
         assertThat(habits.achieved()).isZero();
     }
@@ -130,7 +131,7 @@ class HabitRecorderTests {
         recorder.on(routine(UUID.randomUUID(), 1, RoutineOutcome.DONE, "Bebi 1 litro de água"));
         recorder.on(routine(UUID.randomUUID(), 1, RoutineOutcome.DONE, "Bebi mais 1 litro de água"));
 
-        assertThat(outcomes.on(day, ZONE).achieved()).isEqualTo(1);
+        assertThat(outcomes.on(DEMO, day, ZONE).achieved()).isEqualTo(1);
     }
 
     @Test
@@ -138,7 +139,7 @@ class HabitRecorderTests {
         recorder.on(routine(UUID.randomUUID(), 1, RoutineOutcome.MISSED, "Não comi besteira"));
         recorder.on(routine(UUID.randomUUID(), 1, RoutineOutcome.DONE, "Comi besteira"));
 
-        DayHabits habits = outcomes.on(day, ZONE);
+        DayHabits habits = outcomes.on(DEMO, day, ZONE);
         assertThat(habits.slipped()).isEqualTo(1);
         assertThat(habits.achieved()).isZero();
     }
@@ -148,7 +149,7 @@ class HabitRecorderTests {
         UUID entryId = UUID.randomUUID();
         recorder.on(routine(entryId, 1, RoutineOutcome.DONE, "Meditei"));
 
-        DayHabits habits = outcomes.on(day, ZONE);
+        DayHabits habits = outcomes.on(DEMO, day, ZONE);
         assertThat(habits.habits()).isEmpty();
         assertThat(habits.logs()).singleElement()
                 .satisfies(log -> {
@@ -161,25 +162,25 @@ class HabitRecorderTests {
     void retiradaEReaceiteSeguemARevisao() {
         UUID entryId = UUID.randomUUID();
         recorder.on(routine(entryId, 1, RoutineOutcome.DONE, "Fui à academia"));
-        recorder.on(new EntryItemRetracted(entryId, 0, 2));
+        recorder.on(new EntryItemRetracted(DEMO, entryId, 0, 2));
         recorder.on(routine(entryId, 1, RoutineOutcome.DONE, "Fui à academia"));
 
-        assertThat(outcomes.on(day, ZONE).logs()).isEmpty();
+        assertThat(outcomes.on(DEMO, day, ZONE).logs()).isEmpty();
 
         recorder.on(routine(entryId, 3, RoutineOutcome.DONE, "Fui à academia"));
 
-        assertThat(outcomes.on(day, ZONE).achieved()).isEqualTo(1);
+        assertThat(outcomes.on(DEMO, day, ZONE).achieved()).isEqualTo(1);
     }
 
     @Test
     void itemDeFinancaNaoViraHabito() {
-        recorder.on(new EntryItemAccepted(UUID.randomUUID(), 0, 1, noon,
+        recorder.on(new EntryItemAccepted(DEMO, UUID.randomUUID(), 0, 1, noon,
                 ParsedEntry.finance(Direction.EXPENSE, BigDecimal.TEN, "Comprei energético", 0.95)));
 
-        assertThat(outcomes.on(day, ZONE).logs()).isEmpty();
+        assertThat(outcomes.on(DEMO, day, ZONE).logs()).isEmpty();
     }
 
     private EntryItemAccepted routine(UUID entryId, long revision, RoutineOutcome outcome, String text) {
-        return new EntryItemAccepted(entryId, 0, revision, noon, ParsedEntry.routine(outcome, null, null, text, 0.6));
+        return new EntryItemAccepted(DEMO, entryId, 0, revision, noon, ParsedEntry.routine(outcome, null, null, text, 0.6));
     }
 }

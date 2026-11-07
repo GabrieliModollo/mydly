@@ -1,5 +1,6 @@
 package com.mydly.preferences.web;
 
+import com.mydly.accounts.CurrentUser;
 import com.mydly.preferences.internal.PreferencesRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.DayOfWeek;
+import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -18,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Preferências do usuário, globais até existir usuário (ADR 0010). Hoje só o dia de início da semana.
+ * Preferências de quem está logado (ADR 0010 e ADR 0012). Hoje só o dia de início da semana.
  */
 @RestController
 @RequestMapping("/api/v1/preferences")
@@ -26,16 +28,18 @@ import org.springframework.web.bind.annotation.RestController;
 class PreferencesController {
 
     private final PreferencesRepository repository;
+    private final CurrentUser currentUser;
 
-    PreferencesController(PreferencesRepository repository) {
+    PreferencesController(PreferencesRepository repository, CurrentUser currentUser) {
         this.repository = repository;
+        this.currentUser = currentUser;
     }
 
     @GetMapping
     @Operation(summary = "Preferências atuais")
     @Transactional(readOnly = true)
     Preferences get() {
-        return new Preferences(repository.firstDayOfWeek());
+        return new Preferences(repository.firstDayOfWeek(currentUser.id()));
     }
 
     @PutMapping
@@ -51,8 +55,9 @@ class PreferencesController {
                     @ApiResponse(responseCode = "400", description = "Dia ausente ou inválido")})
     @Transactional
     Preferences put(@Valid @RequestBody Preferences request) {
-        repository.saveFirstDayOfWeek(request.firstDayOfWeek());
-        return new Preferences(repository.firstDayOfWeek());
+        UUID userId = currentUser.id();
+        repository.saveFirstDayOfWeek(userId, request.firstDayOfWeek());
+        return new Preferences(repository.firstDayOfWeek(userId));
     }
 
     @Schema(description = "Preferências do usuário")

@@ -1,5 +1,6 @@
 package com.mydly.entries.internal;
 
+import static com.mydly.TestUsers.DEMO;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mydly.TestcontainersConfiguration;
@@ -46,8 +47,8 @@ class AcceptedItemsBackfillIntegrationTests {
         // Como um lançamento antigo, gravado direto no banco: um gasto aceito, uma rotina aceita
         // e um gasto descartado pelo usuário, que não pode entrar.
         jdbc.update("""
-                INSERT INTO entry (id, raw_text, occurred_at, parsed_json, resolution, item_state, confidence, status)
-                VALUES (?, 'Gastei 30 no açaí e fui à academia e comprei pão', ?::timestamptz, ?::jsonb, ?::jsonb,
+                INSERT INTO entry (user_id, id, raw_text, occurred_at, parsed_json, resolution, item_state, confidence, status)
+                VALUES ('d3d3d3d3-0000-4000-8000-000000000001', ?, 'Gastei 30 no açaí e fui à academia e comprei pão', ?::timestamptz, ?::jsonb, ?::jsonb,
                         ?::jsonb, 0.40, 'CONFIRMED')""",
                 UUID.randomUUID(), DAY + "T15:00:00Z", """
                 [{"type": "FINANCE", "direction": "EXPENSE", "amount": 30, "confidence": 0.7, "description": "Gastei 30 no açaí"},
@@ -61,8 +62,8 @@ class AcceptedItemsBackfillIntegrationTests {
         transactions.executeWithoutResult(status -> backfill.publishAll());
         transactions.executeWithoutResult(status -> backfill.publishAll());
 
-        assertThat(finance.on(DAY, ZONE).spent()).isEqualByComparingTo("30");
-        assertThat(habits.on(DAY, ZONE).achieved()).isEqualTo(1);
+        assertThat(finance.on(DEMO, DAY, ZONE).spent()).isEqualByComparingTo("30");
+        assertThat(habits.on(DEMO, DAY, ZONE).achieved()).isEqualTo(1);
     }
 
     @Test

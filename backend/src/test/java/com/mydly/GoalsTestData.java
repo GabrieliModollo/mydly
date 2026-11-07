@@ -3,8 +3,9 @@ package com.mydly;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
- * Volta metas, orçamentos e preferências ao estado da migração, para cada teste de integração
- * começar do mesmo ponto. Só os testes mexem direto nas tabelas.
+ * Apaga metas, orçamentos e preferências de todos os usuários, para cada teste de integração começar do
+ * mesmo ponto: sem metas, sem limites e com a semana começando na segunda (o padrão de quem não
+ * escolheu). Só os testes mexem direto nas tabelas.
  */
 public final class GoalsTestData {
 
@@ -14,6 +15,6 @@ public final class GoalsTestData {
     public static void reset(JdbcClient jdbc) {
         jdbc.sql("DELETE FROM habit_goal").update();
         jdbc.sql("DELETE FROM budget").update();
-        jdbc.sql("UPDATE preferences SET first_day_of_week = 'MONDAY' WHERE id = 1").update();
+        jdbc.sql("DELETE FROM preferences").update();
     }
 }

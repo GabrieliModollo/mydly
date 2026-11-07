@@ -51,6 +51,10 @@ public class Entry implements Persistable<UUID> {
     @Id
     private UUID id;
 
+    /** Dono do lançamento (ADR 0012); não muda depois de criado. */
+    @Column(name = "user_id", nullable = false, updatable = false)
+    private UUID userId;
+
     @Column(name = "raw_text", nullable = false)
     private String rawText;
 
@@ -102,7 +106,9 @@ public class Entry implements Persistable<UUID> {
         // JPA
     }
 
-    private Entry(UUID id, String rawText, Instant occurredAt, Instant createdAt, List<ParsedEntry> items) {
+    private Entry(UUID userId, UUID id, String rawText, Instant occurredAt, Instant createdAt,
+                  List<ParsedEntry> items) {
+        this.userId = Objects.requireNonNull(userId, "userId");
         this.id = id;
         this.rawText = rawText;
         this.occurredAt = occurredAt;
@@ -111,12 +117,12 @@ public class Entry implements Persistable<UUID> {
         this.isNew = true;
     }
 
-    static Entry interpreted(UUID id, String rawText, Instant occurredAt, Instant createdAt,
+    static Entry interpreted(UUID userId, UUID id, String rawText, Instant occurredAt, Instant createdAt,
                              List<ParsedEntry> items) {
         if (items.isEmpty()) {
             throw new IllegalArgumentException("um lançamento precisa de ao menos um item interpretado");
         }
-        return new Entry(id, rawText, occurredAt, createdAt, items);
+        return new Entry(userId, id, rawText, occurredAt, createdAt, items);
     }
 
     /**
@@ -135,7 +141,7 @@ public class Entry implements Persistable<UUID> {
         this.statuses = Collections.unmodifiableList(initial);
         for (int i = 0; i < newItems.size(); i++) {
             if (initial.get(i).state().isAccepted()) {
-                events.add(new EntryItemAccepted(id, i, revisions[i], occurredAt, newItems.get(i)));
+                events.add(new EntryItemAccepted(userId, id, i, revisions[i], occurredAt, newItems.get(i)));
             }
         }
         updateStatus();
@@ -202,7 +208,7 @@ public class Entry implements Persistable<UUID> {
         setResolution(index, resolution);
         setStatus(index, next);
         if (newState.isAccepted()) {
-            events.add(new EntryItemAccepted(id, index, next.revision(), occurredAt, resolution.item()));
+            events.add(new EntryItemAccepted(userId, id, index, next.revision(), occurredAt, resolution.item()));
         }
         updateStatus();
     }
@@ -222,7 +228,7 @@ public class Entry implements Persistable<UUID> {
         setResolution(index, null);
         setStatus(index, next);
         if (current.state().isAccepted()) {
-            events.add(new EntryItemRetracted(id, index, next.revision()));
+            events.add(new EntryItemRetracted(userId, id, index, next.revision()));
         }
         updateStatus();
     }
@@ -251,7 +257,7 @@ public class Entry implements Persistable<UUID> {
         for (int i = 0; i < items.size(); i++) {
             ItemStatus old = statusAt(i);
             if (old.state().isAccepted()) {
-                events.add(new EntryItemRetracted(id, i, old.revision() + 1));
+                events.add(new EntryItemRetracted(userId, id, i, old.revision() + 1));
             }
             if (i < revisions.length) {
                 revisions[i] = old.revision() + 2;
@@ -281,7 +287,7 @@ public class Entry implements Persistable<UUID> {
         for (int i = 0; i < effective.size(); i++) {
             ItemStatus itemStatus = effective.get(i).status();
             if (itemStatus.state().isAccepted()) {
-                accepted.add(new EntryItemAccepted(id, i, itemStatus.revision(), occurredAt, effective.get(i).item()));
+                accepted.add(new EntryItemAccepted(userId, id, i, itemStatus.revision(), occurredAt, effective.get(i).item()));
             }
         }
         return accepted;
@@ -345,6 +351,10 @@ public class Entry implements Persistable<UUID> {
     @Override
     public boolean isNew() {
         return isNew;
+    }
+
+    public UUID getUserId() {
+        return userId;
     }
 
     public String getRawText() {

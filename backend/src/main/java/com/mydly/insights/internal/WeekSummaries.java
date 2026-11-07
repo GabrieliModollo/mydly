@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -59,13 +60,13 @@ public class WeekSummaries {
     }
 
     /** O dia em que a semana começa, nas preferências atuais. */
-    public DayOfWeek firstDayOfWeek() {
-        return preferences.firstDayOfWeek();
+    public DayOfWeek firstDayOfWeek(UUID userId) {
+        return preferences.firstDayOfWeek(userId);
     }
 
     /** O primeiro dia da semana de hoje, no fuso do usuário. */
-    public LocalDate currentWeekStart() {
-        return preferences.currentWeek().start();
+    public LocalDate currentWeekStart(UUID userId) {
+        return preferences.currentWeek(userId).start();
     }
 
     /**
@@ -81,12 +82,12 @@ public class WeekSummaries {
     }
 
     /**
-     * O resumo da semana que começa em {@code start}.
+     * O resumo da semana do usuário que começa em {@code start}.
      *
      * @throws IllegalArgumentException se a data não cair no dia em que a semana começa
      */
-    public WeekSummary of(LocalDate start, Tone tone) {
-        DayOfWeek firstDay = firstDayOfWeek();
+    public WeekSummary of(UUID userId, LocalDate start, Tone tone) {
+        DayOfWeek firstDay = firstDayOfWeek(userId);
         if (start.getDayOfWeek() != firstDay) {
             throw new IllegalArgumentException("a semana começa em " + firstDay + ": " + start);
         }
@@ -96,35 +97,36 @@ public class WeekSummaries {
         boolean inProgress = !today.isBefore(start) && !today.isAfter(end);
         LocalDate reference = referenceDay(start, today);
 
-        List<DayHabits> days = daysOf(start, elapsed);
-        List<WeekGoalScore> scores = goals.week(start, end, reference, USER_ZONE);
+        List<DayHabits> days = daysOf(userId, start, elapsed);
+        List<WeekGoalScore> scores = goals.week(userId, start, end, reference, USER_ZONE);
         List<HabitWeek> habitWeeks = habitWeeks(days, elapsed, scores);
-        List<BudgetProgress> budgetProgress = budgets.progress(BudgetWindow.upTo(reference, start), USER_ZONE);
-        PeriodTotals money = totals(start, 7);
+        List<BudgetProgress> budgetProgress = budgets.progress(userId, BudgetWindow.upTo(reference, start),
+                USER_ZONE);
+        PeriodTotals money = totals(userId, start, 7);
         List<BigDecimal> spentPerDay = new ArrayList<>(
-                finance.spentPerDay(start, start.plusDays(elapsed), USER_ZONE).values());
+                finance.spentPerDay(userId, start, start.plusDays(elapsed), USER_ZONE).values());
         boolean hasData = money.spent().signum() > 0 || money.received().signum() > 0
                 || days.stream().anyMatch(day -> !day.logs().isEmpty());
 
-        Previous previous = previousWeek(start.minusDays(7), elapsed);
+        Previous previous = previousWeek(userId, start.minusDays(7), elapsed);
         String upTo = elapsed > 0 && elapsed < 7 ? WeekInsights.dayName(start.plusDays(elapsed - 1)) : null;
-        BigDecimal spentSoFar = elapsed == 7 ? money.spent() : totals(start, elapsed).spent();
+        BigDecimal spentSoFar = elapsed == 7 ? money.spent() : totals(userId, start, elapsed).spent();
         WeekInsights.WeekFacts facts = new WeekInsights.WeekFacts(habitWeeks, spentSoFar, previous, spentPerDay,
                 hasData, upTo, inProgress, budgetProgress);
         return new WeekSummary(start, elapsed, habitWeeks, money, budgetProgress, previous,
                 WeekInsights.evaluate(facts, tone));
     }
 
-    private List<DayHabits> daysOf(LocalDate start, int count) {
+    private List<DayHabits> daysOf(UUID userId, LocalDate start, int count) {
         List<DayHabits> days = new ArrayList<>();
         for (int day = 0; day < count; day++) {
-            days.add(habits.on(start.plusDays(day), USER_ZONE));
+            days.add(habits.on(userId, start.plusDays(day), USER_ZONE));
         }
         return days;
     }
 
-    private PeriodTotals totals(LocalDate start, int days) {
-        return finance.between(start.atStartOfDay(USER_ZONE).toInstant(),
+    private PeriodTotals totals(UUID userId, LocalDate start, int days) {
+        return finance.between(userId, start.atStartOfDay(USER_ZONE).toInstant(),
                 start.plusDays(days).atStartOfDay(USER_ZONE).toInstant());
     }
 
@@ -171,16 +173,16 @@ public class WeekSummaries {
      * para a comparação ser justa no meio da semana. {@code null} quando a semana anterior inteira não
      * teve nenhum dado.
      */
-    private Previous previousWeek(LocalDate start, int elapsed) {
-        PeriodTotals wholeWeek = totals(start, 7);
-        List<DayHabits> wholeDays = daysOf(start, 7);
+    private Previous previousWeek(UUID userId, LocalDate start, int elapsed) {
+        PeriodTotals wholeWeek = totals(userId, start, 7);
+        List<DayHabits> wholeDays = daysOf(userId, start, 7);
         boolean hasData = wholeWeek.spent().signum() > 0 || wholeWeek.received().signum() > 0
                 || wholeDays.stream().anyMatch(day -> !day.logs().isEmpty());
         if (!hasData) {
             return null;
         }
         int compared = Math.max(elapsed, 1);
-        BigDecimal spent = compared == 7 ? wholeWeek.spent() : totals(start, compared).spent();
+        BigDecimal spent = compared == 7 ? wholeWeek.spent() : totals(userId, start, compared).spent();
         long achieved = wholeDays.subList(0, compared).stream().mapToLong(DayHabits::achieved).sum();
         return new Previous(spent, achieved, compared);
     }

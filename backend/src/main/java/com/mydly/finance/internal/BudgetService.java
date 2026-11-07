@@ -7,6 +7,7 @@ import com.mydly.preferences.UserCalendar;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,28 +28,28 @@ public class BudgetService {
 
     /** O orçamento com efeito hoje. */
     @Transactional(readOnly = true)
-    public Optional<Budget> current(Category category) {
-        return repository.budgetOn(category, calendar.today());
+    public Optional<Budget> current(UUID userId, Category category) {
+        return repository.budgetOn(userId, category, calendar.today());
     }
 
     /** Define o limite a partir de hoje. Um limite igual ao que já vale não grava versão nova. */
     @Transactional
-    public void set(Category category, BudgetPeriod period, BigDecimal limit) {
+    public void set(UUID userId, Category category, BudgetPeriod period, BigDecimal limit) {
         LocalDate today = calendar.today();
-        Optional<Budget> current = repository.budgetOn(category, today);
+        Optional<Budget> current = repository.budgetOn(userId, category, today);
         boolean same = current.isPresent() && current.get().period() == period
                 && current.get().limit().compareTo(limit) == 0;
         if (!same) {
-            repository.upsert(new Budget(category, today, period, limit));
+            repository.upsert(userId, new Budget(category, today, period, limit));
         }
     }
 
     /** Tira o limite a partir de hoje. Sem orçamento vigente, não faz nada. */
     @Transactional
-    public void remove(Category category) {
+    public void remove(UUID userId, Category category) {
         LocalDate today = calendar.today();
-        if (repository.budgetOn(category, today).isPresent()) {
-            repository.upsert(new Budget(category, today, null, null));
+        if (repository.budgetOn(userId, category, today).isPresent()) {
+            repository.upsert(userId, new Budget(category, today, null, null));
         }
     }
 }
