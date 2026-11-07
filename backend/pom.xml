@@ -22,6 +22,7 @@
         <spring-modulith.version>1.4.0</spring-modulith.version>
         <jacoco.version>0.8.12</jacoco.version>
         <springdoc.version>2.8.17</springdoc.version>
+        <anthropic-java.version>3.2.0</anthropic-java.version>
     </properties>
 
     <dependencyManagement>
@@ -71,6 +72,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <!-- SDK oficial da Anthropic: o LLM de fallback do parser (ADR 0013). Só é chamado com LLM_API_KEY. -->
+        <dependency>
+            <groupId>com.anthropic</groupId>
+            <artifactId>anthropic-java</artifactId>
+            <version>${anthropic-java.version}</version>
         </dependency>
         <!-- Swagger UI para testar a API pelo navegador -->
         <dependency>

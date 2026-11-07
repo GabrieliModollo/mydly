@@ -26,6 +26,12 @@ springdoc:
     path: /swagger-ui.html
 
 mydly:
+  llm:
+    # Chave da API da Anthropic para o LLM de fallback do parser (ADR 0013). Vazia: só regras locais.
+    api-key: ${LLM_API_KEY:}
+    model: claude-opus-5-5
+    # Quanto o lançamento espera o LLM antes de seguir com o que as regras entenderam.
+    timeout: PT15S
   auth:
     # Segredo dos tokens (HS256), com pelo menos 32 bytes. Vazio gera um aleatório a cada subida, e os
     # tokens deixam de valer quando a aplicação reinicia (ADR 0012).

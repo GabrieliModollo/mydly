@@ -26,6 +26,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-mydly}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mydly}
       MYDLY_JWT_SECRET: ${MYDLY_JWT_SECRET:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
     ports:
       - "8080:8080"
     depends_on:
