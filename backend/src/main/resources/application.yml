@@ -14,6 +14,11 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  servlet:
+    multipart:
+      # Extrato OFX ou CSV (ADR 0014).
+      max-file-size: 2MB
+      max-request-size: 3MB
   modulith:
     events:
       # Eventos que ficaram sem concluir (a aplicação caiu, um consumidor falhou) são reenviados ao subir.
