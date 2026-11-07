@@ -26,5 +26,11 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./goals/goals.page').then((m) => m.GoalsPage),
   },
+  {
+    path: 'extrato',
+    title: 'MyDly · Extrato',
+    canActivate: [authGuard],
+    loadComponent: () => import('./imports/imports.page').then((m) => m.ImportsPage),
+  },
   { path: '**', redirectTo: '' },
 ];

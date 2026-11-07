@@ -241,3 +241,14 @@ button:focus-visible,
   outline: 3px solid var(--mydly-focus);
   outline-offset: 2px;
 }
+
+// O link para a tela Extrato tem o visual dos botões de texto e o mesmo alvo de toque.
+a.link-button {
+  display: inline-flex;
+  align-items: center;
+
+  &:focus-visible {
+    outline: 3px solid var(--mydly-focus);
+    outline-offset: 2px;
+  }
+}

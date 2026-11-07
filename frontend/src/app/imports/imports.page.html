@@ -1,0 +1,98 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <div class="header">
+      <a class="back" routerLink="/metas">
+        <ion-icon name="arrow-back" aria-hidden="true" />
+        Metas
+      </a>
+      <h1 class="header__title">Extrato</h1>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <main class="page">
+    <form class="card" (submit)="upload($event)">
+      <h2 class="card__title">Importar extrato do banco</h2>
+      <p class="card__note" id="import-hint">
+        Exporte o extrato em OFX ou CSV no app ou no site do banco. O que você já lançou aqui não conta duas vezes, e
+        importar o mesmo arquivo de novo não duplica nada.
+      </p>
+
+      <label class="file" for="statement-file">
+        <ion-icon name="document-attach-outline" aria-hidden="true" />
+        <span class="file__text">{{ fileName() ?? 'Escolher arquivo OFX ou CSV' }}</span>
+      </label>
+      <input
+        #fileInput
+        id="statement-file"
+        class="file__input"
+        type="file"
+        accept=".ofx,.qfx,.csv,text/csv,application/x-ofx"
+        aria-describedby="import-hint"
+        (change)="onFileChosen($event)"
+      />
+
+      <button type="submit" class="primary" [disabled]="uploading()">
+        {{ uploading() ? 'Importando…' : 'Importar' }}
+      </button>
+
+      <p class="summary" role="status">{{ summary() }}</p>
+      <p class="error" role="alert">{{ error() }}</p>
+    </form>
+
+    <section class="card" aria-labelledby="list-title">
+      <h2 id="list-title" class="card__title">Últimos 60 dias</h2>
+      @switch (loadState()) {
+        @case ('loading') {
+          <div class="loading">
+            <ion-spinner name="dots" aria-hidden="true" />
+            <span class="sr-only">Carregando as transações importadas</span>
+          </div>
+        }
+        @case ('error') {
+          <div class="banner" role="alert">
+            <ion-icon name="cloud-offline-outline" aria-hidden="true" />
+            <span>Não foi possível carregar as transações importadas.</span>
+            <button type="button" class="link-button" (click)="load()">Tentar de novo</button>
+          </div>
+        }
+        @default {
+          @if (transactions().length === 0) {
+            <p class="card__note">Nenhuma transação importada ainda.</p>
+          } @else {
+            <ul class="rows" aria-label="Transações importadas">
+              @for (transaction of transactions(); track transaction.id) {
+                <li class="row" [attr.data-status]="transaction.status">
+                  <div class="row__main">
+                    <span class="row__date">{{ shortDate(transaction.date) }}</span>
+                    <span class="row__description">{{ transaction.description ?? 'Sem descrição' }}</span>
+                  </div>
+                  <div class="row__details">
+                    <span class="chip" [attr.data-tone]="amountChip(transaction).tone">{{
+                      amountChip(transaction).label
+                    }}</span>
+                    <span class="row__status">{{ statusLabel(transaction) }}</span>
+                    <button
+                      type="button"
+                      class="link-button"
+                      [disabled]="changing() === transaction.id"
+                      [attr.aria-label]="toggleLabel(transaction)"
+                      (click)="toggle(transaction)"
+                    >
+                      {{ transaction.status === 'IGNORED' ? 'Contar de novo' : 'Não contar' }}
+                    </button>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        }
+      }
+    </section>
+  </main>
+</ion-content>
+
+<ion-footer class="ion-no-border">
+  <app-nav />
+</ion-footer>

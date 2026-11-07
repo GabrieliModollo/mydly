@@ -1,0 +1,258 @@
+// Tela Extrato (docs/design.md), nas medidas da aba Metas.
+:host {
+  --page-width: 40rem;
+  --gutter: 20px;
+}
+
+ion-toolbar {
+  --background: var(--mydly-bg);
+  --border-width: 0;
+}
+
+ion-content,
+ion-footer {
+  --background: var(--mydly-bg);
+  background: var(--mydly-bg);
+}
+
+.header {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 16px var(--gutter) 8px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--mydly-subtle);
+  text-decoration: none;
+}
+
+.header__title {
+  margin: 0;
+  font-family: var(--mydly-font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--mydly-ink);
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 8px var(--gutter) 24px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--mydly-radius);
+  background: var(--mydly-surface);
+  color: var(--mydly-ink);
+}
+
+.card__title {
+  margin: 0;
+  font-family: var(--mydly-font-display);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.card__note {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--mydly-subtle);
+}
+
+// O input de arquivo fica escondido atrás do rótulo, que é o alvo de toque visível e o nome acessível.
+.file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px dashed var(--mydly-field-border);
+  border-radius: var(--mydly-radius);
+  color: var(--mydly-ink);
+  font-size: 15px;
+  cursor: pointer;
+
+  ion-icon {
+    flex: none;
+    font-size: 20px;
+  }
+}
+
+.file__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+// O foco do teclado fica no input escondido; quem mostra o contorno é o rótulo, antes dele.
+.file:has(+ .file__input:focus-visible) {
+  outline: 3px solid var(--mydly-focus);
+  outline-offset: 2px;
+}
+
+.primary {
+  min-height: 52px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--mydly-accent);
+  color: var(--mydly-accent-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:disabled {
+    background: var(--mydly-line);
+    color: var(--mydly-muted);
+    cursor: progress;
+  }
+}
+
+.summary,
+.error {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+
+  &:empty {
+    display: none;
+  }
+}
+
+.summary {
+  color: var(--mydly-routine-text);
+  font-weight: 600;
+}
+
+.error {
+  color: var(--mydly-expense-text);
+  font-weight: 500;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid var(--mydly-line);
+
+  &:first-child {
+    border-top: 0;
+  }
+
+  // Não conta: o texto fica mais apagado, e o "Não conta" por escrito diz o estado.
+  &[data-status='IGNORED'] .row__description {
+    color: var(--mydly-muted);
+    text-decoration: line-through;
+  }
+}
+
+.row__main {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.row__date {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--mydly-muted);
+}
+
+.row__description {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.row__details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.row__status {
+  font-size: 13px;
+  color: var(--mydly-subtle);
+}
+
+.chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+
+  @each $tone in expense, income {
+    &[data-tone='#{$tone}'] {
+      background: var(--mydly-#{$tone}-bg);
+      color: var(--mydly-#{$tone}-text);
+    }
+  }
+}
+
+.link-button {
+  min-height: 44px;
+  margin-left: auto;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--mydly-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.back:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--mydly-focus);
+  outline-offset: 2px;
+}

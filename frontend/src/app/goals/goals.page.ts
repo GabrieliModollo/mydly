@@ -4,7 +4,7 @@ import { IonContent, IonFooter, IonHeader, IonIcon, IonModal, IonSpinner, IonToo
 import { addIcons } from 'ionicons';
 import { cloudOfflineOutline } from 'ionicons/icons';
 import { firstValueFrom, forkJoin, Observable } from 'rxjs';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { EntriesStore } from '../entries/entries-store';
 import { CATEGORY_LABELS, logoutWarning } from '../entries/entry-format';
 import { AuthSession } from '../entries/session';
@@ -37,7 +37,19 @@ type LoadState = 'loading' | 'loaded' | 'error';
  */
 @Component({
   selector: 'app-goals',
-  imports: [AppNav, BudgetSheet, HabitGoalSheet, IonContent, IonFooter, IonHeader, IonIcon, IonModal, IonSpinner, IonToolbar],
+  imports: [
+    AppNav,
+    BudgetSheet,
+    HabitGoalSheet,
+    IonContent,
+    IonFooter,
+    IonHeader,
+    IonIcon,
+    IonModal,
+    IonSpinner,
+    IonToolbar,
+    RouterLink,
+  ],
   templateUrl: './goals.page.html',
   styleUrl: './goals.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
