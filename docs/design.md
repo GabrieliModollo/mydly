@@ -82,8 +82,15 @@ Chip "Precisa confirmar", título "Quanto foi?", a frase original, campo de valo
 2. Cartão "Hábitos": os hábitos do catálogo, primeiro os para cumprir e depois os para evitar, com a explicação de que neles a meta é um limite. Cada linha tem o nome (15 px 500), a meta atual por escrito (13 px 600 no `--mydly-subtle`: "2 L por dia", "4 dias por semana", "No máximo 2 dias por semana") ou "Sem meta" e "Sem limite" no `--mydly-muted`, e um botão em pílula "Definir" ou "Editar" (44 px), com o nome do hábito no `aria-label` ("Editar meta de Hidratação").
 3. Cartão "Orçamentos": as categorias fixas com o limite ("R$ 100,00 por semana") ou "Sem limite", uma barra de 8 px (verde-água abaixo de 80%, laranja a partir dele) com `role="progressbar"` e o gasto por escrito ("R$ 85,00 de R$ 100,00 · 85%, perto do limite").
 4. Cartão "Semana": `select` com label "Início da semana" e a nota de que as semanas passadas também passam a ser contadas assim.
-5. Cartão "Conta", sempre presente: "Você entrou como demo." e o link "Sair". Com lançamentos guardados no aparelho, "Sair" mostra antes o aviso no laranja das saídas ("2 lançamentos ainda não foram enviados. Sair apaga esses lançamentos deste aparelho.", `role="alert"`) com "Sair mesmo assim" e "Cancelar".
-6. Estados vazios explicativos ("Nenhuma meta ainda. Escolha um hábito, como 2 L de água por dia ...", "Nenhum limite ainda. ... o MyDly avisa quando o gasto chega a 80%"). Depois de salvar, uma região `role="status"` anuncia "Meta de Hidratação salva.".
+5. Cartão "Extrato do banco", com a explicação curta e o link "Importar extrato", que abre a tela Extrato.
+6. Cartão "Conta", sempre presente: "Você entrou como demo." e o link "Sair". Com lançamentos guardados no aparelho, "Sair" mostra antes o aviso no laranja das saídas ("2 lançamentos ainda não foram enviados. Sair apaga esses lançamentos deste aparelho.", `role="alert"`) com "Sair mesmo assim" e "Cancelar".
+7. Estados vazios explicativos ("Nenhuma meta ainda. Escolha um hábito, como 2 L de água por dia ...", "Nenhum limite ainda. ... o MyDly avisa quando o gasto chega a 80%"). Depois de salvar, uma região `role="status"` anuncia "Meta de Hidratação salva.".
+
+### Extrato
+
+1. Link "← Metas" e título "Extrato".
+2. Cartão "Importar extrato do banco": a explicação de onde exportar e de que nada conta duas vezes; o rótulo do arquivo como alvo de toque tracejado (52 px, ícone de anexo, "Escolher arquivo OFX ou CSV" ou o nome do arquivo escolhido), com o input de arquivo escondido atrás dele e o contorno de foco no rótulo; o botão principal "Importar" no acento ("Importando…" enquanto envia). O resumo aparece em verde-água (`role="status"`) e o erro no laranja das saídas (`role="alert"`), com a mensagem da API ("Linha 2: valor inválido.").
+3. Cartão "Últimos 60 dias": cada transação com a data curta ("05/11"), a descrição do banco, o chip "Saída · R$ 50,00" ou "Entrada · R$ 3.000,00", o efeito por escrito ("Conta nos seus números", "Já estava lançado no app", "Não conta") e o link "Não contar" ou "Contar de novo", com a transação no `aria-label`. A que não conta fica riscada e no `--mydly-muted`, sempre com o "Não conta" por escrito.
 
 ### Painéis de meta e de limite (sobre "Metas")
 

@@ -12,7 +12,7 @@ API do MyDly em Java 21 + Spring Boot, organizada como monólito modular com Spr
 | `com.mydly.routines` | Hábitos, registros diários, metas |
 | `com.mydly.preferences` | Preferências do usuário e o calendário dele |
 | `com.mydly.insights` | Estatísticas, streaks, mensagens |
-| `com.mydly.integrations` | Extrato, Open Finance, reconciliação |
+| `com.mydly.integrations` | Importação de extrato OFX e CSV (e Open Finance depois) e reconciliação com os lançamentos |
 | `com.mydly.notifications` | Push e lembretes |
 
 As fronteiras são verificadas pelo teste `ModularityTests`, que também gera a documentação dos módulos em `target/spring-modulith-docs`.

@@ -136,7 +136,7 @@ flowchart LR
 | `routines` | Hábitos, registros diários, metas |
 | `preferences` | Preferências do usuário (dia de início da semana) e o calendário dele (fuso e hoje) |
 | `insights` | Estatísticas, streaks, cruzamentos rotina × finanças, mensagens |
-| `integrations` | Fontes externas de transação (extrato, Open Finance) e reconciliação |
+| `integrations` | Fontes externas de transação atrás da porta `TransactionSource` (extrato OFX e CSV; Open Finance depois) e reconciliação com os lançamentos manuais |
 | `notifications` | Push e lembretes |
 
 ## Modelo de dados (núcleo)
@@ -152,6 +152,8 @@ erDiagram
     APP_USER ||--o{ BUDGET : define
     APP_USER ||--o| PREFERENCES : tem
     APP_USER ||--o{ INSIGHT : recebe
+    APP_USER ||--o{ EXTERNAL_TRANSACTION : importa
+    EXTERNAL_TRANSACTION |o--o| TRANSACTION : "conta como (IMPORTED) ou casa com (MATCHED)"
 
     APP_USER {
         uuid id
@@ -223,6 +225,20 @@ erDiagram
         uuid user_id
         string first_day_of_week
     }
+    EXTERNAL_TRANSACTION {
+        uuid id
+        uuid user_id
+        string source
+        text external_id
+        date occurred_on
+        decimal amount
+        string direction
+        string description
+        string status
+        uuid matched_entry_id
+        int matched_item_index
+        bigint revision
+    }
     INSIGHT {
         uuid id
         string kind
@@ -242,7 +258,8 @@ erDiagram
 - `APP_USER` é do módulo `accounts`, e as outras tabelas guardam o dono em `user_id`, sem chave estrangeira entre módulos. Os dados que existiam antes do login são do usuário `demo`, criado pela migração ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)).
 - `HABIT_GOAL` e `BUDGET` são versões: a chave é `(user_id, habit_code, valid_from)` e `(user_id, category, valid_from)`, e a versão vigente num dia é a de maior `valid_from` até ele. A versão de remoção tem `kind = NONE` na meta e período e limite nulos no orçamento ([ADR 0010](adr/0010-metas-e-orcamentos-versionados.md)).
 - `PREFERENCES` tem uma linha por usuário, criada quando ele muda algo; sem linha, a semana começa na segunda.
-- `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`) e é a base da reconciliação.
+- `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`). Uma transação importada que não casou com um lançamento conta como uma linha com `source = STATEMENT_IMPORT`, o id dela em `entry_id` e `item_index` zero.
+- `EXTERNAL_TRANSACTION` é do módulo `integrations`: cada linha de extrato importada, única por usuário, origem e id externo, com o status `IMPORTED` (conta nos números), `MATCHED` (ligada ao lançamento manual em `matched_entry_id`, não conta de novo) ou `IGNORED`. A reconciliação acontece na importação e, no outro sentido, quando um lançamento é aceito ou retirado depois ([ADR 0014](adr/0014-importacao-de-extrato-e-reconciliacao.md)).
 
 ## App (frontend)
 
