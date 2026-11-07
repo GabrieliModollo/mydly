@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideIonicAngular } from '@ionic/angular';
 import { Observable, of, Subject, throwError } from 'rxjs';
 import {
@@ -10,7 +11,9 @@ import {
   HabitGoalResponse,
   Preferences,
 } from '../entries/goal.models';
+import { EntriesStore } from '../entries/entries-store';
 import { GoalsApi } from '../entries/goals-api';
+import { AuthSession } from '../entries/session';
 import { GoalsPage } from './goals.page';
 
 const HYDRATION: HabitGoalResponse = {
@@ -68,6 +71,8 @@ describe('GoalsPage', () => {
   let habitGoals: () => Observable<HabitGoalResponse[]>;
   let savePreferencesResponse: (preferences: Preferences) => Observable<Preferences>;
   let serverPreferences: () => Observable<Preferences>;
+  let waitingCount: WritableSignal<number>;
+  let logoutSteps: string[];
 
   async function open(): Promise<HTMLElement> {
     TestBed.configureTestingModule({
@@ -75,6 +80,17 @@ describe('GoalsPage', () => {
       providers: [
         provideRouter([]),
         provideIonicAngular({ mode: 'md' }),
+        {
+          provide: EntriesStore,
+          useValue: { waitingCount: (waitingCount = signal(0)), forgetUser: () => logoutSteps.push('fila') },
+        },
+        {
+          provide: AuthSession,
+          useValue: {
+            user: signal({ id: 'u1', username: 'demo' }),
+            end: () => logoutSteps.push('sessão'),
+          },
+        },
         {
           provide: GoalsApi,
           useValue: {
@@ -100,6 +116,10 @@ describe('GoalsPage', () => {
         },
       ],
     });
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockImplementation(async (url) => {
+      logoutSteps.push(`navega ${String(url)}`);
+      return true;
+    });
     fixture = TestBed.createComponent(GoalsPage);
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
@@ -124,7 +144,42 @@ describe('GoalsPage', () => {
     return row?.querySelector('.row__detail')?.textContent?.trim() ?? '';
   }
 
+  describe('Conta', () => {
+    it('mostra quem entrou e "Sair" apaga a fila, encerra a sessão e volta ao login', async () => {
+      const root = await open();
+      expect(root.textContent).toContain('Você entrou como demo.');
+
+      button(root, 'Sair').click();
+      await fixture.whenStable();
+
+      expect(logoutSteps).toEqual(['fila', 'sessão', 'navega /login']);
+    });
+
+    it('com lançamentos não enviados, pede confirmação antes de sair', async () => {
+      const root = await open();
+      waitingCount.set(2);
+
+      button(root, 'Sair').click();
+      await fixture.whenStable();
+      expect(logoutSteps).toEqual([]);
+      expect(root.querySelector('.account__warning')?.textContent).toContain(
+        '2 lançamentos ainda não foram enviados. Sair apaga esses lançamentos deste aparelho.',
+      );
+
+      button(root, 'Cancelar').click();
+      await fixture.whenStable();
+      expect(root.querySelector('.account__warning')).toBeNull();
+
+      button(root, 'Sair').click();
+      await fixture.whenStable();
+      button(root, 'Sair mesmo assim').click();
+      await fixture.whenStable();
+      expect(logoutSteps).toEqual(['fila', 'sessão', 'navega /login']);
+    });
+  });
+
   beforeEach(() => {
+    logoutSteps = [];
     habits = [GYM, HYDRATION, DELIVERY];
     budgets = [FOOD, GROCERIES];
     savedHabits = [];

@@ -5,8 +5,10 @@ import { Connectivity } from './connectivity';
 import { EntriesApi } from './entries-api';
 import { dayInSaoPaulo, summaryFrom } from './entry-format';
 import { DaySummaryResponse, EntryItemResponse, EntryResponse, ItemHabit, ResolveItemRequest } from './entry.models';
+import { NOW } from './now';
 import { OUTBOX_KEY, OUTBOX_STORAGE, OutboxEntry, readOutbox, writeOutbox } from './outbox-storage';
 import { randomId } from './random-id';
+import { AuthSession } from './session';
 
 /** Gera o id de um lançamento novo. Substituível nos testes. */
 export const NEW_ENTRY_ID = new InjectionToken<() => string>('NEW_ENTRY_ID', {
@@ -14,11 +16,8 @@ export const NEW_ENTRY_ID = new InjectionToken<() => string>('NEW_ENTRY_ID', {
   factory: () => () => randomId(),
 });
 
-/** Relógio do app. Substituível nos testes. */
-export const NOW = new InjectionToken<() => Date>('NOW', {
-  providedIn: 'root',
-  factory: () => () => new Date(),
-});
+// O relógio mora em now.ts (a sessão também usa); continua exportado daqui para quem já importava.
+export { NOW };
 
 /** Espera entre uma falha de envio e a próxima tentativa automática. Substituível nos testes. */
 export const RETRY_DELAY_MS = new InjectionToken<number>('RETRY_DELAY_MS', {
@@ -56,6 +55,10 @@ export type ResolveResult = 'ok' | 'stale' | 'error';
  * chega. Sem rede, ele fica guardado no aparelho e é enviado quando a conexão volta, do mais antigo
  * ao mais novo. Como o id e a data são gerados aqui, um reenvio não duplica nada (ADR 0006), e o dia
  * do lançamento é o dia em que foi escrito, não o da sincronização (ADR 0011).
+ *
+ * Os dados são de quem está logado (ADR 0012). A fila do aparelho é de um usuário por vez: entrar
+ * com outro usuário descarta a fila do anterior, e só o dono envia os lançamentos guardados. Sem
+ * sessão válida, o lançamento fica guardado até o login.
  */
 @Injectable({ providedIn: 'root' })
 export class EntriesStore {
@@ -65,7 +68,10 @@ export class EntriesStore {
   private readonly connectivity = inject(Connectivity);
   private readonly storage = inject(OUTBOX_STORAGE);
   private readonly retryDelay = inject(RETRY_DELAY_MS);
+  private readonly session = inject(AuthSession);
 
+  /** O usuário dos dados em memória; muda quando outra pessoa entra. */
+  private owner: string | null = null;
   private readonly entries = signal<TimelineEntry[]>([]);
   /**
    * Ids que esta aba já teve na lista. Ao gravar a fila, os lançamentos guardados que não estão aqui
@@ -94,9 +100,11 @@ export class EntriesStore {
   );
 
   constructor() {
-    this.adoptOutbox();
+    this.ensureOwner();
     const stopListening = this.connectivity.whenBackOnline(() => {
-      void (this.loadState() === 'error' ? this.load() : this.flush());
+      if (this.session.isLoggedIn()) {
+        void (this.loadState() === 'error' ? this.load() : this.flush());
+      }
     });
     // Outra aba guardou um lançamento: ele aparece aqui também, e qualquer uma das duas pode enviá-lo.
     const view = inject(DOCUMENT).defaultView;
@@ -159,6 +167,7 @@ export class EntriesStore {
    * fila. Um lançamento guardado que o servidor já tem (a resposta se perdeu) sai da fila.
    */
   async load(): Promise<void> {
+    this.ensureOwner();
     this.loadState.set('loading');
     try {
       const fromServer = await firstValueFrom(this.api.listToday());
@@ -182,14 +191,15 @@ export class EntriesStore {
    */
   async submit(text: string): Promise<void> {
     const trimmed = text.trim();
-    if (!trimmed) {
+    if (!trimmed || !this.owner) {
       return;
     }
+    const canSend = this.connectivity.online() && this.session.isLoggedIn();
     const draft: TimelineEntry = {
       id: this.newId(),
       text: trimmed,
       occurredAt: this.now().toISOString(),
-      sync: this.connectivity.online() ? 'sending' : 'queued',
+      sync: canSend ? 'sending' : 'queued',
     };
     this.known.add(draft.id);
     this.change((list) => [draft, ...list]);
@@ -211,7 +221,7 @@ export class EntriesStore {
   /**
    * Envia a fila, um lançamento por vez, do mais antigo ao mais novo. Para na primeira falha de rede
    * ou do servidor: os outros falhariam igual, e a próxima tentativa vem com a rede de volta ou depois
-   * de {@link RETRY_DELAY_MS}. Uma recusa (4xx) não para a fila.
+   * de {@link RETRY_DELAY_MS}. Uma recusa (4xx) não para a fila; sem sessão (401), a fila espera o login.
    */
   async flush(): Promise<void> {
     if (this.flushing) {
@@ -219,7 +229,7 @@ export class EntriesStore {
     }
     this.flushing = true;
     try {
-      while (this.connectivity.online()) {
+      while (this.connectivity.online() && this.session.isLoggedIn() && this.owner === this.session.userId()) {
         const next = this.oldestQueued();
         if (!next) {
           return;
@@ -294,11 +304,60 @@ export class EntriesStore {
       this.change((list) =>
         list.map((item) => (item.id === entry.id && item.sync === 'sending' ? { ...item, sync: state } : item)),
       );
-      if (state === 'queued') {
+      // Sem sessão (401), tentar de novo não adianta: a fila volta a andar depois do login.
+      if (state === 'queued' && !isUnauthorized(error)) {
         this.scheduleRetry();
       }
       return state;
     }
+  }
+
+  /** {@code true} quando a lista em memória não é de quem está logado ou ainda não foi carregada. */
+  needsLoad(): boolean {
+    return this.owner !== this.session.userId() || this.loadState() === 'idle' || this.loadState() === 'error';
+  }
+
+  /**
+   * "Sair": apaga deste aparelho os lançamentos de quem está saindo que ainda não foram enviados, e
+   * esvazia a tela. Quem chama encerra a sessão depois.
+   */
+  forgetUser(): void {
+    const leaving = this.owner;
+    writeOutbox(
+      this.storage,
+      readOutbox(this.storage).filter((entry) => entry.userId !== leaving),
+    );
+    this.resetMemory(null);
+  }
+
+  /**
+   * Quando outra pessoa entra, a lista em memória é esvaziada e a fila do aparelho fica só com os
+   * lançamentos dela: a fila é de um usuário por vez.
+   */
+  private ensureOwner(): void {
+    const user = this.session.userId();
+    if (user === this.owner) {
+      return;
+    }
+    this.resetMemory(user);
+    if (user) {
+      const stored = readOutbox(this.storage);
+      const mine = stored.filter((entry) => entry.userId === user);
+      if (mine.length !== stored.length) {
+        writeOutbox(this.storage, mine);
+      }
+      this.adoptOutbox();
+    }
+  }
+
+  private resetMemory(owner: string | null): void {
+    this.owner = owner;
+    this.known.clear();
+    this.entries.set([]);
+    this.daySummary.set(null);
+    this.loadState.set('idle');
+    clearTimeout(this.retryTimer);
+    this.retryTimer = undefined;
   }
 
   private scheduleRetry(): void {
@@ -320,9 +379,14 @@ export class EntriesStore {
       );
   }
 
-  /** Traz para a lista os lançamentos guardados no aparelho que esta aba ainda não conhece. */
+  /** Traz para a lista os lançamentos do usuário guardados no aparelho que esta aba ainda não conhece. */
   private adoptOutbox(): void {
-    const unknown = readOutbox(this.storage).filter((entry) => !this.known.has(entry.id));
+    if (!this.owner) {
+      return;
+    }
+    const unknown = readOutbox(this.storage).filter(
+      (entry) => entry.userId === this.owner && !this.known.has(entry.id),
+    );
     unknown.forEach((entry) => this.known.add(entry.id));
     if (unknown.length > 0) {
       this.entries.update((list) => [...list, ...unknown.map(fromOutbox)]);
@@ -336,9 +400,13 @@ export class EntriesStore {
   /** Muda a lista e grava no aparelho o que ainda não chegou ao servidor. */
   private change(update: (list: TimelineEntry[]) => TimelineEntry[]): void {
     this.entries.update(update);
+    const owner = this.owner;
+    if (!owner) {
+      return;
+    }
     const mine = this.entries()
       .filter((entry) => entry.sync !== 'synced')
-      .map(toOutbox);
+      .map((entry) => toOutbox(entry, owner));
     const fromOtherTabs = readOutbox(this.storage).filter((entry) => !this.known.has(entry.id));
     writeOutbox(this.storage, [...fromOtherTabs, ...mine]);
   }
@@ -403,8 +471,14 @@ function toSynced(entry: EntryResponse): TimelineEntry {
   return { id: entry.id, text: entry.text, occurredAt: entry.occurredAt, sync: 'synced', entry };
 }
 
-function toOutbox(entry: TimelineEntry): OutboxEntry {
-  return { id: entry.id, text: entry.text, occurredAt: entry.occurredAt, rejected: entry.sync === 'rejected' };
+function toOutbox(entry: TimelineEntry, userId: string): OutboxEntry {
+  return {
+    id: entry.id,
+    text: entry.text,
+    occurredAt: entry.occurredAt,
+    rejected: entry.sync === 'rejected',
+    userId,
+  };
 }
 
 /** Um envio interrompido (app fechado no meio) volta como guardado. */
@@ -412,7 +486,14 @@ function fromOutbox(entry: OutboxEntry): TimelineEntry {
   return { id: entry.id, text: entry.text, occurredAt: entry.occurredAt, sync: entry.rejected ? 'rejected' : 'queued' };
 }
 
-/** Sem resposta (status 0) ou erro do servidor (5xx) vale a pena tentar de novo; 4xx não. */
+/** Sem resposta (status 0), erro do servidor (5xx) ou sem sessão (401) o lançamento fica guardado; outro 4xx é recusa. */
 function isRetryable(error: unknown): boolean {
-  return !(error instanceof HttpErrorResponse) || error.status === 0 || error.status >= 500;
+  return (
+    !(error instanceof HttpErrorResponse) || error.status === 0 || error.status >= 500 || isUnauthorized(error)
+  );
+}
+
+/** Sem sessão válida: o lançamento não foi recusado, só espera o login. */
+function isUnauthorized(error: unknown): boolean {
+  return error instanceof HttpErrorResponse && error.status === 401;
 }

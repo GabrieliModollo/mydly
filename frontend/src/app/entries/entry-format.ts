@@ -170,3 +170,11 @@ export function offlineNotice(waiting: number): string {
   }
   return `Sem conexão. ${waiting} lançamentos guardados no aparelho, enviados quando a internet voltar.`;
 }
+
+/** Aviso antes de sair com lançamentos que ainda não foram enviados: sair apaga a fila do aparelho. */
+export function logoutWarning(waiting: number): string {
+  if (waiting === 1) {
+    return '1 lançamento ainda não foi enviado. Sair apaga esse lançamento deste aparelho.';
+  }
+  return `${waiting} lançamentos ainda não foram enviados. Sair apaga esses lançamentos deste aparelho.`;
+}

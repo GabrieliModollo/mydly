@@ -4,7 +4,10 @@ import { IonContent, IonFooter, IonHeader, IonIcon, IonModal, IonSpinner, IonToo
 import { addIcons } from 'ionicons';
 import { cloudOfflineOutline } from 'ionicons/icons';
 import { firstValueFrom, forkJoin, Observable } from 'rxjs';
-import { CATEGORY_LABELS } from '../entries/entry-format';
+import { Router } from '@angular/router';
+import { EntriesStore } from '../entries/entries-store';
+import { CATEGORY_LABELS, logoutWarning } from '../entries/entry-format';
+import { AuthSession } from '../entries/session';
 import {
   BudgetRequest,
   BudgetResponse,
@@ -41,6 +44,14 @@ type LoadState = 'loading' | 'loaded' | 'error';
 })
 export class GoalsPage implements OnInit {
   private readonly api = inject(GoalsApi);
+  private readonly session = inject(AuthSession);
+  private readonly router = inject(Router);
+  protected readonly store = inject(EntriesStore);
+
+  protected readonly username = computed(() => this.session.user()?.username ?? '');
+  protected readonly logoutWarning = logoutWarning;
+  /** "Sair" pediu confirmação porque há lançamentos guardados no aparelho que seriam apagados. */
+  protected readonly confirmingLogout = signal(false);
 
   protected readonly categoryLabels = CATEGORY_LABELS;
   protected readonly dayOptions = DAY_OF_WEEK_OPTIONS;
@@ -111,6 +122,23 @@ export class GoalsPage implements OnInit {
     } catch {
       this.loadState.set('error');
     }
+  }
+
+  /** "Sair": confirma antes quando há lançamentos que ainda não foram enviados. */
+  protected askLogout(): void {
+    if (this.store.waitingCount() > 0) {
+      this.confirmingLogout.set(true);
+    } else {
+      void this.logout();
+    }
+  }
+
+  /** Apaga deste aparelho a fila de quem sai, encerra a sessão e volta ao login (LGPD, ADR 0012). */
+  protected async logout(): Promise<void> {
+    this.confirmingLogout.set(false);
+    this.store.forgetUser();
+    this.session.end();
+    await this.router.navigateByUrl('/login', { replaceUrl: true });
   }
 
   protected habitAction(habit: HabitGoalResponse): string {

@@ -6,6 +6,9 @@ import { Connectivity } from './connectivity';
 import { applyResolution, EntriesStore, NEW_ENTRY_ID, NOW, RETRY_DELAY_MS } from './entries-store';
 import { DaySummaryResponse, EntryResponse } from './entry.models';
 import { OUTBOX_KEY, OUTBOX_STORAGE, OutboxEntry } from './outbox-storage';
+import { AuthSession } from './session';
+
+const USER = 'user-1';
 
 /** Rede controlada pelo teste: {@code back()} faz o que o evento {@code online} do navegador faz. */
 class FakeConnectivity {
@@ -20,6 +23,16 @@ class FakeConnectivity {
   back(): void {
     this.online.set(true);
     this.listener?.();
+  }
+}
+
+/** Sessão controlada pelo teste: quem está logado e se o token ainda vale. */
+class FakeSession {
+  readonly userId = signal<string | null>(USER);
+  loggedIn = true;
+
+  isLoggedIn(): boolean {
+    return this.loggedIn && this.userId() !== null;
   }
 }
 
@@ -115,11 +128,13 @@ describe('EntriesStore', () => {
   let nextId: number;
   let now: string;
   let network: FakeConnectivity;
+  let session: FakeSession;
 
   beforeEach(() => {
     nextId = 0;
     now = NOW_ISO;
     network = new FakeConnectivity();
+    session = new FakeSession();
     localStorage.clear();
     TestBed.configureTestingModule({
       providers: [
@@ -128,6 +143,7 @@ describe('EntriesStore', () => {
         { provide: NEW_ENTRY_ID, useValue: () => `id-${++nextId}` },
         { provide: NOW, useValue: () => new Date(now) },
         { provide: Connectivity, useValue: network },
+        { provide: AuthSession, useValue: session },
         { provide: OUTBOX_STORAGE, useValue: localStorage },
         { provide: RETRY_DELAY_MS, useValue: RETRY_DELAY },
       ],
@@ -194,7 +210,7 @@ describe('EntriesStore', () => {
 
   it('em falha de rede guarda no aparelho e "Enviar agora" reenvia com o MESMO id e data', async () => {
     const first = store.submit('50 reais');
-    expect(outbox()).toEqual([{ id: 'id-1', text: '50 reais', occurredAt: NOW_ISO, rejected: false }]);
+    expect(outbox()).toEqual([{ id: 'id-1', text: '50 reais', occurredAt: NOW_ISO, rejected: false, userId: USER }]);
     http.expectOne(URL).error(new ProgressEvent('error'));
     await first;
     expect(store.timeline()[0].sync).toBe('queued');
@@ -226,7 +242,7 @@ describe('EntriesStore', () => {
     http.expectOne(URL).flush(null, { status: 409, statusText: 'Conflict' });
     await sending;
     expect(store.timeline()[0].sync).toBe('rejected');
-    expect(outbox()).toEqual([{ id: 'id-1', text: '50 reais', occurredAt: NOW_ISO, rejected: true }]);
+    expect(outbox()).toEqual([{ id: 'id-1', text: '50 reais', occurredAt: NOW_ISO, rejected: true, userId: USER }]);
 
     await store.retry('id-1');
     http.expectNone(URL);
@@ -301,8 +317,8 @@ describe('EntriesStore', () => {
 
   it('ao abrir o app, o que estava guardado volta, e um envio interrompido volta como guardado', async () => {
     const reopened = reopenApp([
-      { id: 'a', text: '50 reais', occurredAt: '2026-11-05T11:00:00.000Z', rejected: false },
-      { id: 'b', text: 'xyz', occurredAt: '2026-11-05T10:00:00.000Z', rejected: true },
+      { id: 'a', text: '50 reais', occurredAt: '2026-11-05T11:00:00.000Z', rejected: false, userId: USER },
+      { id: 'b', text: 'xyz', occurredAt: '2026-11-05T10:00:00.000Z', rejected: true, userId: USER },
     ]);
 
     expect(reopened.timeline().map((entry) => [entry.id, entry.sync])).toEqual([
@@ -323,7 +339,7 @@ describe('EntriesStore', () => {
   });
 
   it('um lançamento guardado que o servidor já tem (resposta perdida) sai da fila sem reenviar', async () => {
-    const reopened = reopenApp([{ id: 'a', text: '50 reais', occurredAt: NOW_ISO, rejected: false }]);
+    const reopened = reopenApp([{ id: 'a', text: '50 reais', occurredAt: NOW_ISO, rejected: false, userId: USER }]);
 
     const loading = reopened.load();
     http.expectOne((req) => req.method === 'GET').flush([saved('a', '50 reais')]);
@@ -338,7 +354,7 @@ describe('EntriesStore', () => {
   it('lançamento de ontem aparece enquanto está guardado e sai da lista de hoje depois de enviado', async () => {
     // 20h UTC do dia 4 = 17h do dia 4 em São Paulo; hoje é dia 5.
     const yesterday = '2026-11-04T20:00:00.000Z';
-    const reopened = reopenApp([{ id: 'a', text: 'Dormi mal', occurredAt: yesterday, rejected: false }]);
+    const reopened = reopenApp([{ id: 'a', text: 'Dormi mal', occurredAt: yesterday, rejected: false, userId: USER }]);
     expect(reopened.timeline().map((entry) => entry.id)).toEqual(['a']);
 
     const loading = reopened.load();
@@ -356,7 +372,7 @@ describe('EntriesStore', () => {
   it('não apaga o que outra aba guardou e mostra o lançamento dela', async () => {
     network.online.set(false);
     await store.submit('50 reais');
-    const otherTab: OutboxEntry = { id: 'other', text: 'Dormi bem', occurredAt: NOW_ISO, rejected: false };
+    const otherTab: OutboxEntry = { id: 'other', text: 'Dormi bem', occurredAt: NOW_ISO, rejected: false, userId: USER };
     localStorage.setItem(OUTBOX_KEY, JSON.stringify([...outbox(), otherTab]));
 
     await store.submit('Bebi 2 litros de água');
@@ -364,6 +380,74 @@ describe('EntriesStore', () => {
 
     window.dispatchEvent(new StorageEvent('storage', { key: OUTBOX_KEY }));
     expect(store.timeline().map((entry) => entry.id)).toContain('other');
+  });
+
+  it('sem sessão (401) o lançamento fica guardado e não tenta de novo sozinho', async () => {
+    const sending = store.submit('50 reais');
+    http.expectOne(URL).flush(null, { status: 401, statusText: 'Unauthorized' });
+    await sending;
+
+    expect(store.timeline()[0].sync).toBe('queued');
+    expect(outbox().map((entry) => entry.id)).toEqual(['id-1']);
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY + 20));
+    http.expectNone(URL);
+  });
+
+  it('com o token vencido, nada sai da fila até o login', async () => {
+    session.loggedIn = false;
+
+    await store.submit('50 reais');
+    network.back();
+    await store.flush();
+
+    http.expectNone(URL);
+    expect(store.timeline()[0].sync).toBe('queued');
+
+    session.loggedIn = true;
+    const loading = store.load();
+    http.expectOne((req) => req.method === 'GET').flush([]);
+    await loading;
+    await answerPost('id-1');
+    expect(store.waitingCount()).toBe(0);
+  });
+
+  it('quando outra pessoa entra, a lista é esvaziada e a fila de quem saiu é descartada', async () => {
+    network.online.set(false);
+    await store.submit('50 reais');
+    expect(outbox().map((entry) => entry.userId)).toEqual([USER]);
+
+    session.userId.set('user-2');
+    network.online.set(true);
+    expect(store.needsLoad()).toBe(true);
+    const loading = store.load();
+
+    expect(store.timeline()).toEqual([]);
+    expect(localStorage.getItem(OUTBOX_KEY)).toBeNull();
+    http.expectOne((req) => req.method === 'GET').flush([]);
+    await loading;
+    http.expectNone((req) => req.method === 'POST');
+    expect(store.needsLoad()).toBe(false);
+  });
+
+  it('"Sair" apaga a fila de quem sai e mantém a de mais ninguém', async () => {
+    network.online.set(false);
+    await store.submit('50 reais');
+    const otherUser: OutboxEntry = { id: 'x', text: 'Dormi bem', occurredAt: NOW_ISO, rejected: false, userId: 'u9' };
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify([...outbox(), otherUser]));
+
+    store.forgetUser();
+
+    expect(store.timeline()).toEqual([]);
+    expect(outbox()).toEqual([otherUser]);
+  });
+
+  it('só adota da fila os lançamentos de quem está logado', () => {
+    const reopened = reopenApp([
+      { id: 'mine', text: '50 reais', occurredAt: NOW_ISO, rejected: false, userId: USER },
+      { id: 'theirs', text: 'Dormi bem', occurredAt: NOW_ISO, rejected: false, userId: 'u9' },
+    ]);
+
+    expect(reopened.timeline().map((entry) => entry.id)).toEqual(['mine']);
   });
 
   it('carrega os lançamentos do dia do mais recente para o mais antigo', async () => {

@@ -143,6 +143,22 @@
         </p>
       </section>
     }
+
+    <section class="card" aria-labelledby="account-title">
+      <h2 id="account-title" class="card__title">Conta</h2>
+      <p class="card__note">
+        Você entrou como <strong class="account__name">{{ username() }}</strong>.
+      </p>
+      @if (confirmingLogout()) {
+        <p class="account__warning" role="alert">{{ logoutWarning(store.waitingCount()) }}</p>
+        <div class="account__actions">
+          <button type="button" class="link-button" (click)="logout()">Sair mesmo assim</button>
+          <button type="button" class="link-button" (click)="confirmingLogout.set(false)">Cancelar</button>
+        </div>
+      } @else {
+        <button type="button" class="link-button account__logout" (click)="askLogout()">Sair</button>
+      }
+    </section>
   </main>
 </ion-content>
 

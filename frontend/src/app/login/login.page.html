@@ -1,0 +1,54 @@
+<ion-content>
+  <main class="page">
+    <header class="brand">
+      <h1 class="brand__name">MyDly</h1>
+      <p class="brand__tagline">Escreva como falaria. O MyDly entende se é um gasto ou um hábito.</p>
+    </header>
+
+    <form class="card" (submit)="submit($event)" novalidate>
+      <h2 class="card__title">Entrar</h2>
+
+      <!-- Sempre presente, para o leitor de tela anunciar o erro quando ele aparece. -->
+      <p class="error" role="alert">{{ error() }}</p>
+
+      <label class="label" for="login-username">Usuário</label>
+      <input
+        #username
+        id="login-username"
+        class="field"
+        type="text"
+        name="username"
+        autocomplete="username"
+        autocapitalize="none"
+        spellcheck="false"
+        maxlength="40"
+        [attr.aria-invalid]="error() ? true : null"
+      />
+
+      <label class="label" for="login-password">Senha</label>
+      <input
+        #password
+        id="login-password"
+        class="field"
+        type="password"
+        name="password"
+        autocomplete="current-password"
+        maxlength="200"
+        enterkeyhint="go"
+        [attr.aria-invalid]="error() ? true : null"
+      />
+
+      <button type="submit" class="primary" [disabled]="busy()">{{ busy() ? 'Entrando…' : 'Entrar' }}</button>
+    </form>
+
+    <section class="demo" aria-labelledby="demo-title">
+      <h2 id="demo-title" class="demo__title">Só quer conhecer?</h2>
+      <p class="demo__text">
+        Entre na demonstração com o usuário <strong>{{ demo.username }}</strong> e a senha
+        <strong>{{ demo.password }}</strong>. Os dados dela são compartilhados com quem visita o projeto: não escreva
+        nada pessoal.
+      </p>
+      <button type="button" class="secondary" [disabled]="busy()" (click)="enterDemo()">Entrar na demonstração</button>
+    </section>
+  </main>
+</ion-content>

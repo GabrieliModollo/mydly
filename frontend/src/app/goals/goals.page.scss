@@ -211,6 +211,31 @@ ion-footer {
   padding: 40px 0;
 }
 
+.account__name {
+  color: var(--mydly-ink);
+}
+
+// Sair com lançamentos não enviados apaga esses lançamentos: o aviso usa o laranja das saídas.
+.account__warning {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--mydly-radius);
+  background: var(--mydly-expense-bg);
+  color: var(--mydly-expense-text);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.account__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.account__logout {
+  align-self: flex-start;
+}
+
 button:focus-visible,
 .select:focus-visible {
   outline: 3px solid var(--mydly-focus);

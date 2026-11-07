@@ -1,0 +1,138 @@
+// Tela de login (docs/design.md): mesmo fundo, cartões e botões do resto do app.
+ion-content {
+  --background: var(--mydly-bg);
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: calc(40px + var(--ion-safe-area-top, 0px)) 20px 32px;
+}
+
+.brand__name {
+  margin: 0;
+  font-family: var(--mydly-font-display);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--mydly-ink);
+}
+
+.brand__tagline {
+  margin: 6px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--mydly-subtle);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border-radius: var(--mydly-radius-summary);
+  background: var(--mydly-surface);
+}
+
+.card__title,
+.demo__title {
+  margin: 0;
+  font-family: var(--mydly-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mydly-ink);
+}
+
+.label {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mydly-muted);
+}
+
+.field {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--mydly-field-border);
+  border-radius: var(--mydly-radius);
+  background: var(--mydly-surface);
+  color: var(--mydly-ink);
+  font: inherit;
+  font-size: 16px;
+
+  &[aria-invalid='true'] {
+    border-color: var(--mydly-expense-text);
+  }
+}
+
+.error {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mydly-expense-text);
+
+  &:empty {
+    display: none;
+  }
+}
+
+.primary,
+.secondary {
+  min-height: 52px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: progress;
+  }
+}
+
+.primary {
+  margin-top: 12px;
+  border: 0;
+  background: var(--mydly-accent);
+  color: var(--mydly-accent-ink);
+
+  &:disabled {
+    background: var(--mydly-line);
+    color: var(--mydly-muted);
+  }
+}
+
+.demo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px dashed var(--mydly-field-border);
+  border-radius: var(--mydly-radius-summary);
+}
+
+.demo__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--mydly-subtle);
+
+  strong {
+    color: var(--mydly-ink);
+  }
+}
+
+.secondary {
+  border: 1px solid var(--mydly-ink);
+  background: transparent;
+  color: var(--mydly-ink);
+}
+
+button:focus-visible,
+.field:focus-visible {
+  outline: 3px solid var(--mydly-focus);
+  outline-offset: 2px;
+}

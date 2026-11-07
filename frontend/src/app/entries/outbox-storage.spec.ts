@@ -1,6 +1,12 @@
 import { OUTBOX_KEY, OutboxEntry, readOutbox, writeOutbox } from './outbox-storage';
 
-const ENTRY: OutboxEntry = { id: 'a', text: '50 reais', occurredAt: '2026-11-05T12:00:00.000Z', rejected: false };
+const ENTRY: OutboxEntry = {
+  id: 'a',
+  text: '50 reais',
+  occurredAt: '2026-11-05T12:00:00.000Z',
+  rejected: false,
+  userId: 'user-1',
+};
 
 /** Armazenamento que recusa tudo, como um navegador com dados de site bloqueados. */
 const BLOCKED = {
@@ -52,6 +58,8 @@ describe('fila no aparelho', () => {
         { ...ENTRY, text: '   ' },
         { ...ENTRY, occurredAt: 'ontem' },
         { ...ENTRY, rejected: 'não' },
+        { ...ENTRY, userId: '' },
+        { id: 'sem-dono', text: '50 reais', occurredAt: ENTRY.occurredAt, rejected: false },
         null,
         'texto',
       ]),

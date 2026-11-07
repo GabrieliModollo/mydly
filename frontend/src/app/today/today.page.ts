@@ -100,10 +100,13 @@ export class TodayPage implements OnInit {
     void this.store.load();
   }
 
-  /** Ao voltar para a aba, atualiza os cartões: uma meta ou um limite pode ter mudado na aba Metas. */
+  /**
+   * Ao voltar para a aba, atualiza os cartões: uma meta ou um limite pode ter mudado na aba Metas. Se
+   * outra pessoa entrou desde a última visita (ou a carga falhou), carrega tudo de novo.
+   */
   ionViewWillEnter(): void {
     if (this.entered) {
-      void this.store.refreshSummary();
+      void (this.store.needsLoad() ? this.store.load() : this.store.refreshSummary());
     }
     this.entered = true;
   }

@@ -1,4 +1,4 @@
-import { chipsFor, chipsForItem, dayInSaoPaulo, formatMoney, formatQuantity, itemChip, offlineNotice, parseAmount, summaryFrom } from './entry-format';
+import { chipsFor, chipsForItem, dayInSaoPaulo, formatMoney, formatQuantity, itemChip, logoutWarning, offlineNotice, parseAmount, summaryFrom } from './entry-format';
 import { EntryItemResponse, EntryResponse, ItemHabit } from './entry.models';
 
 function item(overrides: Partial<EntryItemResponse>): EntryItemResponse {
@@ -220,5 +220,14 @@ describe('offlineNotice', () => {
     [3, 'Sem conexão. 3 lançamentos guardados no aparelho, enviados quando a internet voltar.'],
   ])('%i guardado(s)', (waiting, expected) => {
     expect(offlineNotice(waiting)).toBe(expected);
+  });
+});
+
+describe('logoutWarning', () => {
+  it.each([
+    [1, '1 lançamento ainda não foi enviado. Sair apaga esse lançamento deste aparelho.'],
+    [3, '3 lançamentos ainda não foram enviados. Sair apaga esses lançamentos deste aparelho.'],
+  ])('%i não enviado(s)', (waiting, expected) => {
+    expect(logoutWarning(waiting)).toBe(expected);
   });
 });

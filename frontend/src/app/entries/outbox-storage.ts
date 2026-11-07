@@ -6,12 +6,14 @@ export const OUTBOX_KEY = 'mydly.outbox.v1';
 /**
  * Lançamento que ainda não chegou ao servidor, guardado no aparelho.
  * {@code rejected} marca um lançamento que a API recusou: ele fica até o usuário removê-lo.
+ * {@code userId} é o dono: só ele envia o lançamento (ADR 0012).
  */
 export interface OutboxEntry {
   id: string;
   text: string;
   occurredAt: string;
   rejected: boolean;
+  userId: string;
 }
 
 /**
@@ -68,6 +70,8 @@ function isOutboxEntry(value: unknown): value is OutboxEntry {
     entry['text'].trim().length > 0 &&
     typeof entry['occurredAt'] === 'string' &&
     !Number.isNaN(Date.parse(entry['occurredAt'])) &&
-    typeof entry['rejected'] === 'boolean'
+    typeof entry['rejected'] === 'boolean' &&
+    typeof entry['userId'] === 'string' &&
+    entry['userId'].length > 0
   );
 }
