@@ -27,7 +27,8 @@ import org.springframework.modulith.test.Scenario;
  * Consumidor de eventos do módulo finance (ADR 0008): idempotente pela revisão e com lápides.
  * Os eventos podem chegar repetidos ou fora de ordem quando o registro de publicação reenvia.
  */
-@ApplicationModuleTest
+// O módulo usa a API pública de preferences (dia de hoje e semana), que entra junto (ADR 0010).
+@ApplicationModuleTest(extraIncludes = "preferences")
 @Import(TestcontainersConfiguration.class)
 class TransactionRecorderTests {
 
