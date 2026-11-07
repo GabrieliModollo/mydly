@@ -1,0 +1,218 @@
+// Aba Metas (docs/design.md), nas medidas das outras telas.
+:host {
+  --page-width: 40rem;
+  --gutter: 20px;
+}
+
+ion-toolbar {
+  --background: var(--mydly-bg);
+  --border-width: 0;
+}
+
+ion-content,
+ion-footer {
+  --background: var(--mydly-bg);
+  background: var(--mydly-bg);
+}
+
+.header {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 16px var(--gutter) 8px;
+}
+
+.header__date {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mydly-muted);
+}
+
+.header__title {
+  margin: 2px 0 0;
+  font-family: var(--mydly-font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--mydly-ink);
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 8px var(--gutter) 24px;
+}
+
+.card {
+  padding: 16px;
+  border-radius: var(--mydly-radius);
+  background: var(--mydly-surface);
+  color: var(--mydly-ink);
+}
+
+.card__title {
+  margin: 0 0 6px;
+  font-family: var(--mydly-font-display);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.card__subtitle {
+  margin: 16px 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.card__empty,
+.card__note {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--mydly-muted);
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 0;
+  border-top: 1px solid var(--mydly-line);
+
+  &:first-child {
+    border-top: 0;
+  }
+}
+
+.row__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.row__name {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.row__detail {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--mydly-subtle);
+
+  &--empty {
+    font-weight: 400;
+    color: var(--mydly-muted);
+  }
+}
+
+.row__progress {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mydly-muted);
+}
+
+.row__action {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--mydly-field-border);
+  border-radius: 999px;
+  background: var(--mydly-surface);
+  color: var(--mydly-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+// Barra de progresso do orçamento: o texto ao lado sempre diz o valor e o estado.
+.meter {
+  display: block;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--mydly-line);
+  overflow: hidden;
+}
+
+.meter__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--mydly-routine-text);
+
+  &[data-status='NEAR'],
+  &[data-status='OVER'] {
+    background: var(--mydly-expense-text);
+  }
+}
+
+.label {
+  display: block;
+  margin: 4px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mydly-muted);
+}
+
+.select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--mydly-field-border);
+  border-radius: var(--mydly-radius);
+  background: var(--mydly-surface);
+  color: var(--mydly-ink);
+  font: inherit;
+  font-size: 15px;
+}
+
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--mydly-radius);
+  background: var(--mydly-surface);
+  color: var(--mydly-ink);
+  font-size: 14px;
+}
+
+.link-button {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--mydly-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+button:focus-visible,
+.select:focus-visible {
+  outline: 3px solid var(--mydly-focus);
+  outline-offset: 2px;
+}

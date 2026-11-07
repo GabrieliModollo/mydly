@@ -9,7 +9,7 @@ const NOW_ISO = '2026-11-05T12:00:00.000Z';
 const SUMMARY_URL = '/api/v1/days/2026-11-05/summary';
 
 function summary(spent: number, habitsAchieved = 0, items: DaySummaryResponse['items'] = []): DaySummaryResponse {
-  return { date: '2026-11-05', spent, received: 0, habitsAchieved, slips: 0, spentByCategory: [], items };
+  return { date: '2026-11-05', spent, received: 0, habitsAchieved, slips: 0, spentByCategory: [], items, dailyGoals: [], budgetAlerts: [] };
 }
 
 function saved(id: string, text: string, occurredAt = NOW_ISO): EntryResponse {

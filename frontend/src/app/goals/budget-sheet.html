@@ -1,0 +1,56 @@
+<form class="sheet" (submit)="save($event)" aria-labelledby="budget-sheet-title" aria-describedby="budget-sheet-hint">
+  <div class="sheet__top">
+    <span class="sheet__chip">Orçamento</span>
+    <button type="button" class="sheet__close" aria-label="Fechar" (click)="closed.emit()">
+      <ion-icon name="close-outline" aria-hidden="true" />
+    </button>
+  </div>
+
+  <h2 id="budget-sheet-title" class="sheet__title">{{ title() }}</h2>
+  <p id="budget-sheet-hint" class="sheet__hint">
+    O MyDly avisa quando o gasto chega a 80% do limite. Vale de hoje em diante.
+  </p>
+
+  <div class="sheet__body">
+    <label class="label" for="budget-limit">Limite de gasto</label>
+    <div class="amount" [class.amount--error]="showLimitError()">
+      <span class="amount__currency" aria-hidden="true">R$</span>
+      <input
+        id="budget-limit"
+        class="amount__input"
+        type="text"
+        inputmode="decimal"
+        autocomplete="off"
+        placeholder="0,00"
+        [attr.aria-invalid]="showLimitError()"
+        [attr.aria-describedby]="showLimitError() ? 'budget-limit-error' : null"
+        [value]="limitText()"
+        (input)="onLimitInput($event)"
+      />
+    </div>
+    @if (showLimitError()) {
+      <p id="budget-limit-error" class="error" role="alert">Use um valor maior que zero, como 100,00.</p>
+    }
+
+    <fieldset class="choice">
+      <legend class="label">Período</legend>
+      <div class="pills">
+        <button type="button" class="pill" [attr.aria-pressed]="period() === 'WEEKLY'" (click)="period.set('WEEKLY')">
+          Por semana
+        </button>
+        <button type="button" class="pill" [attr.aria-pressed]="period() === 'MONTHLY'" (click)="period.set('MONTHLY')">
+          Por mês
+        </button>
+      </div>
+    </fieldset>
+  </div>
+
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+
+  <button type="submit" class="primary" [disabled]="limit() === null || saving()">Salvar limite</button>
+  @if (budget().limit !== null) {
+    <button type="button" class="secondary" [disabled]="saving()" (click)="removed.emit()">Tirar limite</button>
+  }
+</form>

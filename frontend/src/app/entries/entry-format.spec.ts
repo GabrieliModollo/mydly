@@ -124,6 +124,8 @@ describe('resumo do dia', () => {
       slips: 1,
       spentByCategory: [],
       items: [],
+      dailyGoals: [],
+      budgetAlerts: [],
     };
 
     expect(summaryFrom(response)).toEqual({ spent: 62.5, habitsDone: 3 });

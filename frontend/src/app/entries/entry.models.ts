@@ -2,6 +2,7 @@
  * Tipos espelhando o contrato da API (EntryResponse, EntryItemResponse e ResolveItemRequest no
  * backend). Mantenha em sincronia com o Swagger em /swagger-ui.html.
  */
+import type { BudgetAlert, DailyGoal } from './goal.models';
 
 export type EntryType = 'FINANCE' | 'ROUTINE' | 'UNKNOWN';
 export type Direction = 'EXPENSE' | 'INCOME';
@@ -87,4 +88,8 @@ export interface DaySummaryResponse {
   slips: number;
   spentByCategory: { category: Category | null; amount: number }[];
   items: ItemHabit[];
+  /** Progresso de cada meta diária de quantidade vigente no dia, mesmo sem registro. */
+  dailyGoals: DailyGoal[];
+  /** Categorias em aviso (80% ou mais) ou acima do limite no período que contém o dia. */
+  budgetAlerts: BudgetAlert[];
 }

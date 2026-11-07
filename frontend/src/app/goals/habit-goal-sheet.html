@@ -1,0 +1,94 @@
+<form class="sheet" (submit)="save($event)" aria-labelledby="goal-sheet-title" aria-describedby="goal-sheet-hint">
+  <div class="sheet__top">
+    <span class="sheet__chip">{{ isLimit() ? 'Hábito para evitar' : 'Hábito' }}</span>
+    <button type="button" class="sheet__close" aria-label="Fechar" (click)="closed.emit()">
+      <ion-icon name="close-outline" aria-hidden="true" />
+    </button>
+  </div>
+
+  <h2 id="goal-sheet-title" class="sheet__title">{{ title() }}</h2>
+  <p id="goal-sheet-hint" class="sheet__hint">
+    Vale de hoje em diante. Os dias que já passaram continuam com a meta que valia neles.
+  </p>
+
+  <div class="sheet__body">
+    @if (habit().allowedKinds.length > 1) {
+      <fieldset class="choice">
+        <legend class="label">Tipo de meta</legend>
+        <div class="pills">
+          <button
+            type="button"
+            class="pill"
+            [attr.aria-pressed]="kind() === 'DAILY_QUANTITY'"
+            (click)="chooseKind('DAILY_QUANTITY')"
+          >
+            Quantidade por dia
+          </button>
+          <button
+            type="button"
+            class="pill"
+            [attr.aria-pressed]="kind() === 'WEEKLY_FREQUENCY'"
+            (click)="chooseKind('WEEKLY_FREQUENCY')"
+          >
+            Dias por semana
+          </button>
+        </div>
+      </fieldset>
+    }
+
+    @if (kind() === 'DAILY_QUANTITY') {
+      <label class="label" for="goal-quantity">Quantidade por dia</label>
+      <input
+        id="goal-quantity"
+        class="field"
+        [class.field--error]="showQuantityError()"
+        type="text"
+        inputmode="decimal"
+        autocomplete="off"
+        placeholder="2"
+        [attr.aria-invalid]="showQuantityError()"
+        [attr.aria-describedby]="showQuantityError() ? 'goal-quantity-error' : null"
+        [value]="quantityText()"
+        (input)="onQuantityInput($event)"
+      />
+      @if (showQuantityError()) {
+        <p id="goal-quantity-error" class="error" role="alert">Use um número maior que zero, como 1,5.</p>
+      }
+
+      <fieldset class="choice">
+        <legend class="label">Unidade</legend>
+        <div class="pills">
+          @for (option of habit().allowedUnits; track option) {
+            <button type="button" class="pill" [attr.aria-pressed]="unit() === option" (click)="unit.set(option)">
+              {{ option }}
+            </button>
+          }
+        </div>
+      </fieldset>
+    } @else {
+      <fieldset class="choice">
+        <legend class="label">{{ isLimit() ? 'No máximo quantos dias por semana' : 'Quantos dias por semana' }}</legend>
+        <div class="pills pills--days">
+          @for (option of dayOptions(); track option) {
+            <button type="button" class="pill pill--day" [attr.aria-pressed]="days() === option" (click)="days.set(option)">
+              {{ option }}
+            </button>
+          }
+        </div>
+      </fieldset>
+    }
+  </div>
+
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+
+  <button type="submit" class="primary" [disabled]="!canSave() || saving()">
+    {{ isLimit() ? 'Salvar limite' : 'Salvar meta' }}
+  </button>
+  @if (habit().goal) {
+    <button type="button" class="secondary" [disabled]="saving()" (click)="removed.emit()">
+      {{ isLimit() ? 'Tirar limite' : 'Tirar meta' }}
+    </button>
+  }
+</form>

@@ -26,7 +26,7 @@ describe('formatação do resumo da semana', () => {
       name: 'Besteira',
       polarity: 'BAD',
       days: ['ACHIEVED', 'SLIPPED', 'NONE', 'FUTURE', 'FUTURE', 'FUTURE', 'FUTURE'],
-      score: { achieved: 1, elapsedDays: 3, target: null },
+      score: { achieved: 1, elapsedDays: 3, target: null, limit: null, slips: null, goal: null },
     };
 
     expect(habitDescription(habit, '2026-11-02')).toBe(
@@ -40,7 +40,7 @@ describe('formatação do resumo da semana', () => {
       name: 'Academia',
       polarity: 'GOOD',
       days: ['ACHIEVED', 'MISSED', 'ACHIEVED', 'ACHIEVED', 'ACHIEVED', 'ACHIEVED', 'FUTURE'],
-      score: { achieved: 5, elapsedDays: 6, target: null },
+      score: { achieved: 5, elapsedDays: 6, target: null, limit: null, slips: null, goal: null },
     };
 
     expect(habitDescription(habit, '2026-11-02')).toContain('terça: não cumprido');
@@ -56,7 +56,7 @@ describe('formatação do resumo da semana', () => {
       name: 'Academia',
       polarity: 'GOOD',
       days: ['ACHIEVED', 'NONE', 'NONE', 'NONE', 'NONE', 'NONE', 'FUTURE'],
-      score: { achieved: 1, elapsedDays: 6, target: null },
+      score: { achieved: 1, elapsedDays: 6, target: null, limit: null, slips: null, goal: null },
     };
     expect(habitDescription(habit, '2026-11-01')).toContain('domingo: cumprido');
     expect(habitDescription(habit, '2026-11-01')).toContain('sábado ainda não chegou');

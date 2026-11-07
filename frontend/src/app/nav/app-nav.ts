@@ -2,11 +2,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { IonIcon } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { barChartOutline, todayOutline } from 'ionicons/icons';
+import { barChartOutline, flagOutline, todayOutline } from 'ionicons/icons';
 
 /**
- * Barra de navegação inferior (docs/design.md). Metas entra quando a tela existir, para não haver
- * link que não leva a lugar nenhum.
+ * Barra de navegação inferior (docs/design.md): Hoje, Resumo e Metas.
  */
 @Component({
   selector: 'app-nav',
@@ -26,6 +25,10 @@ import { barChartOutline, todayOutline } from 'ionicons/icons';
       <a class="nav__link" routerLink="/resumo" routerLinkActive="nav__link--active" ariaCurrentWhenActive="page">
         <ion-icon name="bar-chart-outline" aria-hidden="true" />
         Resumo
+      </a>
+      <a class="nav__link" routerLink="/metas" routerLinkActive="nav__link--active" ariaCurrentWhenActive="page">
+        <ion-icon name="flag-outline" aria-hidden="true" />
+        Metas
       </a>
     </nav>
   `,
@@ -72,6 +75,6 @@ import { barChartOutline, todayOutline } from 'ionicons/icons';
 })
 export class AppNav {
   constructor() {
-    addIcons({ barChartOutline, todayOutline });
+    addIcons({ barChartOutline, flagOutline, todayOutline });
   }
 }

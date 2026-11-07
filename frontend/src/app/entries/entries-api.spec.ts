@@ -60,7 +60,7 @@ describe('EntriesApi', () => {
   });
 
   it('busca o resumo do dia pela data', async () => {
-    const summary = { date: '2026-11-05', spent: 0, received: 0, habitsAchieved: 0, slips: 0, spentByCategory: [], items: [] };
+    const summary = { date: '2026-11-05', spent: 0, received: 0, habitsAchieved: 0, slips: 0, spentByCategory: [], items: [], dailyGoals: [], budgetAlerts: [] };
     const result = firstValueFrom(api.daySummary('2026-11-05'));
 
     http.expectOne('/api/v1/days/2026-11-05/summary').flush(summary);

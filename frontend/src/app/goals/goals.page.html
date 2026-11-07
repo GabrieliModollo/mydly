@@ -1,0 +1,199 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <div class="header">
+      <p class="header__date">Metas e limites</p>
+      <h1 class="header__title">Metas</h1>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <main class="page">
+    <p class="sr-only" role="status">{{ notice() }}</p>
+
+    @if (loadState() === 'error') {
+      <div class="banner" role="alert">
+        <ion-icon name="cloud-offline-outline" aria-hidden="true" />
+        <span>Não foi possível carregar suas metas.</span>
+        <button type="button" class="link-button" (click)="load()">Tentar de novo</button>
+      </div>
+    } @else if (loadState() === 'loading') {
+      <div class="loading">
+        <ion-spinner name="dots" aria-hidden="true" />
+        <span class="sr-only">Carregando as metas</span>
+      </div>
+    } @else {
+      <section class="card" aria-labelledby="habits-title">
+        <h2 id="habits-title" class="card__title">Hábitos</h2>
+        @if (!hasGoals()) {
+          <p class="card__empty">
+            Nenhuma meta ainda. Escolha um hábito, como 2 L de água por dia ou academia 4 dias por semana, e acompanhe
+            no Hoje e no Resumo.
+          </p>
+        }
+        <ul class="rows" aria-label="Hábitos para cumprir">
+          @for (habit of goodHabits(); track habit.habit) {
+            <li class="row">
+              <span class="row__text">
+                <span class="row__name">{{ habit.name }}</span>
+                <span class="row__detail" [class.row__detail--empty]="!habit.goal">{{ goalSummary(habit) }}</span>
+              </span>
+              <button
+                type="button"
+                class="row__action"
+                [attr.aria-label]="habitAction(habit)"
+                (click)="openHabit(habit, $event)"
+              >
+                {{ habit.goal ? 'Editar' : 'Definir' }}
+              </button>
+            </li>
+          }
+        </ul>
+        <h3 class="card__subtitle">Para evitar</h3>
+        <p class="card__note">Num hábito para evitar, a meta é um limite: no máximo tantos dias por semana.</p>
+        <ul class="rows" aria-label="Hábitos para evitar">
+          @for (habit of badHabits(); track habit.habit) {
+            <li class="row">
+              <span class="row__text">
+                <span class="row__name">{{ habit.name }}</span>
+                <span class="row__detail" [class.row__detail--empty]="!habit.goal">{{ goalSummary(habit) }}</span>
+              </span>
+              <button
+                type="button"
+                class="row__action"
+                [attr.aria-label]="habitAction(habit)"
+                (click)="openHabit(habit, $event)"
+              >
+                {{ habit.goal ? 'Editar' : 'Definir' }}
+              </button>
+            </li>
+          }
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="budgets-title">
+        <h2 id="budgets-title" class="card__title">Orçamentos</h2>
+        @if (!hasBudgets()) {
+          <p class="card__empty">
+            Nenhum limite ainda. Defina quanto quer gastar por semana ou por mês em cada categoria; o MyDly avisa quando
+            o gasto chega a 80%.
+          </p>
+        }
+        <ul class="rows">
+          @for (budget of budgets(); track budget.category) {
+            <li class="row row--budget">
+              <span class="row__text">
+                <span class="row__name">{{ categoryLabels[budget.category] }}</span>
+                <span class="row__detail" [class.row__detail--empty]="budget.limit === null">{{ budgetSummary(budget) }}</span>
+                @if (budget.progress && budget.limit !== null) {
+                  <span
+                    class="meter"
+                    role="progressbar"
+                    [attr.aria-label]="'Gasto em ' + categoryLabels[budget.category]"
+                    aria-valuemin="0"
+                    [attr.aria-valuemax]="budget.limit"
+                    [attr.aria-valuenow]="progressValue(budget.progress.spent, budget.limit)"
+                    [attr.aria-valuetext]="
+                      moneyProgressLabel(budget.progress.spent, budget.limit) +
+                      ', ' +
+                      budgetStatusLabel(budget.progress.percent, budget.progress.status)
+                    "
+                  >
+                    <span
+                      class="meter__fill"
+                      [attr.data-status]="budget.progress.status"
+                      [style.width.%]="progressWidth(budget.progress.spent, budget.limit)"
+                    ></span>
+                  </span>
+                  <span class="row__progress" aria-hidden="true">
+                    {{ moneyProgressLabel(budget.progress.spent, budget.limit) }} ·
+                    {{ budgetStatusLabel(budget.progress.percent, budget.progress.status) }}
+                  </span>
+                }
+              </span>
+              <button
+                type="button"
+                class="row__action"
+                [attr.aria-label]="budgetAction(budget)"
+                (click)="openBudget(budget, $event)"
+              >
+                {{ budget.limit !== null ? 'Editar' : 'Definir' }}
+              </button>
+            </li>
+          }
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="week-title">
+        <h2 id="week-title" class="card__title">Semana</h2>
+        <label class="label" for="first-day">Início da semana</label>
+        <select
+          id="first-day"
+          class="select"
+          aria-describedby="first-day-hint"
+          [value]="firstDay()"
+          (change)="changeFirstDay($event)"
+        >
+          @for (option of dayOptions; track option.value) {
+            <option [value]="option.value" [selected]="option.value === firstDay()">{{ option.label }}</option>
+          }
+        </select>
+        <p id="first-day-hint" class="card__note">
+          Vale para o Resumo e para os limites semanais. As semanas que já passaram também passam a ser contadas assim.
+        </p>
+      </section>
+    }
+  </main>
+</ion-content>
+
+<ion-modal
+  class="confirm-modal"
+  [isOpen]="editingHabit() !== null"
+  [initialBreakpoint]="0.85"
+  [breakpoints]="[0, 0.85, 1]"
+  (didPresent)="onPresented()"
+  (didDismiss)="closeSheet()"
+>
+  <ng-template>
+    <ion-content class="confirm-modal__content">
+      @if (editingHabit(); as habit) {
+        <app-habit-goal-sheet
+          [habit]="habit"
+          [error]="sheetError()"
+          [saving]="saving()"
+          (saved)="saveHabit($event)"
+          (removed)="removeHabit()"
+          (closed)="closeSheet()"
+        />
+      }
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<ion-modal
+  class="confirm-modal"
+  [isOpen]="editingBudget() !== null"
+  [initialBreakpoint]="0.85"
+  [breakpoints]="[0, 0.85, 1]"
+  (didPresent)="onPresented()"
+  (didDismiss)="closeSheet()"
+>
+  <ng-template>
+    <ion-content class="confirm-modal__content">
+      @if (editingBudget(); as budget) {
+        <app-budget-sheet
+          [budget]="budget"
+          [error]="sheetError()"
+          [saving]="saving()"
+          (saved)="saveBudget($event)"
+          (removed)="removeBudget()"
+          (closed)="closeSheet()"
+        />
+      }
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<ion-footer class="ion-no-border">
+  <app-nav />
+</ion-footer>

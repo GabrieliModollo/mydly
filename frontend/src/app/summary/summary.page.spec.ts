@@ -18,10 +18,11 @@ function week(weekStart: string, overrides: Partial<WeekSummaryResponse> = {}): 
         name: 'Hidratação',
         polarity: 'GOOD',
         days: ['ACHIEVED', 'ACHIEVED', 'NONE', 'FUTURE', 'FUTURE', 'FUTURE', 'FUTURE'],
-        score: { achieved: 2, elapsedDays: 3, target: null },
+        score: { achieved: 2, elapsedDays: 3, target: null, limit: null, slips: null, goal: null },
       },
     ],
     money: { spent: 150, received: 0, spentByCategory: [{ category: 'FOOD', amount: 150 }] },
+    budgets: [],
     previous: { spent: 100, habitsAchieved: 4, comparedDays: 3 },
     insights: [
       { kind: 'SPENDING_UP', text: 'Gastos da semana: R$ 150,00, 50% acima da semana passada.', numbers: {} },

@@ -11,5 +11,10 @@ export const routes: Routes = [
     title: 'MyDly · Resumo',
     loadComponent: () => import('./summary/summary.page').then((m) => m.SummaryPage),
   },
+  {
+    path: 'metas',
+    title: 'MyDly · Metas',
+    loadComponent: () => import('./goals/goals.page').then((m) => m.GoalsPage),
+  },
   { path: '**', redirectTo: '' },
 ];
