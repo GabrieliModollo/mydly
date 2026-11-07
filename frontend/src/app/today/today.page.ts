@@ -23,8 +23,9 @@ import {
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { alertCircleOutline, arrowUp, cloudOfflineOutline, refreshOutline } from 'ionicons/icons';
+import { Connectivity } from '../entries/connectivity';
 import { EntriesStore, NOW } from '../entries/entries-store';
-import { chipsForItem, formatMoney } from '../entries/entry-format';
+import { chipsForItem, formatMoney, offlineNotice } from '../entries/entry-format';
 import { EntryItemResponse, EntryResponse, ResolveItemRequest } from '../entries/entry.models';
 import {
   budgetAlertLabel,
@@ -35,7 +36,7 @@ import {
 } from '../goals/goal-format';
 import { AppNav } from '../nav/app-nav';
 import { ConfirmSheet } from './confirm-sheet';
-import { formatDayLabel } from './day-label';
+import { entryTimeFormat, formatDayLabel } from './day-label';
 
 /** Frases do README, para quem abre o app pela primeira vez saber o que escrever. */
 const EXAMPLES = [
@@ -68,10 +69,13 @@ const EXAMPLES = [
 })
 export class TodayPage implements OnInit {
   protected readonly store = inject(EntriesStore);
-  protected readonly todayLabel = formatDayLabel(inject(NOW)(), inject(LOCALE_ID));
+  protected readonly connectivity = inject(Connectivity);
+  private readonly now = inject(NOW);
+  protected readonly todayLabel = formatDayLabel(this.now(), inject(LOCALE_ID));
   protected readonly examples = EXAMPLES;
   protected readonly chipsForItem = chipsForItem;
   protected readonly formatMoney = formatMoney;
+  protected readonly offlineNotice = offlineNotice;
   protected readonly dailyProgressLabel = dailyProgressLabel;
   protected readonly dailyProgressText = dailyProgressText;
   protected readonly budgetAlertLabel = budgetAlertLabel;
@@ -102,6 +106,10 @@ export class TodayPage implements OnInit {
       void this.store.refreshSummary();
     }
     this.entered = true;
+  }
+
+  protected timeFormat(occurredAt: string): string {
+    return entryTimeFormat(occurredAt, this.now());
   }
 
   protected onInput(event: Event): void {

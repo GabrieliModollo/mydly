@@ -4,6 +4,7 @@ import { LOCALE_ID, signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideIonicAngular } from '@ionic/angular';
+import { Connectivity } from '../entries/connectivity';
 import { EntriesStore, NOW, ResolveResult, TimelineEntry } from '../entries/entries-store';
 import { EntryResponse } from '../entries/entry.models';
 import { BudgetAlert, DailyGoal } from '../entries/goal.models';
@@ -45,14 +46,24 @@ describe('TodayPage', () => {
   let input: HTMLInputElement;
   let timeline: WritableSignal<TimelineEntry[]>;
   let resolveResult: ResolveResult;
+  let online: WritableSignal<boolean>;
+  let waitingCount: WritableSignal<number>;
+  let retried: string[];
 
   beforeEach(async () => {
     submitted = [];
+    retried = [];
     timeline = signal([]);
     resolveResult = 'ok';
+    online = signal(true);
+    waitingCount = signal(0);
     const store: Partial<EntriesStore> = {
       loadState: signal('loaded'),
       timeline,
+      waitingCount,
+      retry: async (id: string) => {
+        retried.push(id);
+      },
       summary: signal({ spent: 62.5, habitsDone: 3 }),
       load: async () => undefined,
       submit: async (text: string) => {
@@ -71,12 +82,56 @@ describe('TodayPage', () => {
         provideRouter([]),
         { provide: LOCALE_ID, useValue: 'pt-BR' },
         { provide: EntriesStore, useValue: store },
+        { provide: Connectivity, useValue: { online } },
         { provide: NOW, useValue: () => new Date('2026-11-05T12:00:00Z') },
       ],
     });
     fixture = TestBed.createComponent(TodayPage);
     await fixture.whenStable();
     input = fixture.nativeElement.querySelector('#entry-text');
+  });
+
+  function text(): string {
+    return (fixture.nativeElement as HTMLElement).textContent ?? '';
+  }
+
+  it('sem conexão avisa quantos lançamentos estão guardados no aparelho', async () => {
+    expect(text()).not.toContain('Sem conexão');
+
+    online.set(false);
+    waitingCount.set(2);
+    await fixture.whenStable();
+
+    expect(text()).toContain('Sem conexão. 2 lançamentos guardados no aparelho, enviados quando a internet voltar.');
+  });
+
+  it('lançamento guardado diz que está no aparelho e oferece "Enviar agora" só com rede', async () => {
+    timeline.set([{ id: 'q', text: '50 reais', occurredAt: '2026-11-05T12:00:00Z', sync: 'queued' }]);
+    await fixture.whenStable();
+    expect(text()).toContain('Guardado no aparelho.');
+
+    const button = [...fixture.nativeElement.querySelectorAll('button')].find((candidate: HTMLButtonElement) =>
+      candidate.textContent?.includes('Enviar agora'),
+    ) as HTMLButtonElement;
+    button.click();
+    expect(retried).toEqual(['q']);
+
+    online.set(false);
+    await fixture.whenStable();
+    expect(text()).toContain('Guardado no aparelho.');
+    expect(text()).not.toContain('Enviar agora');
+  });
+
+  it('lançamento guardado de outro dia mostra a data junto do horário', async () => {
+    timeline.set([
+      { id: 'y', text: 'Dormi mal', occurredAt: '2026-11-04T20:00:00Z', sync: 'queued' },
+      { id: 't', text: '50 reais', occurredAt: '2026-11-05T12:00:00Z', sync: 'queued' },
+    ]);
+    await fixture.whenStable();
+
+    const times = [...fixture.nativeElement.querySelectorAll('.entry__time')].map((el: Element) => el.textContent?.trim());
+    expect(times[0]).toMatch(/^04\/11, \d{2}:\d{2}$/);
+    expect(times[1]).toMatch(/^\d{2}:\d{2}$/);
   });
 
   function type(text: string): void {

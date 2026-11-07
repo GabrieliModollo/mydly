@@ -1,8 +1,32 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { applyResolution, EntriesStore, NEW_ENTRY_ID, NOW } from './entries-store';
+import { Connectivity } from './connectivity';
+import { applyResolution, EntriesStore, NEW_ENTRY_ID, NOW, RETRY_DELAY_MS } from './entries-store';
 import { DaySummaryResponse, EntryResponse } from './entry.models';
+import { OUTBOX_KEY, OUTBOX_STORAGE, OutboxEntry } from './outbox-storage';
+
+/** Rede controlada pelo teste: {@code back()} faz o que o evento {@code online} do navegador faz. */
+class FakeConnectivity {
+  readonly online = signal(true);
+  private listener: (() => void) | undefined;
+
+  whenBackOnline(listener: () => void): () => void {
+    this.listener = listener;
+    return () => (this.listener = undefined);
+  }
+
+  back(): void {
+    this.online.set(true);
+    this.listener?.();
+  }
+}
+
+/** Uma volta no laço de eventos, para as promessas do store andarem. */
+const tick = () => new Promise((resolve) => setTimeout(resolve));
+
+const RETRY_DELAY = 40;
 
 const URL = '/api/v1/entries';
 const NOW_ISO = '2026-11-05T12:00:00.000Z';
@@ -89,15 +113,23 @@ describe('EntriesStore', () => {
   let store: EntriesStore;
   let http: HttpTestingController;
   let nextId: number;
+  let now: string;
+  let network: FakeConnectivity;
 
   beforeEach(() => {
     nextId = 0;
+    now = NOW_ISO;
+    network = new FakeConnectivity();
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: NEW_ENTRY_ID, useValue: () => `id-${++nextId}` },
-        { provide: NOW, useValue: () => new Date(NOW_ISO) },
+        { provide: NOW, useValue: () => new Date(now) },
+        { provide: Connectivity, useValue: network },
+        { provide: OUTBOX_STORAGE, useValue: localStorage },
+        { provide: RETRY_DELAY_MS, useValue: RETRY_DELAY },
       ],
     });
     store = TestBed.inject(EntriesStore);
@@ -108,7 +140,27 @@ describe('EntriesStore', () => {
   afterEach(() => {
     http.match(SUMMARY_URL).forEach((req) => req.flush(summary(0)));
     http.verify();
+    localStorage.clear();
   });
+
+  /** O que está guardado no aparelho. */
+  function outbox(): OutboxEntry[] {
+    return JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]') as OutboxEntry[];
+  }
+
+  /** Um store novo, como se o app fosse aberto de novo com o que está no aparelho. */
+  function reopenApp(entries: OutboxEntry[]): EntriesStore {
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify(entries));
+    return TestBed.runInInjectionContext(() => new EntriesStore());
+  }
+
+  /** Responde o próximo envio da fila, conferindo qual lançamento foi. */
+  async function answerPost(id: string, text = '50 reais'): Promise<void> {
+    const req = http.expectOne((candidate) => candidate.method === 'POST');
+    expect(req.request.body.id).toBe(id);
+    req.flush(saved(id, text, req.request.body.occurredAt));
+    await tick();
+  }
 
   /** Espera os pedidos de resumo que o store dispara depois de cada mudança, e responde todos. */
   async function answerSummary(response: DaySummaryResponse): Promise<void> {
@@ -140,11 +192,13 @@ describe('EntriesStore', () => {
     http.expectNone(URL);
   });
 
-  it('em falha de rede marca para tentar de novo e reenvia com o MESMO id e data', async () => {
+  it('em falha de rede guarda no aparelho e "Enviar agora" reenvia com o MESMO id e data', async () => {
     const first = store.submit('50 reais');
+    expect(outbox()).toEqual([{ id: 'id-1', text: '50 reais', occurredAt: NOW_ISO, rejected: false }]);
     http.expectOne(URL).error(new ProgressEvent('error'));
     await first;
-    expect(store.timeline()[0].sync).toBe('failed');
+    expect(store.timeline()[0].sync).toBe('queued');
+    expect(store.waitingCount()).toBe(1);
 
     const retry = store.retry('id-1');
     expect(store.timeline()[0].sync).toBe('sending');
@@ -155,27 +209,161 @@ describe('EntriesStore', () => {
 
     expect(store.timeline()).toHaveLength(1);
     expect(store.timeline()[0].sync).toBe('synced');
+    expect(store.waitingCount()).toBe(0);
+    expect(localStorage.getItem(OUTBOX_KEY)).toBeNull();
   });
 
-  it('erro do servidor (5xx) também pode ser reenviado', async () => {
+  it('erro do servidor (5xx) também fica guardado para reenviar', async () => {
     const sending = store.submit('50 reais');
     http.expectOne(URL).flush(null, { status: 503, statusText: 'Service Unavailable' });
     await sending;
 
-    expect(store.timeline()[0].sync).toBe('failed');
+    expect(store.timeline()[0].sync).toBe('queued');
   });
 
-  it('recusa da API (4xx) não oferece reenvio e pode ser removida', async () => {
+  it('recusa da API (4xx) não oferece reenvio, fica no aparelho até ser removida', async () => {
     const sending = store.submit('50 reais');
     http.expectOne(URL).flush(null, { status: 409, statusText: 'Conflict' });
     await sending;
     expect(store.timeline()[0].sync).toBe('rejected');
+    expect(outbox()).toEqual([{ id: 'id-1', text: '50 reais', occurredAt: NOW_ISO, rejected: true }]);
 
     await store.retry('id-1');
     http.expectNone(URL);
 
     store.dismiss('id-1');
     expect(store.timeline()).toEqual([]);
+    expect(localStorage.getItem(OUTBOX_KEY)).toBeNull();
+  });
+
+  it('sem rede, o lançamento vai direto para a fila, sem tentar enviar', async () => {
+    network.online.set(false);
+
+    await store.submit('50 reais');
+
+    http.expectNone(URL);
+    expect(store.timeline()[0].sync).toBe('queued');
+    expect(outbox().map((entry) => entry.id)).toEqual(['id-1']);
+  });
+
+  it('quando a rede volta, envia a fila um por vez, do mais antigo ao mais novo', async () => {
+    network.online.set(false);
+    now = '2026-11-05T12:05:00.000Z';
+    await store.submit('Bebi 2 litros de água');
+    now = '2026-11-05T12:00:00.000Z';
+    await store.submit('50 reais');
+
+    network.back();
+
+    // Só um envio por vez: o segundo espera a resposta do primeiro.
+    await answerPost('id-2');
+    expect(store.timeline().find((entry) => entry.id === 'id-1')?.sync).toBe('sending');
+    await answerPost('id-1', 'Bebi 2 litros de água');
+
+    expect(store.timeline().map((entry) => entry.sync)).toEqual(['synced', 'synced']);
+    expect(localStorage.getItem(OUTBOX_KEY)).toBeNull();
+  });
+
+  it('falha no meio da fila para de enviar e tenta de novo depois de um tempo', async () => {
+    network.online.set(false);
+    await store.submit('50 reais');
+    now = '2026-11-05T12:05:00.000Z';
+    await store.submit('Bebi 2 litros de água');
+
+    network.back();
+    http.expectOne(URL).error(new ProgressEvent('error'));
+    await tick();
+    http.expectNone(URL);
+    expect(store.waitingCount()).toBe(2);
+
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY + 20));
+    await answerPost('id-1');
+    await answerPost('id-2', 'Bebi 2 litros de água');
+    expect(store.waitingCount()).toBe(0);
+  });
+
+  it('recusa no meio da fila não segura os outros', async () => {
+    network.online.set(false);
+    await store.submit('50 reais');
+    now = '2026-11-05T12:05:00.000Z';
+    await store.submit('Bebi 2 litros de água');
+
+    network.back();
+    http.expectOne(URL).flush(null, { status: 409, statusText: 'Conflict' });
+    await tick();
+    await answerPost('id-2', 'Bebi 2 litros de água');
+
+    expect(store.timeline().map((entry) => [entry.id, entry.sync])).toEqual([
+      ['id-2', 'synced'],
+      ['id-1', 'rejected'],
+    ]);
+  });
+
+  it('ao abrir o app, o que estava guardado volta, e um envio interrompido volta como guardado', async () => {
+    const reopened = reopenApp([
+      { id: 'a', text: '50 reais', occurredAt: '2026-11-05T11:00:00.000Z', rejected: false },
+      { id: 'b', text: 'xyz', occurredAt: '2026-11-05T10:00:00.000Z', rejected: true },
+    ]);
+
+    expect(reopened.timeline().map((entry) => [entry.id, entry.sync])).toEqual([
+      ['a', 'queued'],
+      ['b', 'rejected'],
+    ]);
+
+    const loading = reopened.load();
+    http.expectOne((req) => req.method === 'GET').flush([]);
+    await loading;
+    await answerPost('a');
+
+    expect(reopened.timeline().map((entry) => [entry.id, entry.sync])).toEqual([
+      ['a', 'synced'],
+      ['b', 'rejected'],
+    ]);
+    expect(outbox().map((entry) => entry.id)).toEqual(['b']);
+  });
+
+  it('um lançamento guardado que o servidor já tem (resposta perdida) sai da fila sem reenviar', async () => {
+    const reopened = reopenApp([{ id: 'a', text: '50 reais', occurredAt: NOW_ISO, rejected: false }]);
+
+    const loading = reopened.load();
+    http.expectOne((req) => req.method === 'GET').flush([saved('a', '50 reais')]);
+    await loading;
+    await tick();
+
+    http.expectNone((req) => req.method === 'POST');
+    expect(reopened.timeline()[0].sync).toBe('synced');
+    expect(localStorage.getItem(OUTBOX_KEY)).toBeNull();
+  });
+
+  it('lançamento de ontem aparece enquanto está guardado e sai da lista de hoje depois de enviado', async () => {
+    // 20h UTC do dia 4 = 17h do dia 4 em São Paulo; hoje é dia 5.
+    const yesterday = '2026-11-04T20:00:00.000Z';
+    const reopened = reopenApp([{ id: 'a', text: 'Dormi mal', occurredAt: yesterday, rejected: false }]);
+    expect(reopened.timeline().map((entry) => entry.id)).toEqual(['a']);
+
+    const loading = reopened.load();
+    http.expectOne((req) => req.method === 'GET').flush([]);
+    await loading;
+    const req = http.expectOne((candidate) => candidate.method === 'POST');
+    expect(req.request.body.occurredAt).toBe(yesterday);
+    req.flush(saved('a', 'Dormi mal', yesterday));
+    await tick();
+
+    expect(reopened.timeline()).toEqual([]);
+    expect(reopened.waitingCount()).toBe(0);
+  });
+
+  it('não apaga o que outra aba guardou e mostra o lançamento dela', async () => {
+    network.online.set(false);
+    await store.submit('50 reais');
+    const otherTab: OutboxEntry = { id: 'other', text: 'Dormi bem', occurredAt: NOW_ISO, rejected: false };
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify([...outbox(), otherTab]));
+
+    await store.submit('Bebi 2 litros de água');
+    expect(outbox().map((entry) => entry.id).sort()).toEqual(['id-1', 'id-2', 'other']);
+
+    window.dispatchEvent(new StorageEvent('storage', { key: OUTBOX_KEY }));
+    expect(store.timeline().map((entry) => entry.id)).toContain('other');
   });
 
   it('carrega os lançamentos do dia do mais recente para o mais antigo', async () => {
@@ -200,9 +388,12 @@ describe('EntriesStore', () => {
     const loading = store.load();
     http.expectOne((req) => req.method === 'GET').flush([saved('x', 'Dormi bem', '2026-11-05T08:00:00Z')]);
     await loading;
+    // Depois de carregar, a fila tenta de novo; a rede continua fora.
+    http.expectOne((req) => req.method === 'POST').error(new ProgressEvent('error'));
+    await tick();
 
     expect(store.timeline().map((entry) => [entry.id, entry.sync])).toEqual([
-      ['id-1', 'failed'],
+      ['id-1', 'queued'],
       ['x', 'synced'],
     ]);
   });

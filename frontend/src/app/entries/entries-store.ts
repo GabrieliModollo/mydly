@@ -1,9 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { computed, inject, Injectable, InjectionToken, signal } from '@angular/core';
+import { computed, DestroyRef, DOCUMENT, inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { Connectivity } from './connectivity';
 import { EntriesApi } from './entries-api';
 import { dayInSaoPaulo, summaryFrom } from './entry-format';
 import { DaySummaryResponse, EntryItemResponse, EntryResponse, ItemHabit, ResolveItemRequest } from './entry.models';
+import { OUTBOX_KEY, OUTBOX_STORAGE, OutboxEntry, readOutbox, writeOutbox } from './outbox-storage';
 import { randomId } from './random-id';
 
 /** Gera o id de um lançamento novo. Substituível nos testes. */
@@ -18,14 +20,20 @@ export const NOW = new InjectionToken<() => Date>('NOW', {
   factory: () => () => new Date(),
 });
 
+/** Espera entre uma falha de envio e a próxima tentativa automática. Substituível nos testes. */
+export const RETRY_DELAY_MS = new InjectionToken<number>('RETRY_DELAY_MS', {
+  providedIn: 'root',
+  factory: () => 30_000,
+});
+
 /**
  * Situação de um lançamento no app:
  * - sending: enviado, aguardando a API;
  * - synced: gravado e interpretado pela API;
- * - failed: falha de rede ou do servidor; pode ser reenviado com o mesmo id;
+ * - queued: guardado no aparelho, esperando a rede ou o servidor; vai com o mesmo id;
  * - rejected: a API recusou (4xx); reenviar não adianta.
  */
-export type SyncState = 'sending' | 'synced' | 'failed' | 'rejected';
+export type SyncState = 'sending' | 'synced' | 'queued' | 'rejected';
 
 export interface TimelineEntry {
   id: string;
@@ -42,26 +50,68 @@ export type LoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type ResolveResult = 'ok' | 'stale' | 'error';
 
 /**
- * Estado da tela "Hoje": os lançamentos do dia e os que estão sendo enviados.
+ * Estado da tela "Hoje": os lançamentos do dia e a fila dos que ainda não chegaram ao servidor.
  *
- * O lançamento aparece na lista assim que é enviado (estado "sending") e é substituído pela
- * resposta da API quando ela chega. Como o id e a data são gerados aqui, um reenvio depois de
- * falha de rede não duplica nada (ADR 0006).
+ * O lançamento aparece na lista assim que é escrito e é substituído pela resposta da API quando ela
+ * chega. Sem rede, ele fica guardado no aparelho e é enviado quando a conexão volta, do mais antigo
+ * ao mais novo. Como o id e a data são gerados aqui, um reenvio não duplica nada (ADR 0006), e o dia
+ * do lançamento é o dia em que foi escrito, não o da sincronização (ADR 0011).
  */
 @Injectable({ providedIn: 'root' })
 export class EntriesStore {
   private readonly api = inject(EntriesApi);
   private readonly newId = inject(NEW_ENTRY_ID);
   private readonly now = inject(NOW);
+  private readonly connectivity = inject(Connectivity);
+  private readonly storage = inject(OUTBOX_STORAGE);
+  private readonly retryDelay = inject(RETRY_DELAY_MS);
 
   private readonly entries = signal<TimelineEntry[]>([]);
+  /**
+   * Ids que esta aba já teve na lista. Ao gravar a fila, os lançamentos guardados que não estão aqui
+   * são de outra aba e são mantidos.
+   */
+  private readonly known = new Set<string>();
+  private flushing = false;
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
 
   readonly loadState = signal<LoadState>('idle');
 
-  /** Lançamentos do mais recente para o mais antigo. */
-  readonly timeline = computed(() =>
-    [...this.entries()].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)),
+  /**
+   * Lançamentos do mais recente para o mais antigo: os de hoje e os que ainda não foram enviados,
+   * mesmo que sejam de outro dia. Um lançamento de ontem sai da lista assim que chega ao servidor.
+   */
+  readonly timeline = computed(() => {
+    const today = dayInSaoPaulo(this.now());
+    return this.entries()
+      .filter((entry) => entry.sync !== 'synced' || dayInSaoPaulo(new Date(entry.occurredAt)) === today)
+      .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+  });
+
+  /** Quantos lançamentos ainda não chegaram ao servidor (guardados ou sendo enviados). */
+  readonly waitingCount = computed(
+    () => this.entries().filter((entry) => entry.sync === 'queued' || entry.sync === 'sending').length,
   );
+
+  constructor() {
+    this.adoptOutbox();
+    const stopListening = this.connectivity.whenBackOnline(() => {
+      void (this.loadState() === 'error' ? this.load() : this.flush());
+    });
+    // Outra aba guardou um lançamento: ele aparece aqui também, e qualquer uma das duas pode enviá-lo.
+    const view = inject(DOCUMENT).defaultView;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === OUTBOX_KEY) {
+        this.adoptOutbox();
+      }
+    };
+    view?.addEventListener('storage', onStorage);
+    inject(DestroyRef).onDestroy(() => {
+      stopListening();
+      view?.removeEventListener('storage', onStorage);
+      clearTimeout(this.retryTimer);
+    });
+  }
 
   /** Resumo do dia vindo da API (finance e routines); {@code null} até a primeira resposta. */
   private readonly daySummary = signal<DaySummaryResponse | null>(null);
@@ -104,22 +154,32 @@ export class EntriesStore {
     }
   }
 
-  /** Busca os lançamentos de hoje, preservando os que ainda não chegaram ao servidor. */
+  /**
+   * Busca os lançamentos de hoje, preservando os que ainda não chegaram ao servidor, e depois envia a
+   * fila. Um lançamento guardado que o servidor já tem (a resposta se perdeu) sai da fila.
+   */
   async load(): Promise<void> {
     this.loadState.set('loading');
     try {
       const fromServer = await firstValueFrom(this.api.listToday());
       const serverIds = new Set(fromServer.map((entry) => entry.id));
-      const notYetOnServer = this.entries().filter((entry) => entry.sync !== 'synced' && !serverIds.has(entry.id));
-      this.entries.set([...fromServer.map(toSynced), ...notYetOnServer]);
+      serverIds.forEach((id) => this.known.add(id));
+      this.change((list) => [
+        ...fromServer.map(toSynced),
+        ...list.filter((entry) => entry.sync !== 'synced' && !serverIds.has(entry.id)),
+      ]);
       this.loadState.set('loaded');
       void this.refreshSummary();
     } catch {
       this.loadState.set('error');
     }
+    void this.flush();
   }
 
-  /** Registra um lançamento. Texto vazio é ignorado. */
+  /**
+   * Registra um lançamento. Texto vazio é ignorado. Sem rede, ele vai direto para a fila do aparelho,
+   * sem esperar a falha do envio.
+   */
   async submit(text: string): Promise<void> {
     const trimmed = text.trim();
     if (!trimmed) {
@@ -129,20 +189,49 @@ export class EntriesStore {
       id: this.newId(),
       text: trimmed,
       occurredAt: this.now().toISOString(),
-      sync: 'sending',
+      sync: this.connectivity.online() ? 'sending' : 'queued',
     };
-    this.entries.update((list) => [draft, ...list]);
-    await this.send(draft);
+    this.known.add(draft.id);
+    this.change((list) => [draft, ...list]);
+    if (draft.sync === 'sending') {
+      await this.send(draft);
+    }
   }
 
-  /** Reenvia um lançamento que falhou, com o mesmo id e a mesma data. */
+  /** "Enviar agora": tenta um lançamento guardado na hora, com o mesmo id e a mesma data. */
   async retry(id: string): Promise<void> {
     const entry = this.entries().find((candidate) => candidate.id === id);
-    if (!entry || entry.sync !== 'failed') {
+    if (!entry || entry.sync !== 'queued') {
       return;
     }
     this.patch(id, { sync: 'sending' });
     await this.send(entry);
+  }
+
+  /**
+   * Envia a fila, um lançamento por vez, do mais antigo ao mais novo. Para na primeira falha de rede
+   * ou do servidor: os outros falhariam igual, e a próxima tentativa vem com a rede de volta ou depois
+   * de {@link RETRY_DELAY_MS}. Uma recusa (4xx) não para a fila.
+   */
+  async flush(): Promise<void> {
+    if (this.flushing) {
+      return;
+    }
+    this.flushing = true;
+    try {
+      while (this.connectivity.online()) {
+        const next = this.oldestQueued();
+        if (!next) {
+          return;
+        }
+        this.patch(next.id, { sync: 'sending' });
+        if ((await this.send(next)) === 'queued') {
+          return;
+        }
+      }
+    } finally {
+      this.flushing = false;
+    }
   }
 
   /** A versão atual de um lançamento já gravado. */
@@ -181,28 +270,77 @@ export class EntriesStore {
   }
 
   private replaceEntry(entry: EntryResponse): void {
-    this.entries.update((list) => list.map((item) => (item.id === entry.id ? toSynced(entry) : item)));
+    this.change((list) => list.map((item) => (item.id === entry.id ? toSynced(entry) : item)));
   }
 
-  /** Tira da lista um lançamento recusado pela API. */
+  /** Tira da lista (e do aparelho) um lançamento recusado pela API. */
   dismiss(id: string): void {
-    this.entries.update((list) => list.filter((entry) => entry.id !== id || entry.sync !== 'rejected'));
+    this.change((list) => list.filter((entry) => entry.id !== id || entry.sync !== 'rejected'));
   }
 
-  private async send(entry: TimelineEntry): Promise<void> {
+  /** Envia um lançamento e diz como ele ficou. Depois de um envio que deu certo, segue com a fila. */
+  private async send(entry: TimelineEntry): Promise<SyncState> {
     try {
       const saved = await firstValueFrom(
         this.api.create({ id: entry.id, text: entry.text, occurredAt: entry.occurredAt }),
       );
-      this.entries.update((list) => list.map((item) => (item.id === entry.id ? toSynced(saved) : item)));
+      this.change((list) => list.map((item) => (item.id === entry.id ? toSynced(saved) : item)));
       void this.refreshSummary();
+      void this.flush();
+      return 'synced';
     } catch (error) {
-      this.patch(entry.id, { sync: isRetryable(error) ? 'failed' : 'rejected' });
+      const state = isRetryable(error) ? 'queued' : 'rejected';
+      // Se a listagem trouxe a versão do servidor enquanto o envio falhava, ela vale.
+      this.change((list) =>
+        list.map((item) => (item.id === entry.id && item.sync === 'sending' ? { ...item, sync: state } : item)),
+      );
+      if (state === 'queued') {
+        this.scheduleRetry();
+      }
+      return state;
+    }
+  }
+
+  private scheduleRetry(): void {
+    if (this.retryTimer !== undefined) {
+      return;
+    }
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined;
+      void this.flush();
+    }, this.retryDelay);
+  }
+
+  private oldestQueued(): TimelineEntry | undefined {
+    return this.entries()
+      .filter((entry) => entry.sync === 'queued')
+      .reduce<TimelineEntry | undefined>(
+        (oldest, entry) => (!oldest || Date.parse(entry.occurredAt) < Date.parse(oldest.occurredAt) ? entry : oldest),
+        undefined,
+      );
+  }
+
+  /** Traz para a lista os lançamentos guardados no aparelho que esta aba ainda não conhece. */
+  private adoptOutbox(): void {
+    const unknown = readOutbox(this.storage).filter((entry) => !this.known.has(entry.id));
+    unknown.forEach((entry) => this.known.add(entry.id));
+    if (unknown.length > 0) {
+      this.entries.update((list) => [...list, ...unknown.map(fromOutbox)]);
     }
   }
 
   private patch(id: string, changes: Partial<TimelineEntry>): void {
-    this.entries.update((list) => list.map((item) => (item.id === id ? { ...item, ...changes } : item)));
+    this.change((list) => list.map((item) => (item.id === id ? { ...item, ...changes } : item)));
+  }
+
+  /** Muda a lista e grava no aparelho o que ainda não chegou ao servidor. */
+  private change(update: (list: TimelineEntry[]) => TimelineEntry[]): void {
+    this.entries.update(update);
+    const mine = this.entries()
+      .filter((entry) => entry.sync !== 'synced')
+      .map(toOutbox);
+    const fromOtherTabs = readOutbox(this.storage).filter((entry) => !this.known.has(entry.id));
+    writeOutbox(this.storage, [...fromOtherTabs, ...mine]);
   }
 }
 
@@ -263,6 +401,15 @@ export function applyResolution(entry: EntryResponse, index: number, request: Re
 
 function toSynced(entry: EntryResponse): TimelineEntry {
   return { id: entry.id, text: entry.text, occurredAt: entry.occurredAt, sync: 'synced', entry };
+}
+
+function toOutbox(entry: TimelineEntry): OutboxEntry {
+  return { id: entry.id, text: entry.text, occurredAt: entry.occurredAt, rejected: entry.sync === 'rejected' };
+}
+
+/** Um envio interrompido (app fechado no meio) volta como guardado. */
+function fromOutbox(entry: OutboxEntry): TimelineEntry {
+  return { id: entry.id, text: entry.text, occurredAt: entry.occurredAt, sync: entry.rejected ? 'rejected' : 'queued' };
 }
 
 /** Sem resposta (status 0) ou erro do servidor (5xx) vale a pena tentar de novo; 4xx não. */

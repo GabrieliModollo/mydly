@@ -64,7 +64,17 @@
       </div>
     }
 
-    @if (store.loadState() === 'error') {
+    <!-- Sempre presente, para o leitor de tela anunciar quando a conexão cai, sem roubar o foco. -->
+    <div role="status">
+      @if (!connectivity.online()) {
+        <div class="banner banner--offline">
+          <ion-icon name="cloud-offline-outline" aria-hidden="true" />
+          <span>{{ offlineNotice(store.waitingCount()) }}</span>
+        </div>
+      }
+    </div>
+
+    @if (store.loadState() === 'error' && connectivity.online()) {
       <div class="banner" role="alert">
         <ion-icon name="cloud-offline-outline" aria-hidden="true" />
         <span>Não foi possível carregar seus lançamentos.</span>
@@ -97,7 +107,9 @@
           <li class="entry" [attr.data-sync]="item.sync">
             <div class="entry__head">
               <p class="entry__text">{{ item.text }}</p>
-              <time class="entry__time" [attr.datetime]="item.occurredAt">{{ item.occurredAt | date: 'HH:mm' }}</time>
+              <time class="entry__time" [attr.datetime]="item.occurredAt">{{
+                item.occurredAt | date: timeFormat(item.occurredAt)
+              }}</time>
             </div>
 
             @if (item.entry; as saved) {
@@ -140,12 +152,15 @@
                   <ion-spinner name="dots" aria-hidden="true" />
                   <span>Enviando…</span>
                 }
-                @case ('failed') {
-                  <span>Não foi enviado.</span>
-                  <button type="button" class="link-button" (click)="store.retry(item.id)">
-                    <ion-icon name="refresh-outline" aria-hidden="true" />
-                    Tentar de novo
-                  </button>
+                @case ('queued') {
+                  <ion-icon name="cloud-offline-outline" aria-hidden="true" />
+                  <span>Guardado no aparelho.</span>
+                  @if (connectivity.online()) {
+                    <button type="button" class="link-button" (click)="store.retry(item.id)">
+                      <ion-icon name="refresh-outline" aria-hidden="true" />
+                      Enviar agora
+                    </button>
+                  }
                 }
                 @case ('rejected') {
                   <span>Não foi possível registrar este lançamento.</span>

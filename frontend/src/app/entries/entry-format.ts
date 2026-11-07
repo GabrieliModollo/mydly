@@ -159,3 +159,14 @@ export function dayInSaoPaulo(date: Date): string {
   // O locale en-CA formata como AAAA-MM-DD.
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(date);
 }
+
+/** Aviso da tela Hoje sem conexão, com quantos lançamentos esperam no aparelho. */
+export function offlineNotice(waiting: number): string {
+  if (waiting <= 0) {
+    return 'Sem conexão. O que você lançar fica guardado no aparelho e é enviado quando a internet voltar.';
+  }
+  if (waiting === 1) {
+    return 'Sem conexão. 1 lançamento guardado no aparelho, enviado quando a internet voltar.';
+  }
+  return `Sem conexão. ${waiting} lançamentos guardados no aparelho, enviados quando a internet voltar.`;
+}

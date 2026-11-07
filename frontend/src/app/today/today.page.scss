@@ -163,6 +163,16 @@ ion-footer {
   color: var(--mydly-attention-text);
 }
 
+.banner--offline {
+  flex-wrap: nowrap;
+  background: var(--mydly-neutral-bg);
+  color: var(--mydly-neutral-text);
+
+  ion-icon {
+    flex: none;
+  }
+}
+
 .loading {
   display: flex;
   justify-content: center;
@@ -228,7 +238,12 @@ ion-footer {
     opacity: 0.7;
   }
 
-  &[data-sync='failed'],
+  // Guardado no aparelho não é erro: borda tracejada neutra, com o texto "Guardado no aparelho." dizendo o estado.
+  &[data-sync='queued'] {
+    border-style: dashed;
+    border-color: var(--mydly-field-border);
+  }
+
   &[data-sync='rejected'] {
     border-color: var(--mydly-expense-text);
   }

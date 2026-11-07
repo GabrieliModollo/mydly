@@ -1,4 +1,4 @@
-import { chipsFor, chipsForItem, dayInSaoPaulo, formatMoney, formatQuantity, itemChip, parseAmount, summaryFrom } from './entry-format';
+import { chipsFor, chipsForItem, dayInSaoPaulo, formatMoney, formatQuantity, itemChip, offlineNotice, parseAmount, summaryFrom } from './entry-format';
 import { EntryItemResponse, EntryResponse, ItemHabit } from './entry.models';
 
 function item(overrides: Partial<EntryItemResponse>): EntryItemResponse {
@@ -210,5 +210,15 @@ describe('parseAmount', () => {
 
   it.each(['', 'abc', '0', '0,00', '-5', '8,505', '1,2,3', '12.34.5'])('"%s" não é um valor válido', (text) => {
     expect(parseAmount(text)).toBeNull();
+  });
+});
+
+describe('offlineNotice', () => {
+  it.each([
+    [0, 'Sem conexão. O que você lançar fica guardado no aparelho e é enviado quando a internet voltar.'],
+    [1, 'Sem conexão. 1 lançamento guardado no aparelho, enviado quando a internet voltar.'],
+    [3, 'Sem conexão. 3 lançamentos guardados no aparelho, enviados quando a internet voltar.'],
+  ])('%i guardado(s)', (waiting, expected) => {
+    expect(offlineNotice(waiting)).toBe(expected);
   });
 });

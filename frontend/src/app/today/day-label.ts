@@ -1,4 +1,13 @@
 import { formatDate } from '@angular/common';
+import { dayInSaoPaulo } from '../entries/entry-format';
+
+/**
+ * Formato do horário de um lançamento na lista: só a hora quando é de hoje, e a data junto quando é de
+ * outro dia (um lançamento guardado no aparelho desde ontem, por exemplo).
+ */
+export function entryTimeFormat(occurredAt: string, now: Date): string {
+  return dayInSaoPaulo(new Date(occurredAt)) === dayInSaoPaulo(now) ? 'HH:mm' : 'dd/MM, HH:mm';
+}
 
 /**
  * Data do cabeçalho no formato do design: "Quinta, 5 de novembro".
