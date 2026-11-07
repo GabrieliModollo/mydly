@@ -48,7 +48,9 @@ class HabitRecorder {
     void on(EntryItemAccepted event) {
         ParsedEntry item = event.item();
         boolean routine = item.type() == EntryType.ROUTINE;
-        String habitCode = routine ? catalog.match(item.description()).map(HabitCatalog.Habit::code).orElse(null) : null;
+        String habitCode = routine
+                ? catalog.match(item.description(), item.unit()).map(HabitCatalog.Habit::code).orElse(null)
+                : null;
         jdbc.sql(UPSERT)
                 .param("entryId", event.entryId())
                 .param("itemIndex", event.itemIndex())

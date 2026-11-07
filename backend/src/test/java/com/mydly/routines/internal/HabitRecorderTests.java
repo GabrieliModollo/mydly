@@ -30,7 +30,8 @@ import org.springframework.modulith.test.Scenario;
  * Consumidor de eventos do módulo routines: o hábito do catálogo, a polaridade e as mesmas regras
  * de revisão e lápide do módulo finance (ADR 0008).
  */
-@ApplicationModuleTest
+// O módulo usa a API pública de preferences (dia de hoje e semana), que entra junto (ADR 0010).
+@ApplicationModuleTest(extraIncludes = "preferences")
 @Import(TestcontainersConfiguration.class)
 class HabitRecorderTests {
 
@@ -78,6 +79,24 @@ class HabitRecorderTests {
             """)
     void encontraOHabitoDoCatalogo(String text, String expected) {
         assertThat(catalog.match(text).map(HabitCatalog.Habit::code).orElse(null)).isEqualTo(expected);
+    }
+
+    /**
+     * Sem palavra-chave, {@code bebi} com um volume e nada mais é Hidratação. A palavra-chave vence:
+     * {@code bebi 2 litros de refrigerante} é Refrigerante, e bebida sem palavra-chave fica em outros.
+     */
+    @ParameterizedTest(name = "\"{0}\" ({1}) → {2}")
+    @CsvSource(delimiter = '|', nullValues = "SEM", textBlock = """
+            Bebi 1 litro                      | L    | HYDRATION
+            bebi 500ml                        | mL   | HYDRATION
+            Bebi 2 litros hoje                | L    | HYDRATION
+            Bebi 2 litros de água             | L    | HYDRATION
+            bebi 1 litro de cerveja           | L    | SEM
+            bebi 500 ml de suco               | mL   | SEM
+            bebi 2 litros de refrigerante     | L    | SODA
+            """)
+    void bebiComVolumeESemBebidaEAgua(String text, String unit, String expected) {
+        assertThat(catalog.match(text, unit).map(HabitCatalog.Habit::code).orElse(null)).isEqualTo(expected);
     }
 
     @Test
