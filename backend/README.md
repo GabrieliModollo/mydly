@@ -32,6 +32,8 @@ mvn spring-boot:run
 
 Saúde da aplicação: <http://localhost:8080/actuator/health>. API e exemplos: <http://localhost:8080/swagger-ui.html>.
 
+O parser usa um LLM de fallback (Claude) só quando `LLM_API_KEY` está definida; sem ela, só as regras locais ([ADR 0013](../docs/adr/0013-llm-de-fallback-com-claude.md)). Os testes nunca chamam a API: o cliente é simulado.
+
 A API pede login ([ADR 0012](../docs/adr/0012-login-com-jwt-e-dados-por-usuario.md)). Entre com `POST /api/v1/auth/login` (usuário `demo`, senha `demo`) e mande o `accessToken` no header `Authorization: Bearer`; no Swagger, pelo botão Authorize. Sem `MYDLY_JWT_SECRET`, a API gera um segredo a cada subida, e os tokens deixam de valer quando ela reinicia.
 
 Para subir tudo em containers: `docker compose up --build` na raiz.

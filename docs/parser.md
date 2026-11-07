@@ -1,6 +1,6 @@
 # Parser de lançamentos
 
-Como o MyDly interpreta um lançamento em texto livre usando só regras locais, sem LLM. A decisão de arquitetura está no [ADR 0003](adr/0003-parser-hibrido.md). A implementação fica em `backend/src/main/java/com/mydly/entries/internal/RuleBasedEntryParser.java`, e cada regra tem caso de teste em `RuleBasedEntryParserTests`.
+Como o MyDly interpreta um lançamento em texto livre. As regras locais deste documento resolvem a maioria das frases sem rede; o que elas não entendem vai para um LLM, quando há chave, e depois para o usuário (veja [LLM de fallback](#llm-de-fallback)). A decisão de arquitetura está no [ADR 0003](adr/0003-parser-hibrido.md). As regras ficam em `backend/src/main/java/com/mydly/entries/internal/RuleBasedEntryParser.java`, e cada uma tem caso de teste em `RuleBasedEntryParserTests`.
 
 ## Contrato
 
@@ -120,12 +120,25 @@ Toda finança ganha uma categoria sugerida pelas palavras da frase, que o usuár
 
 Sem palavra conhecida, a categoria fica vazia, e quem escolhe é o usuário. Outros (`OTHER`) só aparece por escolha dele.
 
+## LLM de fallback
+
+O `HybridEntryParser` roda as regras e manda para o LLM só os itens abaixo do limiar, todos numa chamada, cada um com o seu trecho ([ADR 0013](adr/0013-llm-de-fallback-com-claude.md)). Os itens que as regras entenderam ficam como estão.
+
+| O LLM devolve | Vira | Confiança |
+| --- | --- | --- |
+| Leitura clara e completa (finança com valor, ou rotina) | o item do LLM, com o trecho original como descrição | 0,75 (vale sem perguntar) |
+| Leitura incerta, ou finança sem valor | o item do LLM, com a sugestão de categoria e direção | 0,45 (o app pergunta) |
+| `UNKNOWN`, campo fora do formato ou índice inválido | o item das regras | a das regras |
+| Nada (sem chave, falha, recusa, demora acima de 15 s) | o item das regras | a das regras |
+
+Exemplos com o LLM ligado: "Gastei cinquenta reais na padaria" vira R$ 50,00 em Alimentação; "Fui à academia e comprei pão por cinco reais" manda para o LLM só "comprei pão por cinco reais". Valor negativo, com mais de duas casas ou grande demais é tratado como não dito. Só o texto do lançamento vai para o LLM, e nada é registrado em log.
+
 ## Limitações conhecidas
 
-São casos que ficam para o LLM ou para próximas etapas:
+São casos que ficam para o LLM, quando há chave, ou para próximas etapas:
 
 - **Verbos fora do passado em primeira pessoa** ("vou à academia", "a gente comeu pizza") não são âncora, então uma frase composta com eles pode ficar com um item só. Hábitos conhecidos também viram âncora quando existirem, com o módulo `routines`.
-- **Valores por extenso** ("cinquenta reais") viram finança sem valor e com confiança baixa.
+- **Valores por extenso** ("cinquenta reais") viram finança sem valor e com confiança baixa nas regras; com o LLM ligado, ele lê o valor.
 - **Categorias de rotina** (academia, hidratação, sono) não são inferidas pelo parser; só as de finança. O hábito de cada rotina é decidido no módulo `routines`, pelas palavras-chave do catálogo, com uma regra a mais para a água: "bebi 1 litro", sem dizer o que foi bebido, é Hidratação; "bebi 1 litro de cerveja" não é ([arquitetura](arquitetura.md#eventos-entre-módulos)).
 
 ## Privacidade

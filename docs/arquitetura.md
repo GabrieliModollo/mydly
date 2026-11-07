@@ -28,9 +28,9 @@ sequenceDiagram
     end
     E->>P: interpretar
     P->>P: regras locais
-    alt confiança baixa
-        P->>LLM: extrair JSON estruturado
-        LLM-->>P: tipo, valor, categoria...
+    alt confiança baixa e LLM_API_KEY definida
+        P->>LLM: só os trechos duvidosos (saída estruturada)
+        LLM-->>P: tipo, valor, categoria... (validados)
     end
     alt ainda ambíguo
         E-->>App: pergunta ao usuário ("Isso foi um gasto?")
@@ -45,7 +45,7 @@ As regras locais do parser, com as faixas de confiança e o limiar a partir do q
 
 **O que já está implementado.** O `POST /api/v1/entries` recebe o lançamento, interpreta com as regras locais e grava na tabela `entry`. Ele é idempotente pelo id enviado pelo app: o reenvio do mesmo conteúdo devolve o original, e o mesmo id com outro conteúdo devolve 409 ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)). A resposta da API usa DTOs próprios, separados do formato gravado no `parsed_json`. Uma frase composta ("fui à academia e gastei 30 no açaí") vira vários itens no mesmo lançamento, até 5, cada um com o seu trecho do texto ([regras](parser.md#frases-compostas)).
 
-Cada item tem um estado ([ADR 0008](adr/0008-eventos-com-registro-e-revisao-por-item.md)). Um item com confiança de 0,50 para cima vale na hora e segue para `finance` ou `routines`. Um item abaixo disso espera o usuário no painel "Quanto foi?" (`POST /api/v1/entries/{id}/items/{index}/resolution`, com `If-Match`), onde ele confirma como gasto, entrada ou rotina, ou descarta. A resposta fica na coluna `resolution`, sem sobrescrever o que o parser entendeu ([ADR 0007](adr/0007-parse-e-resolucao-separados.md)). Todo item aceito pode voltar com "Não foi isso" (ação `REOPEN`): ele sai dos números e o painel abre para corrigir. O lançamento fica `NEEDS_INPUT` enquanto algum item estiver pendente e `CONFIRMED` quando nenhum estiver. O fallback para o LLM entra numa próxima etapa. A API pode ser testada pelo Swagger UI em `/swagger-ui.html`.
+Cada item tem um estado ([ADR 0008](adr/0008-eventos-com-registro-e-revisao-por-item.md)). Um item com confiança de 0,50 para cima vale na hora e segue para `finance` ou `routines`. Um item abaixo disso espera o usuário no painel "Quanto foi?" (`POST /api/v1/entries/{id}/items/{index}/resolution`, com `If-Match`), onde ele confirma como gasto, entrada ou rotina, ou descarta. A resposta fica na coluna `resolution`, sem sobrescrever o que o parser entendeu ([ADR 0007](adr/0007-parse-e-resolucao-separados.md)). Todo item aceito pode voltar com "Não foi isso" (ação `REOPEN`): ele sai dos números e o painel abre para corrigir. O lançamento fica `NEEDS_INPUT` enquanto algum item estiver pendente e `CONFIRMED` quando nenhum estiver. Antes de gravar, os itens abaixo do limiar vão para o LLM, quando há `LLM_API_KEY`: o Claude, pelo SDK oficial da Anthropic, com saída estruturada e só o texto do lançamento. A resposta é validada campo a campo, e qualquer falha deixa o item como as regras entenderam ([ADR 0013](adr/0013-llm-de-fallback-com-claude.md), [regras](parser.md#llm-de-fallback)). A API pode ser testada pelo Swagger UI em `/swagger-ui.html`.
 
 ```mermaid
 stateDiagram-v2
@@ -273,7 +273,7 @@ O app guarda dados financeiros e dados que podem ser de saúde (sono, dieta). Po
 - consentimento explícito no cadastro;
 - criptografia dos campos sensíveis em repouso;
 - exportação e exclusão de conta;
-- só o texto do lançamento vai para o LLM, sem identificar o usuário;
+- só o texto do lançamento vai para o LLM, sem identificar o usuário, e só quando as regras não o entenderam e há chave configurada;
 - o texto de um lançamento fica no aparelho só até ser enviado, e "Sair" apaga a fila de quem sai;
 - só o hash BCrypt da senha fica no banco, e nem o nome de login nem a senha vão para log;
 - a fonte do app é servida por ele mesmo, sem chamadas a serviços de terceiros como o Google Fonts.

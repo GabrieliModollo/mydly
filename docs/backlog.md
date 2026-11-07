@@ -8,13 +8,12 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 
 | # | Etapa | Escopo | Notas |
 | --- | --- | --- | --- |
-| — | Nenhuma | A próxima é a etapa 10 | |
+| — | Nenhuma | A próxima é a etapa 11 | |
 
 ## Próximas
 
 | # | Prioridade | Etapa | Escopo | Por que agora |
 | --- | --- | --- | --- | --- |
-| 10 | Baixa | LLM como fallback | Lançamentos de confiança baixa interpretados pelo LLM; modo sem LLM continua funcionando | Valor por extenso, frases fora das regras |
 | 11 | Baixa | Importação de extrato | OFX/CSV atrás da porta `TransactionSource`, reconciliação com lançamentos manuais | Primeira fonte externa |
 | 12 | Baixa | Open Finance (sandbox) | Adaptador do agregador, só com dados fictícios | Demonstração da integração |
 | 13 | Baixa | Apps Android e iOS | Build com Capacitor, notificações push | Depois que o fluxo web estiver redondo |
@@ -29,6 +28,9 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 - Refresh token curto com revogação, e limite de tentativas de login.
 - Restaurar os dados da demonstração todo dia, para visitantes não herdarem o que outros escreveram.
 - Fuso horário por usuário (hoje todo mundo usa America/Sao_Paulo).
+- Conjunto de avaliação do LLM do parser com frases reais anonimizadas, para medir acertos antes de trocar modelo, esforço ou prompt.
+- Origem de cada item (regras ou LLM) no `parsed_json`, para reprocessar e medir.
+- Limite de chamadas ao LLM por usuário.
 
 ## Concluído
 
@@ -48,3 +50,4 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 | Metas e preferências (módulo `preferences` com o dia de início da semana, metas de hábito por dia ou por semana e limite de hábito ruim, orçamentos semanais ou mensais com aviso em 80%, versões com `valid_from` avaliadas no dia de referência, conversão de unidades e "bebi 1 litro" como água, mensagens de meta e de orçamento, aba Metas, ADR 0010) | `3d0b932`, `094ba24`, `7a20d24`, `cd949b7`, `9be1161`, `06d3d81` e o commit de documentação seguinte |
 | Offline-first (fila no `localStorage` com envio em ordem quando a rede volta, ao abrir o app e depois de 30 s, estado "Guardado no aparelho", aviso "Sem conexão", lançamento de outro dia com data, convivência entre abas, ADR 0011) | `07d6d63` e o commit de documentação seguinte |
 | Usuário e autenticação (módulo `accounts`, login com JWT HS256 emitido pela API, usuário demo, `user_id` em todos os dados e eventos, isolamento entre usuários, tela de login, token no aparelho, fila offline por usuário e "Sair", ADR 0012) | `41b36b8`, `750ac35`, `71b5fb6` e o commit de documentação seguinte |
+| LLM como fallback (`HybridEntryParser`, Claude pelo SDK oficial só para os itens abaixo do limiar, saída estruturada validada campo a campo, só o texto do lançamento, regras de volta em qualquer falha, desligado sem `LLM_API_KEY`, ADR 0013) | `7b79f3d` e o commit de documentação seguinte |
