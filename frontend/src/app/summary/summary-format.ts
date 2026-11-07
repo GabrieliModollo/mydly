@@ -1,6 +1,7 @@
 import { CATEGORY_LABELS, formatMoney } from '../entries/entry-format';
 import { Category } from '../entries/entry.models';
-import { DayMark, HabitRow, Tone } from '../entries/week.models';
+import { DayMark, HabitRow, Tone, WeekBudget } from '../entries/week.models';
+import { budgetBarNote, goalScoreLabel } from '../goals/goal-format';
 
 /** Iniciais e nomes por dia da semana do JavaScript (0 = domingo), como no protótipo. */
 const INITIALS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'] as const;
@@ -96,7 +97,8 @@ export function habitDescription(habit: HabitRow, weekStart: string): string {
   const future = habit.days.filter((mark) => mark === 'FUTURE').length;
   const elapsed = habit.score.elapsedDays;
   const days = elapsed === 1 ? '1 dia' : `${elapsed} dias`;
-  const sentences = [`${habit.name}, ${habit.score.achieved} de ${days}`, ...known];
+  const goal = goalScoreLabel(habit.score);
+  const sentences = [`${habit.name}, ${habit.score.achieved} de ${days}`, ...(goal ? [goal] : []), ...known];
   if (future > 0) {
     sentences.push(future === 1 ? `${names[6]} ainda não chegou` : `os próximos ${future} dias ainda não chegaram`);
   }
@@ -106,18 +108,43 @@ export function habitDescription(habit: HabitRow, weekStart: string): string {
 export interface CategoryBar {
   label: string;
   amount: string;
-  /** Largura da barra, de 0 a 100, proporcional à maior categoria. */
+  /** Largura da barra, de 0 a 100, proporcional à maior categoria (ou ao maior limite semanal). */
   percent: number;
+  /** Posição da marca do limite semanal na barra, de 0 a 100; nula sem limite semanal. */
+  limitAt: number | null;
+  /** O orçamento da categoria por escrito (semanal ou mensal), para ninguém depender da marca. */
+  budgetNote: string | null;
+  /** Estado do orçamento, para o estilo; nulo sem orçamento. */
+  budgetStatus: WeekBudget['status'] | null;
 }
 
-/** Barras dos gastos por categoria, já na ordem da API (do maior para o menor). */
-export function categoryBars(totals: { category: Category | null; amount: number }[]): CategoryBar[] {
-  const max = Math.max(0, ...totals.map((total) => total.amount));
-  return totals.map((total) => ({
-    label: total.category ? CATEGORY_LABELS[total.category] : 'Sem categoria',
-    amount: formatMoney(total.amount),
-    percent: max > 0 ? Math.round((total.amount / max) * 100) : 0,
-  }));
+/**
+ * Barras dos gastos por categoria, já na ordem da API (do maior para o menor). A escala vai até a
+ * maior categoria ou o maior limite semanal, para a marca do limite caber na barra. O limite mensal
+ * não vira marca, porque a barra é da semana; ele aparece só por escrito.
+ */
+export function categoryBars(
+  totals: { category: Category | null; amount: number }[],
+  budgets: WeekBudget[] = [],
+): CategoryBar[] {
+  const byCategory = new Map(budgets.map((budget) => [budget.category, budget]));
+  const weeklyLimits = totals
+    .map((total) => (total.category ? byCategory.get(total.category) : undefined))
+    .filter((budget): budget is WeekBudget => budget?.period === 'WEEKLY')
+    .map((budget) => budget.limit);
+  const max = Math.max(0, ...totals.map((total) => total.amount), ...weeklyLimits);
+  const scale = (value: number) => (max > 0 ? Math.round((value / max) * 100) : 0);
+  return totals.map((total) => {
+    const budget = total.category ? byCategory.get(total.category) : undefined;
+    return {
+      label: total.category ? CATEGORY_LABELS[total.category] : 'Sem categoria',
+      amount: formatMoney(total.amount),
+      percent: scale(total.amount),
+      limitAt: budget?.period === 'WEEKLY' ? scale(budget.limit) : null,
+      budgetNote: budget ? budgetBarNote(budget) : null,
+      budgetStatus: budget?.status ?? null,
+    };
+  });
 }
 
 /**

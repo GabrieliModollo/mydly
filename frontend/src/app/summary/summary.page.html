@@ -81,7 +81,12 @@
           <ul class="habits">
             @for (habit of summary.habits; track habit.code) {
               <li class="habit">
-                <span class="habit__name" aria-hidden="true">{{ habit.name }}</span>
+                <span class="habit__name" aria-hidden="true">
+                  {{ habit.name }}
+                  @if (goalScoreLabel(habit.score); as goal) {
+                    <span class="habit__goal">{{ goal }}</span>
+                  }
+                </span>
                 <span class="sr-only">{{ habitDescription(habit, summary.weekStart) }}</span>
                 <span class="dots" aria-hidden="true">
                   @for (mark of habit.days; track $index) {
@@ -108,9 +113,15 @@
               <li class="bar">
                 <span class="bar__label">{{ bar.label }}</span>
                 <span class="bar__track" aria-hidden="true">
-                  <span class="bar__fill" [style.width.%]="bar.percent"></span>
+                  <span class="bar__fill" [attr.data-status]="bar.budgetStatus" [style.width.%]="bar.percent"></span>
+                  @if (bar.limitAt !== null) {
+                    <span class="bar__limit" [style.left.%]="bar.limitAt"></span>
+                  }
                 </span>
                 <span class="bar__amount">{{ bar.amount }}</span>
+                @if (bar.budgetNote; as note) {
+                  <span class="bar__note">{{ note }}</span>
+                }
               </li>
             }
           </ul>

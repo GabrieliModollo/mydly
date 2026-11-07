@@ -212,6 +212,15 @@ ion-footer {
   white-space: nowrap;
 }
 
+.habit__goal {
+  display: block;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mydly-muted);
+  text-overflow: ellipsis;
+}
+
 .habit__score {
   font-size: 13px;
   font-weight: 600;
@@ -283,6 +292,7 @@ ion-footer {
 }
 
 .bar__track {
+  position: relative;
   height: 8px;
   border-radius: 999px;
   background: var(--mydly-line);
@@ -293,6 +303,27 @@ ion-footer {
   height: 100%;
   border-radius: 999px;
   background: var(--mydly-expense-text);
+}
+
+// Marca do limite semanal: um traço na tinta, mais alto que a barra, com um contorno na cor do cartão
+// para se separar do preenchimento laranja quando o gasto passa do limite (a tinta sobre o laranja não
+// chega a 3:1). A linha de texto abaixo diz o mesmo, então a marca nunca é a única pista.
+.bar__limit {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 16px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--mydly-ink);
+  box-shadow: 0 0 0 2px var(--mydly-surface);
+}
+
+.bar__note {
+  grid-column: 1 / -1;
+  margin-top: -4px;
+  font-size: 12px;
+  color: var(--mydly-muted);
 }
 
 .bar__amount {

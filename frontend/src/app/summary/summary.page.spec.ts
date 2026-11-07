@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideIonicAngular } from '@ionic/angular';
@@ -163,6 +164,93 @@ describe('SummaryPage', () => {
     expect(root.querySelector('.message__text')?.textContent).toContain('Sua semana começa aqui.');
     expect(root.textContent).toContain('Nenhum hábito registrado nesta semana.');
     expect(root.textContent).toContain('Nenhum gasto nesta semana.');
+  });
+
+  it('placar contra a meta sob o nome do hábito e na descrição para leitor de tela', async () => {
+    respond = () =>
+      of(
+        week('2026-11-02', {
+          habits: [
+            {
+              code: 'GYM',
+              name: 'Academia',
+              polarity: 'GOOD',
+              days: ['ACHIEVED', 'ACHIEVED', 'ACHIEVED', 'NONE', 'FUTURE', 'FUTURE', 'FUTURE'],
+              score: { achieved: 3, elapsedDays: 4, target: 4, limit: null, slips: null, goal: 'WEEKLY_FREQUENCY' },
+            },
+            {
+              code: 'DELIVERY',
+              name: 'Delivery',
+              polarity: 'BAD',
+              days: ['SLIPPED', 'NONE', 'NONE', 'NONE', 'FUTURE', 'FUTURE', 'FUTURE'],
+              score: { achieved: 0, elapsedDays: 4, target: null, limit: 2, slips: 1, goal: 'WEEKLY_FREQUENCY' },
+            },
+          ],
+        }),
+      );
+
+    const root = await open();
+
+    const goals = [...root.querySelectorAll('.habit__goal')].map((el) => el.textContent?.trim());
+    expect(goals).toEqual(['Meta: 3 de 4 dias', 'Limite: 1 de no máximo 2 dias']);
+    expect(root.querySelector('.habit .sr-only')?.textContent).toContain('Meta: 3 de 4 dias');
+  });
+
+  it('marca do limite semanal na barra da categoria, com a descrição por escrito', async () => {
+    respond = () =>
+      of(
+        week('2026-11-02', {
+          budgets: [
+            {
+              category: 'FOOD',
+              period: 'WEEKLY',
+              limit: 200,
+              periodStart: '2026-11-02',
+              periodEnd: '2026-11-08',
+              spent: 150,
+              percent: 75,
+              status: 'OK',
+            },
+          ],
+        }),
+      );
+
+    const root = await open();
+
+    const bar = root.querySelector('.bar')!;
+    expect((bar.querySelector('.bar__limit') as HTMLElement).style.left).toBe('100%');
+    expect((bar.querySelector('.bar__fill') as HTMLElement).style.width).toBe('75%');
+    expect(bar.querySelector('.bar__note')?.textContent).toBe('Limite da semana: R$ 200,00 (75%)');
+  });
+
+  it('sem orçamento a barra não tem marca nem linha de limite', async () => {
+    const root = await open();
+
+    expect(root.querySelector('.bar__limit')).toBeNull();
+    expect(root.querySelector('.bar__note')).toBeNull();
+  });
+
+  it('início de semana antigo (400 depois de trocar o dia de início) volta para a semana atual', async () => {
+    const root = await open();
+    button(root, 'Semana anterior').click();
+    await fixture.whenStable();
+    expect(calls.at(-1)).toEqual(['2026-10-26', 'direct']);
+
+    respond = (monday) =>
+      monday === null
+        ? of(week('2026-11-01', { weekEnd: '2026-11-07' }))
+        : throwError(() => new HttpErrorResponse({ status: 400 }));
+    button(root, 'Semana anterior').click();
+    await fixture.whenStable();
+    await fixture.whenStable();
+
+    expect(calls.slice(-2)).toEqual([
+      ['2026-10-19', 'direct'],
+      [null, 'direct'],
+    ]);
+    expect(root.querySelector('[role="alert"]')).toBeNull();
+    expect(root.querySelector('.header__date')?.textContent).toContain('1 a 7 de novembro');
+    expect(button(root, 'Próxima semana').disabled).toBe(true);
   });
 
   it('falha ao carregar avisa e permite tentar de novo', async () => {

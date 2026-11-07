@@ -6,6 +6,7 @@ import { provideRouter } from '@angular/router';
 import { provideIonicAngular } from '@ionic/angular';
 import { EntriesStore, NOW, ResolveResult, TimelineEntry } from '../entries/entries-store';
 import { EntryResponse } from '../entries/entry.models';
+import { BudgetAlert, DailyGoal } from '../entries/goal.models';
 import { TodayPage } from './today.page';
 
 registerLocaleData(localePt, 'pt-BR');
@@ -60,6 +61,8 @@ describe('TodayPage', () => {
       resolve: async () => resolveResult,
       find: () => PENDING,
       habitFor: () => undefined,
+      dailyGoals: signal([]),
+      budgetAlerts: signal([]),
     };
     TestBed.configureTestingModule({
       imports: [TodayPage],
@@ -165,6 +168,8 @@ describe('TodayPage · confirmação', () => {
       },
       find: () => PENDING,
       habitFor: () => undefined,
+      dailyGoals: signal([]),
+      budgetAlerts: signal([]),
     };
     TestBed.configureTestingModule({
       imports: [TodayPage],
@@ -218,7 +223,7 @@ describe('TodayPage · confirmação', () => {
     await fixture.whenStable();
 
     expect(resolved).toEqual([['p', 0, { action: 'DISMISS' }]]);
-    expect(fixture.nativeElement.querySelector('[role="status"]')?.textContent).toContain('mudou');
+    expect(fixture.nativeElement.querySelector('.banner[role="status"]')?.textContent).toContain('mudou');
     expect(confirming()).toEqual({ entry: PENDING, index: 0 });
   });
 
@@ -300,7 +305,7 @@ describe('TodayPage · confirmação', () => {
     await fixture.whenStable();
 
     expect(resolved).toEqual([['a', 0, { action: 'REOPEN' }]]);
-    expect(fixture.nativeElement.querySelector('[role="status"]')?.textContent).toContain('Removido dos seus números');
+    expect(fixture.nativeElement.querySelector('.banner[role="status"]')?.textContent).toContain('Removido dos seus números');
     expect(confirming()).toEqual({ entry: PENDING, index: 0 });
   });
 
@@ -315,7 +320,7 @@ describe('TodayPage · confirmação', () => {
     await page.resolve('a', 0, { action: 'CONFIRM_FINANCE', amount: 35, direction: 'EXPENSE', category: 'PHARMACY' });
     await fixture.whenStable();
 
-    expect(fixture.nativeElement.querySelector('[role="status"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.banner[role="status"]')).toBeNull();
   });
 
   it('"Desfazer" traz de volta o item descartado sem abrir o painel', async () => {
@@ -340,7 +345,7 @@ describe('TodayPage · confirmação', () => {
     button('Não foi isso')!.click();
     await fixture.whenStable();
 
-    expect(fixture.nativeElement.querySelector('[role="status"]')?.textContent).toContain('Não foi possível desfazer');
+    expect(fixture.nativeElement.querySelector('.banner[role="status"]')?.textContent).toContain('Não foi possível desfazer');
     expect(confirming()).toBeNull();
   });
 
@@ -353,7 +358,90 @@ describe('TodayPage · confirmação', () => {
     await page.resolve('p', 0, { action: 'DISMISS' });
     await fixture.whenStable();
 
-    expect(fixture.nativeElement.querySelector('[role="status"]')?.textContent).toContain('Não foi possível salvar');
+    expect(fixture.nativeElement.querySelector('.banner[role="status"]')?.textContent).toContain('Não foi possível salvar');
     expect(confirming()).toBeNull();
   });
 });
+
+describe('TodayPage · metas e orçamento', () => {
+  let fixture: ComponentFixture<TodayPage>;
+
+  async function open(dailyGoals: DailyGoal[], budgetAlerts: BudgetAlert[]): Promise<HTMLElement> {
+    const store: Partial<EntriesStore> = {
+      loadState: signal('loaded'),
+      timeline: signal([]),
+      summary: signal({ spent: 85, habitsDone: 1 }),
+      load: async () => undefined,
+      find: () => undefined,
+      habitFor: () => undefined,
+      dailyGoals: signal(dailyGoals),
+      budgetAlerts: signal(budgetAlerts),
+    };
+    TestBed.configureTestingModule({
+      imports: [TodayPage],
+      providers: [
+        provideIonicAngular({ mode: 'md' }),
+        provideRouter([]),
+        { provide: LOCALE_ID, useValue: 'pt-BR' },
+        { provide: EntriesStore, useValue: store },
+        { provide: NOW, useValue: () => new Date('2026-11-05T12:00:00Z') },
+      ],
+    });
+    fixture = TestBed.createComponent(TodayPage);
+    await fixture.whenStable();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  const water: DailyGoal = { habit: 'HYDRATION', habitName: 'Hidratação', target: 2, unit: 'L', done: 1.5, met: false };
+
+  it('o cartão de hábitos mostra o progresso da meta diária por escrito e numa barra acessível', async () => {
+    const root = await open([water], []);
+
+    const goal = root.querySelector('.summary__card:nth-child(2) .goal')!;
+    expect(goal.querySelector('.goal__name')?.textContent).toBe('Hidratação');
+    expect(goal.querySelector('.goal__value')?.textContent).toBe('1,5 / 2 L');
+    const bar = goal.querySelector('[role="progressbar"]')!;
+    expect(bar.getAttribute('aria-label')).toBe('Meta de Hidratação');
+    expect(bar.getAttribute('aria-valuetext')).toBe('1,5 de 2 L');
+    expect(bar.getAttribute('aria-valuenow')).toBe('1.5');
+    expect(bar.getAttribute('aria-valuemax')).toBe('2');
+    expect((goal.querySelector('.goal__fill') as HTMLElement).style.width).toBe('75%');
+  });
+
+  it('meta passada do alvo: aria-valuenow no máximo e o valor real no texto', async () => {
+    const root = await open([{ ...water, done: 2.5, met: true }], []);
+
+    const bar = root.querySelector('.goal [role="progressbar"]')!;
+    expect(bar.getAttribute('aria-valuenow')).toBe('2');
+    expect(bar.getAttribute('aria-valuemax')).toBe('2');
+    expect(bar.getAttribute('aria-valuetext')).toBe('2,5 de 2 L, meta cumprida');
+    expect(root.querySelector('.goal__value')?.textContent).toBe('2,5 / 2 L');
+  });
+
+  it('sem meta diária o cartão fica só com o número', async () => {
+    const root = await open([], []);
+
+    expect(root.querySelector('.goals')).toBeNull();
+  });
+
+  it('alerta de orçamento discreto, anunciado pelo leitor de tela sem roubar o foco', async () => {
+    const root = await open([], [
+      { category: 'FOOD', period: 'WEEKLY', limit: 100, spent: 85, percent: 85, status: 'NEAR' },
+    ]);
+
+    const region = root.querySelector('.budget-alerts')!;
+    expect(region.getAttribute('role')).toBe('status');
+    expect(region.textContent).toContain('Alimentação: 85% do limite da semana (R$ 85,00 de R$ 100,00)');
+    expect(region.contains(document.activeElement)).toBe(false);
+    expect(region.querySelector('[data-status]')?.getAttribute('data-status')).toBe('NEAR');
+  });
+
+  it('a região do alerta existe vazia, para anunciar quando o alerta chegar', async () => {
+    const root = await open([], []);
+
+    const region = root.querySelector('.budget-alerts[role="status"]');
+    expect(region).not.toBeNull();
+    expect(region?.textContent?.trim()).toBe('');
+  });
+});
+

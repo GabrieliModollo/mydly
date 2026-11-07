@@ -69,9 +69,47 @@ describe('formatação do resumo da semana', () => {
         { category: null, amount: 30 },
       ]),
     ).toEqual([
-      { label: 'Alimentação', amount: 'R$ 120,00', percent: 100 },
-      { label: 'Sem categoria', amount: 'R$ 30,00', percent: 25 },
+      { label: 'Alimentação', amount: 'R$ 120,00', percent: 100, limitAt: null, budgetNote: null, budgetStatus: null },
+      { label: 'Sem categoria', amount: 'R$ 30,00', percent: 25, limitAt: null, budgetNote: null, budgetStatus: null },
     ]);
+  });
+
+  it('limite semanal vira marca na barra, com a escala até o maior limite, e por escrito', () => {
+    const bars = categoryBars(
+      [
+        { category: 'FOOD', amount: 85 },
+        { category: 'LEISURE', amount: 50 },
+      ],
+      [
+        { category: 'FOOD', period: 'WEEKLY', limit: 100, periodStart: '', periodEnd: '', spent: 85, percent: 85, status: 'NEAR' },
+        { category: 'LEISURE', period: 'MONTHLY', limit: 400, periodStart: '', periodEnd: '', spent: 200, percent: 50, status: 'OK' },
+      ],
+    );
+
+    expect(bars[0]).toEqual({
+      label: 'Alimentação',
+      amount: 'R$ 85,00',
+      percent: 85,
+      limitAt: 100,
+      budgetNote: 'Limite da semana: R$ 100,00 (85%, perto do limite)',
+      budgetStatus: 'NEAR',
+    });
+    // O mensal não vira marca na barra da semana nem entra na escala.
+    expect(bars[1].limitAt).toBeNull();
+    expect(bars[1].percent).toBe(50);
+    expect(bars[1].budgetNote).toBe('No mês: R$ 200,00 de R$ 400,00 (50%)');
+  });
+
+  it('a descrição para leitor de tela inclui o placar contra a meta', () => {
+    const habit: HabitRow = {
+      code: 'GYM',
+      name: 'Academia',
+      polarity: 'GOOD',
+      days: ['ACHIEVED', 'ACHIEVED', 'ACHIEVED', 'NONE', 'FUTURE', 'FUTURE', 'FUTURE'],
+      score: { achieved: 3, elapsedDays: 4, target: 4, limit: null, slips: null, goal: 'WEEKLY_FREQUENCY' },
+    };
+
+    expect(habitDescription(habit, '2026-11-02')).toContain('Academia, 3 de 4 dias. Meta: 3 de 4 dias. segunda: cumprido');
   });
 
   it('linha da semana anterior só quando ela tem dados', () => {

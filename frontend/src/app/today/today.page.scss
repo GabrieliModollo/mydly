@@ -72,6 +72,85 @@ ion-footer {
   color: var(--mydly-ink);
 }
 
+// Metas diárias no cartão de hábitos: o texto sempre diz o progresso, a barra só reforça.
+.goals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goal__line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 6px;
+  font-size: 12px;
+}
+
+.goal__name {
+  font-weight: 500;
+  color: var(--mydly-subtle);
+}
+
+.goal__value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--mydly-ink);
+}
+
+.goal__track {
+  display: block;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--mydly-line);
+  overflow: hidden;
+}
+
+.goal__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--mydly-routine-text);
+}
+
+// Alerta de orçamento: discreto, na cor neutra; passou do limite ganha o laranja das saídas.
+.budget-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  &:not(:empty) {
+    margin-bottom: 12px;
+  }
+}
+
+.budget-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--mydly-radius);
+  background: var(--mydly-neutral-bg);
+  color: var(--mydly-neutral-text);
+  font-size: 13px;
+  font-weight: 500;
+
+  ion-icon {
+    flex: none;
+    font-size: 16px;
+  }
+
+  &[data-status='OVER'] {
+    background: var(--mydly-expense-bg);
+    color: var(--mydly-expense-text);
+  }
+}
+
 .banner {
   display: flex;
   flex-wrap: wrap;

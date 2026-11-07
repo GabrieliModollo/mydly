@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { IonContent, IonFooter, IonHeader, IonIcon, IonSpinner, IonToolbar } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -18,6 +19,7 @@ import {
   TONE_OPTIONS,
 } from './summary-format';
 import { formatMoney } from '../entries/entry-format';
+import { goalScoreLabel } from '../goals/goal-format';
 
 type LoadState = 'loading' | 'loaded' | 'error';
 
@@ -39,6 +41,7 @@ export class SummaryPage implements OnInit {
   protected readonly habitDescription = habitDescription;
   protected readonly markLabel = markLabel;
   protected readonly formatMoney = formatMoney;
+  protected readonly goalScoreLabel = goalScoreLabel;
 
   protected readonly tone = signal<Tone>(loadTone());
   /** O primeiro dia da semana mostrada, ou {@code null} para a semana atual. */
@@ -47,6 +50,7 @@ export class SummaryPage implements OnInit {
   private readonly currentStart = signal<string | null>(null);
   protected readonly week = signal<WeekSummaryResponse | null>(null);
   protected readonly loadState = signal<LoadState>('loading');
+  private entered = false;
 
   protected readonly range = computed(() => {
     const week = this.week();
@@ -64,7 +68,9 @@ export class SummaryPage implements OnInit {
   protected readonly crossing = computed<WeekInsight | null>(
     () => this.week()?.insights.slice(1).find((insight) => insight.kind === 'SLEEP_AND_SPENDING') ?? null,
   );
-  protected readonly bars = computed(() => categoryBars(this.week()?.money.spentByCategory ?? []));
+  protected readonly bars = computed(() =>
+    categoryBars(this.week()?.money.spentByCategory ?? [], this.week()?.budgets ?? []),
+  );
   protected readonly previous = computed(() => {
     const week = this.week();
     return week ? previousWeekLabel(week.previous, week.weekStart) : null;
@@ -81,6 +87,14 @@ export class SummaryPage implements OnInit {
 
   ngOnInit(): void {
     void this.load();
+  }
+
+  /** Ao voltar para a aba, recarrega: as metas, os limites ou o início da semana podem ter mudado. */
+  ionViewWillEnter(): void {
+    if (this.entered) {
+      void this.load();
+    }
+    this.entered = true;
   }
 
   protected chooseTone(tone: Tone): void {
@@ -118,7 +132,15 @@ export class SummaryPage implements OnInit {
       }
       this.week.set(week);
       this.loadState.set('loaded');
-    } catch {
+    } catch (error) {
+      // O início guardado deixou de ser início de semana (o dia de início mudou na aba Metas): volta para
+      // a semana atual, que a API acha pelas preferências novas.
+      if (error instanceof HttpErrorResponse && error.status === 400 && this.start() !== null) {
+        this.start.set(null);
+        this.currentStart.set(null);
+        await this.load();
+        return;
+      }
       this.loadState.set('error');
     }
   }

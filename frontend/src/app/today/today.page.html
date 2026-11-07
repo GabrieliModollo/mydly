@@ -21,8 +21,41 @@
       <div class="summary__card">
         <p class="summary__label">Hábitos cumpridos</p>
         <p class="summary__value">{{ store.summary().habitsDone }}</p>
+        @if (store.dailyGoals().length > 0) {
+          <ul class="goals" aria-label="Metas de hoje">
+            @for (goal of store.dailyGoals(); track goal.habit) {
+              <li class="goal" [attr.data-met]="goal.met">
+                <span class="goal__line">
+                  <span class="goal__name">{{ goal.habitName }}</span>
+                  <span class="goal__value">{{ dailyProgressLabel(goal) }}</span>
+                </span>
+                <span
+                  class="goal__track"
+                  role="progressbar"
+                  [attr.aria-label]="'Meta de ' + goal.habitName"
+                  aria-valuemin="0"
+                  [attr.aria-valuemax]="goal.target"
+                  [attr.aria-valuenow]="progressValue(goal.done, goal.target)"
+                  [attr.aria-valuetext]="dailyProgressText(goal)"
+                >
+                  <span class="goal__fill" [style.width.%]="progressWidth(goal.done, goal.target)"></span>
+                </span>
+              </li>
+            }
+          </ul>
+        }
       </div>
     </section>
+
+    <!-- Sempre presente, para o leitor de tela anunciar o alerta quando ele aparece, sem roubar o foco. -->
+    <div class="budget-alerts" role="status">
+      @for (alert of store.budgetAlerts(); track alert.category) {
+        <p class="budget-alert" [attr.data-status]="alert.status">
+          <ion-icon name="alert-circle-outline" aria-hidden="true" />
+          <span>{{ budgetAlertLabel(alert) }}</span>
+        </p>
+      }
+    </div>
 
     @if (notice(); as message) {
       <div class="banner" role="status">

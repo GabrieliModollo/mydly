@@ -22,10 +22,17 @@ import {
   RefresherCustomEvent,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { arrowUp, cloudOfflineOutline, refreshOutline } from 'ionicons/icons';
+import { alertCircleOutline, arrowUp, cloudOfflineOutline, refreshOutline } from 'ionicons/icons';
 import { EntriesStore, NOW } from '../entries/entries-store';
 import { chipsForItem, formatMoney } from '../entries/entry-format';
 import { EntryItemResponse, EntryResponse, ResolveItemRequest } from '../entries/entry.models';
+import {
+  budgetAlertLabel,
+  dailyProgressLabel,
+  dailyProgressText,
+  progressValue,
+  progressWidth,
+} from '../goals/goal-format';
 import { AppNav } from '../nav/app-nav';
 import { ConfirmSheet } from './confirm-sheet';
 import { formatDayLabel } from './day-label';
@@ -65,22 +72,36 @@ export class TodayPage implements OnInit {
   protected readonly examples = EXAMPLES;
   protected readonly chipsForItem = chipsForItem;
   protected readonly formatMoney = formatMoney;
+  protected readonly dailyProgressLabel = dailyProgressLabel;
+  protected readonly dailyProgressText = dailyProgressText;
+  protected readonly budgetAlertLabel = budgetAlertLabel;
+  protected readonly progressWidth = progressWidth;
+  protected readonly progressValue = progressValue;
 
   /** Item aberto no painel "Quanto foi?", ou {@code null} com o painel fechado. */
   protected readonly confirming = signal<{ entry: EntryResponse; index: number } | null>(null);
   /** Aviso curto no topo da lista (lançamento desatualizado, falha ao salvar). */
   protected readonly notice = signal<string | null>(null);
   protected readonly maxLength = 1000;
+  private entered = false;
 
   protected readonly draft = signal('');
   private readonly input = viewChild.required<ElementRef<HTMLInputElement>>('entryInput');
 
   constructor() {
-    addIcons({ arrowUp, cloudOfflineOutline, refreshOutline });
+    addIcons({ alertCircleOutline, arrowUp, cloudOfflineOutline, refreshOutline });
   }
 
   ngOnInit(): void {
     void this.store.load();
+  }
+
+  /** Ao voltar para a aba, atualiza os cartões: uma meta ou um limite pode ter mudado na aba Metas. */
+  ionViewWillEnter(): void {
+    if (this.entered) {
+      void this.store.refreshSummary();
+    }
+    this.entered = true;
   }
 
   protected onInput(event: Event): void {

@@ -70,6 +70,12 @@ export class EntriesStore {
   /** Totais dos cartões: o que vale em finance e routines, sem os itens retirados com "Não foi isso". */
   readonly summary = computed(() => summaryFrom(this.daySummary()));
 
+  /** Progresso das metas diárias de quantidade de hoje ("Hidratação 1,5 / 2 L"). */
+  readonly dailyGoals = computed(() => this.daySummary()?.dailyGoals ?? []);
+
+  /** Categorias que chegaram a 80% do limite no período de hoje; vêm só no resumo do dia. */
+  readonly budgetAlerts = computed(() => this.daySummary()?.budgetAlerts ?? []);
+
   /** O hábito do catálogo de cada item de rotina, pela chave {@code entryId:itemIndex}. */
   private readonly habits = computed(
     () => new Map((this.daySummary()?.items ?? []).map((habit) => [`${habit.entryId}:${habit.itemIndex}`, habit])),
