@@ -26,6 +26,11 @@ springdoc:
     path: /swagger-ui.html
 
 mydly:
+  auth:
+    # Segredo dos tokens (HS256), com pelo menos 32 bytes. Vazio gera um aleatório a cada subida, e os
+    # tokens deixam de valer quando a aplicação reinicia (ADR 0012).
+    jwt-secret: ${MYDLY_JWT_SECRET:}
+    token-ttl: P7D
   # O dia de início da semana é preferência do usuário, na tabela preferences (ADR 0010).
   events:
     # Nova tentativa dos eventos entre módulos que ficaram sem concluir (ADR 0008).

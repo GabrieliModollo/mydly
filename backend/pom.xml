@@ -62,6 +62,16 @@
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-jpa</artifactId>
         </dependency>
+        <!-- Login e token de acesso (ADR 0012). O resource server traz o Nimbus, que assina e confere o JWT:
+             a API emite e valida os próprios tokens sem biblioteca de JWT de terceiros. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
         <!-- Swagger UI para testar a API pelo navegador -->
         <dependency>
             <groupId>org.springdoc</groupId>
@@ -91,6 +101,12 @@
         <dependency>
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Pedidos autenticados nos testes da API (jwt() do MockMvc) -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
