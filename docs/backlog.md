@@ -8,13 +8,12 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 
 | # | Etapa | Escopo | Notas |
 | --- | --- | --- | --- |
-| — | Nenhuma | A próxima é a etapa 7 | |
+| — | Nenhuma | A próxima é a etapa 8 | |
 
 ## Próximas
 
 | # | Prioridade | Etapa | Escopo | Por que agora |
 | --- | --- | --- | --- | --- |
-| 7 | Média | Metas e preferências | Pedido da autora (2026-11-06). Dia de início da semana configurável (módulo `preferences`); metas por hábito do catálogo (quantidade por dia, como 2 L de água, ou vezes por semana, como academia 4x; em hábito ruim, um limite), versionadas com `valid_from`; limite de gasto por categoria (semanal ou mensal) com avisos em 80% e 100%; resumo e cartões comparando com a meta; aba "Metas" no app. Preferências globais até a etapa de usuário, depois migram para o perfil | Completa o resumo da semana, que já nasceu preparado (`WeekDefinition`, `score.target`) |
 | 8 | Média | Offline-first | Fila local no app para lançamentos sem internet, sincronização com o id já gerado | Uso no celular, na rua |
 | 9 | Média | Usuário e autenticação | Spring Security com JWT, coluna de usuário nos dados, usuário "demo" com seed | Necessário antes de publicar uma demo |
 | 10 | Baixa | LLM como fallback | Lançamentos de confiança baixa interpretados pelo LLM; modo sem LLM continua funcionando | Valor por extenso, frases fora das regras |
@@ -42,3 +41,4 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 | Frases compostas (divisão por âncora, herança do verbo, números compostos com "e", até 5 itens, sem reprocessar lançamentos com resolução) | `b04d996`, `f58dd2e` e o commit de documentação seguinte |
 | Módulos `finance` e `routines` (estado e revisão por item, "Não foi isso", eventos com registro de publicação, catálogo de hábitos com polaridade, resumo do dia, backfill, nova tentativa e saúde, ADR 0008) | `9359a98`, `4a4ef3c`, `76c206b`, `fe91cb9`, `30a64f1`, `50710e3` e o commit de documentação seguinte |
 | Resumo da semana (mensagens por regras nos três tons, cruzamento de sono e gastos com limiar, comparação nos mesmos dias, semana com início configurável, tela Resumo, ADR 0009) | `5ccbb38`, `79bc890` e o commit de documentação seguinte |
+| Metas e preferências (módulo `preferences` com o dia de início da semana, metas de hábito por dia ou por semana e limite de hábito ruim, orçamentos semanais ou mensais com aviso em 80%, versões com `valid_from` avaliadas no dia de referência, conversão de unidades e "bebi 1 litro" como água, mensagens de meta e de orçamento, aba Metas, ADR 0010) | `3d0b932`, `094ba24`, `7a20d24`, `cd949b7`, `9be1161`, `06d3d81` e o commit de documentação seguinte |

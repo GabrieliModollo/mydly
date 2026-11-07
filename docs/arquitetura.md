@@ -86,14 +86,43 @@ sequenceDiagram
 ```
 
 - **Ordem e repetição.** Um evento só vale se a revisão for maior que a gravada, numa única instrução SQL. Retirada vira lápide (`active = false`), nunca `DELETE`, para que uma aceitação antiga atrasada não ressuscite o item.
-- **Hábitos.** O módulo `routines` encontra o hábito do catálogo pelas palavras-chave e aplica a polaridade: hábito ruim evitado ("Não comi besteira") conta como cumprido, e hábito ruim consumido ("Tomei 2 energéticos") é deslize. Rotina fora do catálogo fica como "outros", fora dos indicadores.
+- **Hábitos.** O módulo `routines` encontra o hábito do catálogo pelas palavras-chave e aplica a polaridade: hábito ruim evitado ("Não comi besteira") conta como cumprido, e hábito ruim consumido ("Tomei 2 energéticos") é deslize. Rotina fora do catálogo fica como "outros", fora dos indicadores. Quando nenhuma palavra-chave casa, a frase é só "bebi" com um volume (`L` ou `mL`) e não há complemento de bebida depois da quantidade, o item é Hidratação: "bebi 1 litro", "bebi 500ml" e "Bebi 2 litros hoje" contam como água, mas "bebi 1 litro de cerveja" e "bebi 500 ml de suco" ficam em "outros" (e "bebi 2 litros de refrigerante" já é Refrigerante pela palavra-chave). Só advérbios de tempo ("hoje", "agora", "no total") podem vir depois da quantidade.
 - **Resumo do dia.** O `GET /api/v1/days/{date}/summary`, no módulo `insights`, só lê as APIs públicas de `finance` (`FinanceTotals`) e `routines` (`HabitOutcomes`), no fuso `America/Sao_Paulo`.
 - **Histórico.** Os lançamentos anteriores à etapa 5 entraram por um backfill que roda uma vez só e pode ser repetido sem duplicar.
 - **Falhas.** Se um consumidor falhar, uma nova tentativa agendada reenvia o evento em cerca de um minuto, e o `/actuator/health` fica `OUT_OF_SERVICE` se um evento passar de dez minutos sem concluir.
 
 ## Resumo da semana
 
-O `GET /api/v1/weeks/{inicio}/summary?tone=gentle|direct|scold` (ou `/weeks/current/summary`), no módulo `insights`, monta a semana de 7 dias a partir do dia configurado (`mydly.week.first-day-of-week`, segunda por padrão) no fuso `America/Sao_Paulo`. Ele traz os hábitos com os 7 dias (`ACHIEVED`, `SLIPPED`, `MISSED`, `NONE` ou `FUTURE`) e o placar `{ achieved, elapsedDays, target }`, os gastos por categoria, a comparação com os mesmos dias decorridos da semana anterior e até três mensagens no tom pedido. As mensagens saem de regras locais com limiar fixo, sem LLM ([ADR 0009](adr/0009-mensagens-da-semana-por-regras.md)). Como no resumo do dia, `insights` só lê as APIs públicas de `finance` (`FinanceTotals`, inclusive o gasto por dia) e `routines` (`HabitOutcomes`).
+O `GET /api/v1/weeks/{inicio}/summary?tone=gentle|direct|scold` (ou `/weeks/current/summary`), no módulo `insights`, monta a semana de 7 dias a partir do dia de início das preferências (segunda por padrão) no fuso `America/Sao_Paulo`. Ele traz os hábitos com os 7 dias (`ACHIEVED`, `SLIPPED`, `MISSED`, `NONE` ou `FUTURE`) e o placar `{ achieved, elapsedDays, target, limit, slips, goal }`, os gastos por categoria, os orçamentos, a comparação com os mesmos dias decorridos da semana anterior e até três mensagens no tom pedido. As mensagens saem de regras locais com limiar fixo, sem LLM ([ADR 0009](adr/0009-mensagens-da-semana-por-regras.md) e [ADR 0010](adr/0010-metas-e-orcamentos-versionados.md)). Como no resumo do dia, `insights` só lê as APIs públicas de `finance` (`FinanceTotals`, `Budgets`), `routines` (`HabitOutcomes`, `HabitGoals`) e `preferences` (`WeekPreferences`, `UserCalendar`).
+
+## Metas, orçamentos e preferências
+
+A etapa 7 ([ADR 0010](adr/0010-metas-e-orcamentos-versionados.md)) traz três coisas, cada uma no seu módulo:
+
+| O quê | Módulo | Endpoints |
+| --- | --- | --- |
+| Dia de início da semana, global até existir usuário | `preferences` (folha, não depende de nenhum módulo) | `GET` e `PUT /api/v1/preferences` |
+| Meta por hábito do catálogo: quantidade por dia (`DAILY_QUANTITY`, como 2 L) ou dias por semana (`WEEKLY_FREQUENCY`); num hábito ruim, um limite | `routines` | `GET /api/v1/goals/habits`; `GET`, `PUT` e `DELETE /api/v1/goals/habits/{habitId}` |
+| Limite de gasto por categoria, semanal ou mensal, com aviso em 80% | `finance` | `GET /api/v1/budgets`; `GET`, `PUT` e `DELETE /api/v1/budgets/{category}` |
+
+```mermaid
+flowchart LR
+    App -->|"PUT /preferences"| P["preferences<br/>WeekPreferences, UserCalendar"]
+    App -->|"PUT /goals/habits/{id}"| R["routines<br/>habit_goal"]
+    App -->|"PUT /budgets/{categoria}"| F["finance<br/>budget"]
+    R --> P
+    F --> P
+    I["insights<br/>resumo do dia e da semana"] --> R
+    I --> F
+    I --> P
+```
+
+- **Versões com `valid_from`.** Metas e orçamentos nunca são sobrescritos: mudar grava uma versão a partir de hoje (em São Paulo, pelo `Clock` injetável), remover grava uma versão "sem meta", e duas gravações no mesmo dia ficam numa versão só (upsert). Cada dia é avaliado pela versão vigente nele.
+- **Dia de referência.** A meta de dias por semana e o limite de uma semana são os da versão vigente no último dia dela, ou hoje se ela está em curso. A meta diária é avaliada dia a dia, cada um pela sua versão.
+- **Unidades.** O catálogo tem a dimensão de medida de cada hábito (`VOLUME` na hidratação; `DURATION` no estudo, sono, leitura e academia). A meta diária só aceita unidade da mesma dimensão (`L` e `mL`, `h` e `min`), e a soma do dia é feita em `BigDecimal` na unidade base. "3 copos" e registros sem número não somam.
+- **Onde aparece.** O resumo do dia traz o progresso das metas diárias (`dailyGoals`) e os alertas de orçamento (`budgetAlerts`, o único lugar com o alerta). O resumo da semana traz o placar contra a meta, os orçamentos (`budgets`) e as mensagens `BUDGET_OVER`, `GOAL_AT_RISK`, `BUDGET_NEAR` e `GOAL_MET`.
+- **Troca do dia de início.** A semana é calculada na hora, então as semanas passadas também passam a seguir o dia novo. O `/weeks/{inicio}` valida a data contra o dia atual; o app navega pelas datas que a API devolve e volta para `/weeks/current` depois da troca.
+- **Privacidade.** Valores de meta e de orçamento são valores: não vão para log, como o texto e o valor dos lançamentos.
 
 ## Módulos
 
@@ -102,6 +131,7 @@ O `GET /api/v1/weeks/{inicio}/summary?tone=gentle|direct|scold` (ou `/weeks/curr
 | `entries` | Recebe o texto bruto, guarda sempre o original e coordena a interpretação |
 | `finance` | Transações, categorias, orçamentos |
 | `routines` | Hábitos, registros diários, metas |
+| `preferences` | Preferências do usuário (dia de início da semana) e o calendário dele (fuso e hoje) |
 | `insights` | Estatísticas, streaks, cruzamentos rotina × finanças, mensagens |
 | `integrations` | Fontes externas de transação (extrato, Open Finance) e reconciliação |
 | `notifications` | Push e lembretes |
@@ -115,7 +145,9 @@ erDiagram
     ENTRY ||--o{ HABIT_LOG : gera
     USER ||--o{ HABIT : define
     HABIT ||--o{ HABIT_LOG : registra
-    USER ||--o{ GOAL : define
+    HABIT ||--o{ HABIT_GOAL : "tem versões de meta"
+    USER ||--o{ BUDGET : define
+    USER ||--|| PREFERENCES : tem
     USER ||--o{ INSIGHT : recebe
 
     ENTRY {
@@ -146,6 +178,7 @@ erDiagram
         string code
         string name
         string polarity
+        string measure
         text_array keywords
     }
     HABIT_LOG {
@@ -159,11 +192,23 @@ erDiagram
         string unit
         timestamp occurred_at
     }
-    GOAL {
-        uuid id
+    HABIT_GOAL {
+        string habit_code
+        date valid_from
         string kind
-        decimal target
+        decimal target_quantity
+        string unit
+        smallint days_per_week
+    }
+    BUDGET {
+        string category
+        date valid_from
         string period
+        decimal limit_amount
+    }
+    PREFERENCES {
+        smallint id
+        string first_day_of_week
     }
     INSIGHT {
         uuid id
@@ -180,7 +225,9 @@ erDiagram
 - `Entry.resolution` guarda as respostas do usuário, alinhadas com os itens, e `Entry.version` faz o controle de concorrência (ETag). O valor efetivo de um item é a resolução, quando existe ([ADR 0007](adr/0007-parse-e-resolucao-separados.md)).
 - `Entry.item_state` guarda o estado e a revisão de cada item ([ADR 0008](adr/0008-eventos-com-registro-e-revisao-por-item.md)).
 - `TRANSACTION` é a tabela `finance_transaction`, e ela e `HABIT_LOG` têm uma linha por item de lançamento (`entry_id` + `item_index`), com `revision` e `active` para aplicar os eventos na ordem certa.
-- `Habit.polarity` diferencia hábitos bons ("dormi bem") de ruins ("pedi delivery 3x"). Por enquanto o catálogo é fixo, criado por migração; hábitos do usuário, alvos e metas (`USER`, `GOAL`) entram depois.
+- `Habit.polarity` diferencia hábitos bons ("dormi bem") de ruins ("pedi delivery 3x"), e `Habit.measure` diz se o hábito se mede em volume, em duração ou não se mede. Por enquanto o catálogo é fixo, criado por migração; hábitos do usuário (`USER`) entram depois.
+- `HABIT_GOAL` e `BUDGET` são versões: a chave é `(habit_code, valid_from)` e `(category, valid_from)`, e a versão vigente num dia é a de maior `valid_from` até ele. A versão de remoção tem `kind = NONE` na meta e período e limite nulos no orçamento ([ADR 0010](adr/0010-metas-e-orcamentos-versionados.md)).
+- `PREFERENCES` tem uma linha só (`id = 1`) até a etapa de usuário, quando ganha `user_id`; `HABIT_GOAL` e `BUDGET` ganham o usuário na chave na mesma etapa.
 - `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`) e é a base da reconciliação.
 
 ## App (frontend)
@@ -191,7 +238,11 @@ Angular 22 + Ionic 9 + Capacitor 8 em `frontend/`, com componentes standalone e 
 flowchart LR
     Page["Tela Hoje"] --> Store["EntriesStore<br/>(signals)"]
     Store --> Api["EntriesApi<br/>(HttpClient)"]
+    Summary["Tela Resumo"] --> Weeks["WeeksApi"]
+    Goals["Aba Metas"] --> GoalsApi["GoalsApi"]
     Api -->|"/api"| Proxy["proxy do ng serve<br/>ou nginx no Docker"]
+    Weeks -->|"/api"| Proxy
+    GoalsApi -->|"/api"| Proxy
     Proxy --> Backend["API Spring Boot"]
 ```
 

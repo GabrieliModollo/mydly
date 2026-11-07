@@ -126,7 +126,7 @@ São casos que ficam para o LLM ou para próximas etapas:
 
 - **Verbos fora do passado em primeira pessoa** ("vou à academia", "a gente comeu pizza") não são âncora, então uma frase composta com eles pode ficar com um item só. Hábitos conhecidos também viram âncora quando existirem, com o módulo `routines`.
 - **Valores por extenso** ("cinquenta reais") viram finança sem valor e com confiança baixa.
-- **Categorias de rotina** (academia, hidratação, sono) ainda não são inferidas; só as de finança.
+- **Categorias de rotina** (academia, hidratação, sono) não são inferidas pelo parser; só as de finança. O hábito de cada rotina é decidido no módulo `routines`, pelas palavras-chave do catálogo, com uma regra a mais para a água: "bebi 1 litro", sem dizer o que foi bebido, é Hidratação; "bebi 1 litro de cerveja" não é ([arquitetura](arquitetura.md#eventos-entre-módulos)).
 
 ## Privacidade
 

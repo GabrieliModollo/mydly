@@ -1,6 +1,6 @@
 # ADR 0009 — Mensagens da semana por regras locais, com limiar contra o acaso
 
-- **Status:** Aceita
+- **Status:** Aceita. Complementada pelo [ADR 0010](0010-metas-e-orcamentos-versionados.md)
 - **Data:** 2026-11-06
 
 ## Contexto
