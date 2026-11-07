@@ -26,9 +26,7 @@ springdoc:
     path: /swagger-ui.html
 
 mydly:
-  week:
-    # Dia em que a semana do resumo começa (ADR 0009); vira preferência do usuário na etapa de metas.
-    first-day-of-week: MONDAY
+  # O dia de início da semana é preferência do usuário, na tabela preferences (ADR 0010).
   events:
     # Nova tentativa dos eventos entre módulos que ficaram sem concluir (ADR 0008).
     retry-interval: PT1M

@@ -37,17 +37,20 @@ class WeekSummaryController {
 
     @GetMapping("/current/summary")
     @Operation(summary = "Resumo da semana atual",
-            description = "Semana de 7 dias que contém hoje, a partir do dia configurado (segunda por padrão), "
-                    + "no fuso America/Sao_Paulo.")
+            description = "Semana de 7 dias que contém hoje, a partir do dia de início das preferências "
+                    + "(segunda por padrão), no fuso America/Sao_Paulo. Depois de trocar o dia de início, é por "
+                    + "aqui que o app acha a semana atual.")
     WeekSummaryResponse current(@ToneParameter @RequestParam(required = false) String tone) {
         return summary(weeks.currentWeekStart(), tone);
     }
 
     @GetMapping("/{start}/summary")
     @Operation(summary = "Resumo de uma semana",
-            description = "A data precisa cair no dia em que a semana começa (segunda por padrão, configurável); "
-                    + "outra data devolve 400. As mensagens seguem regras locais (sem LLM) e falam de "
-                    + "comportamento, nunca de corpo, peso ou aparência.")
+            description = "A data precisa cair no dia de início da semana das preferências atuais; outra data "
+                    + "devolve 400, inclusive um início antigo depois de o dia mudar. As metas e os orçamentos são "
+                    + "avaliados no dia de referência: o último dia da semana, ou hoje se ela está em curso. As "
+                    + "mensagens seguem regras locais (sem LLM) e falam de comportamento, nunca de corpo, peso ou "
+                    + "aparência.")
     WeekSummaryResponse week(
             @Parameter(description = "O primeiro dia da semana, no formato AAAA-MM-DD", example = "2026-11-02")
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
