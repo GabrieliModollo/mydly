@@ -10,6 +10,8 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +62,30 @@ public class FinanceTotals {
         }
         byCategory.sort(Comparator.comparing(PeriodTotals.CategoryTotal::amount).reversed());
         return new PeriodTotals(spent, received, byCategory);
+    }
+
+    /**
+     * Gasto de cada dia, de {@code from} até o dia anterior a {@code until}, no fuso informado. Todo dia
+     * do intervalo aparece, com zero quando não houve gasto.
+     */
+    @Transactional(readOnly = true)
+    public Map<LocalDate, BigDecimal> spentPerDay(LocalDate from, LocalDate until, ZoneId zone) {
+        Map<LocalDate, BigDecimal> perDay = new TreeMap<>();
+        for (LocalDate day = from; day.isBefore(until); day = day.plusDays(1)) {
+            perDay.put(day, BigDecimal.ZERO);
+        }
+        jdbc.sql("""
+                        SELECT (occurred_at AT TIME ZONE :zone)::date AS day, sum(amount) AS total
+                        FROM finance_transaction
+                        WHERE active AND direction = 'EXPENSE' AND occurred_at >= :start AND occurred_at < :end
+                        GROUP BY 1""")
+                .param("zone", zone.getId())
+                .param("start", Timestamp.from(from.atStartOfDay(zone).toInstant()))
+                .param("end", Timestamp.from(until.atStartOfDay(zone).toInstant()))
+                .query((rs, n) -> Map.entry(rs.getObject("day", LocalDate.class), rs.getBigDecimal("total")))
+                .list()
+                .forEach(row -> perDay.put(row.getKey(), row.getValue()));
+        return perDay;
     }
 
     private record Row(Direction direction, Category category, BigDecimal total) {
