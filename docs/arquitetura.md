@@ -248,8 +248,8 @@ flowchart LR
 
 - **Mesma origem.** O app chama `/api/...`. No desenvolvimento, o proxy do `ng serve` encaminha ao `localhost:8080`; no `docker compose`, o nginx que serve o app encaminha ao backend. Não há CORS.
 - **Envio otimista.** O lançamento aparece na lista como "Enviando…" com o id e a data gerados no app. Se a rede falhar, o reenvio usa o mesmo id, e a API não duplica ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)).
+- **Fila offline.** Sem rede, ou com o servidor fora, o lançamento fica no `localStorage` do aparelho (`mydly.outbox.v1`) e é enviado quando a conexão volta, ao abrir o app e 30 segundos depois de uma falha, um por vez e do mais antigo ao mais novo. O parser continua só no servidor: um lançamento guardado aparece sem chips até ser enviado ([ADR 0011](adr/0011-fila-offline-no-aparelho.md)).
 - **Listagem do dia.** O `GET /api/v1/entries?date=AAAA-MM-DD` filtra pelo `occurred_at` no fuso `America/Sao_Paulo`, até existir fuso por usuário. Sem `date`, vale hoje.
-- **Próximo passo:** a fila offline, que guarda os lançamentos no aparelho enquanto não há rede.
 
 ## Privacidade (LGPD)
 
@@ -259,4 +259,5 @@ O app guarda dados financeiros e dados que podem ser de saúde (sono, dieta). Po
 - criptografia dos campos sensíveis em repouso;
 - exportação e exclusão de conta;
 - só o texto do lançamento vai para o LLM, sem identificar o usuário;
+- o texto de um lançamento fica no aparelho só até ser enviado, e sair da conta (etapa 9) precisa apagar a fila;
 - a fonte do app é servida por ele mesmo, sem chamadas a serviços de terceiros como o Google Fonts.

@@ -35,7 +35,9 @@ src/app/
 │   ├── entries-api.ts      # chamadas HTTP dos lançamentos e do resumo do dia
 │   ├── weeks-api.ts        # resumo da semana
 │   ├── goals-api.ts        # metas de hábito, orçamentos e preferências
-│   ├── entries-store.ts    # estado com signals: envio otimista, falha e reenvio
+│   ├── entries-store.ts    # estado com signals: envio otimista, fila offline e reenvio
+│   ├── outbox-storage.ts   # leitura e gravação da fila no localStorage
+│   ├── connectivity.ts     # rede do aparelho (eventos online/offline e volta para a frente)
 │   ├── entry-format.ts     # texto dos chips e resumo do dia (funções puras)
 │   └── random-id.ts        # UUID do lançamento, com alternativa fora de HTTPS
 ├── today/                  # tela "Hoje" e o formato da data do cabeçalho
@@ -47,7 +49,8 @@ src/theme/variables.css     # tokens do design.md: cores, fontes, tema escuro
 
 ## Decisões
 
-- **Id e data gerados no app** ([ADR 0006](../docs/adr/0006-id-do-cliente-e-occurred-at.md)). O lançamento aparece na lista assim que é enviado, como "Enviando…". Se a rede falhar, o botão "Tentar de novo" reenvia com o mesmo id, e a API não duplica. Recusas da API (4xx) não oferecem reenvio, porque o resultado seria o mesmo.
+- **Id e data gerados no app** ([ADR 0006](../docs/adr/0006-id-do-cliente-e-occurred-at.md)). O lançamento aparece na lista assim que é enviado, como "Enviando…". Reenviar usa o mesmo id, e a API não duplica. Recusas da API (4xx) não oferecem reenvio, porque o resultado seria o mesmo.
+- **Fila offline no aparelho** ([ADR 0011](../docs/adr/0011-fila-offline-no-aparelho.md)). Sem rede, ou se o envio falhar por rede ou erro do servidor, o lançamento fica no `localStorage` como "Guardado no aparelho." e é enviado sozinho: quando a rede volta, quando o app volta para a frente, ao abrir o app e 30 segundos depois de uma falha. Vai um por vez, do mais antigo ao mais novo, e "Enviar agora" força a tentativa. Duas abas abertas não apagam a fila uma da outra. Só lançamentos novos entram na fila; confirmar um item ainda precisa de conexão.
 - **Sem zone.js.** O Angular 22 detecta mudanças por signals. Por isso o envio lê o texto direto do campo, sem depender do estado do botão. Um Enter logo depois da digitação seria ignorado se dependesse de o `[disabled]` do botão já ter sido atualizado.
 - **Fontes servidas pelo próprio app** (Space Grotesk nos títulos e números, Inter no texto, via `@fontsource-variable`). Elas funcionam offline e não enviam o IP de quem usa o app ao Google Fonts (LGPD).
 - **Visual do [`design.md`](../docs/design.md), no modo `md` em todas as plataformas.** Saída é laranja e entrada é azul, nunca vermelho e verde, o par mais difícil para quem tem daltonismo. O rótulo sempre diz o tipo por escrito. O tema escuro deriva do claro com a mesma lógica de cor. Todo texto passa o contraste AA do WCAG nos dois temas, e a borda do campo passa os 3:1 exigidos para controles.
@@ -57,6 +60,3 @@ src/theme/variables.css     # tokens do design.md: cores, fontes, tema escuro
 - **Progresso nunca só por cor.** Toda barra tem o valor por escrito e `role="progressbar"` com `aria-valuetext`; a marca do limite no Resumo tem a linha "Limite da semana: ..." logo abaixo.
 - **Capacitor configurado, mas só para web.** Android e iOS entram numa etapa futura (`npx cap add android`).
 
-## Próximos passos
-
-- Fila offline: guardar os lançamentos no aparelho e sincronizar quando a rede voltar (etapa 8 do [backlog](../docs/backlog.md)).
