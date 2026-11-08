@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
@@ -125,6 +126,41 @@ class HybridEntryParserTests {
         HybridEntryParser withoutLlm = new HybridEntryParser(rules, LlmInterpreter.DISABLED);
 
         assertThat(withoutLlm.parse("Comprei pão")).isEqualTo(rules.parse("Comprei pão"));
+    }
+
+    @Test
+    void semCotaFicaComAsRegrasSemChamarOLlm() {
+        List<UUID> asked = new ArrayList<>();
+        HybridEntryParser exhausted = new HybridEntryParser(rules, llm, userId -> {
+            asked.add(userId);
+            return false;
+        });
+        UUID user = UUID.randomUUID();
+
+        assertThat(exhausted.parse("Comprei pão", user)).isEqualTo(rules.parse("Comprei pão"));
+        assertThat(llm.texts).isEmpty();
+        assertThat(asked).containsExactly(user);
+    }
+
+    @Test
+    void oQueAsRegrasEntendemNaoGastaACota() {
+        List<UUID> asked = new ArrayList<>();
+        HybridEntryParser counted = new HybridEntryParser(rules, llm, userId -> asked.add(userId));
+
+        counted.parse("Gastei 50 reais na farmácia", UUID.randomUUID());
+        new HybridEntryParser(rules, LlmInterpreter.DISABLED, userId -> asked.add(userId))
+                .parse("Comprei pão", UUID.randomUUID());
+
+        assertThat(asked).isEmpty();
+    }
+
+    @Test
+    void comCotaOLlmEChamado() {
+        llm.answer = sent -> Optional.of(List.of(finance(0, "8.50", "FOOD", true)));
+        HybridEntryParser counted = new HybridEntryParser(rules, llm, userId -> true);
+
+        assertThat(counted.parse("Comprei pão", UUID.randomUUID()).getFirst().amount()).isEqualByComparingTo("8.50");
+        assertThat(llm.texts).containsExactly("Comprei pão");
     }
 
     private static LlmReading finance(int index, String amount, String category, boolean clear) {

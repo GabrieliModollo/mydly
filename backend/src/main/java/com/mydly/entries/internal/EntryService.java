@@ -93,7 +93,7 @@ public class EntryService {
 
         Instant now = toDatabasePrecision(clock.instant());
         Entry entry = Entry.interpreted(userId, entryId, text, requestedOccurredAt != null ? requestedOccurredAt : now,
-                now, parser.parse(text));
+                now, parser.parse(text, userId));
         try {
             // Gravação e eventos na mesma transação: o registro de publicação só guarda o evento se o
             // lançamento for gravado (ADR 0008).

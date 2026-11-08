@@ -64,7 +64,7 @@ class EntryServiceTests {
 
     @Test
     void outraViolacaoDeIntegridadeEPropagada() {
-        when(parser.parse(any())).thenReturn(saved.getItems());
+        when(parser.parse(any(), any())).thenReturn(saved.getItems());
         when(repository.findById(id)).thenReturn(Optional.empty());
         when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("outra restrição"));
 
@@ -74,7 +74,7 @@ class EntryServiceTests {
 
     @Test
     void semDataUsaORelogioDoServidorNaPrecisaoDoBanco() {
-        when(parser.parse(any())).thenReturn(saved.getItems());
+        when(parser.parse(any(), any())).thenReturn(saved.getItems());
         when(repository.findById(id)).thenReturn(Optional.empty());
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -177,7 +177,7 @@ class EntryServiceTests {
     }
 
     private void simulateConcurrentInsert() {
-        when(parser.parse(any())).thenReturn(saved.getItems());
+        when(parser.parse(any(), any())).thenReturn(saved.getItems());
         when(repository.findById(id)).thenReturn(Optional.empty(), Optional.of(saved));
         when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("pk duplicada"));
     }

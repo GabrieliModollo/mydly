@@ -7,6 +7,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +19,8 @@ import org.springframework.stereotype.Component;
  * confirmação ({@link ParsedEntry#needsConfirmation()}) vão para o LLM, todos numa chamada, cada um
  * com o seu trecho. Os itens que as regras entenderam ficam como estão. Uma leitura do LLM troca o
  * item das regras quando é válida; se o LLM não souber, falhar ou estiver desligado, o item continua
- * como as regras deixaram e o app pergunta ao usuário (ADR 0013).
+ * como as regras deixaram e o app pergunta ao usuário (ADR 0013). O mesmo vale quando a cota diária
+ * de chamadas do usuário ou de todos acabou (ADR 0017).
  */
 @Primary
 @Component
@@ -25,14 +28,27 @@ class HybridEntryParser implements EntryParser {
 
     private final RuleBasedEntryParser rules;
     private final LlmInterpreter llm;
+    private final LlmQuota quota;
 
-    HybridEntryParser(RuleBasedEntryParser rules, LlmInterpreter llm) {
+    @Autowired
+    HybridEntryParser(RuleBasedEntryParser rules, LlmInterpreter llm, LlmQuota quota) {
         this.rules = rules;
         this.llm = llm;
+        this.quota = quota;
+    }
+
+    HybridEntryParser(RuleBasedEntryParser rules, LlmInterpreter llm) {
+        this(rules, llm, LlmQuota.UNLIMITED);
+    }
+
+    /** Sem usuário não há cota: só os testes chamam assim, e o {@code EntryService} sempre informa o dono. */
+    @Override
+    public List<ParsedEntry> parse(String text) {
+        return parse(text, null);
     }
 
     @Override
-    public List<ParsedEntry> parse(String text) {
+    public List<ParsedEntry> parse(String text, UUID userId) {
         List<ParsedEntry> items = rules.parse(text);
         if (!llm.enabled()) {
             return items;
@@ -44,7 +60,7 @@ class HybridEntryParser implements EntryParser {
                 doubtful.add(i);
             }
         }
-        if (doubtful.isEmpty()) {
+        if (doubtful.isEmpty() || (userId != null && !quota.tryAcquire(userId))) {
             return items;
         }
         List<String> segments = doubtful.stream().map(i -> items.get(i).description()).toList();
