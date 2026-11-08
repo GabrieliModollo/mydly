@@ -76,6 +76,10 @@ describe('LoginPage', () => {
     expect(element('label[for="login-password"]').textContent).toContain('Senha');
   });
 
+  it('leva ao cadastro de conta', () => {
+    expect(element('a[href="/cadastro"]').textContent).toContain('Criar conta');
+  });
+
   it('entra com usuário e senha e vai para o Hoje', async () => {
     fill(' demo ', 'demo');
     submit();

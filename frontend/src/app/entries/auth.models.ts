@@ -1,4 +1,4 @@
-/** Espelha o login da API (POST /api/v1/auth/login, ADR 0012). */
+/** Espelha o login e o cadastro da API (POST /api/v1/auth/login e /register, ADRs 0012 e 0018). */
 export interface SessionUser {
   id: string;
   username: string;

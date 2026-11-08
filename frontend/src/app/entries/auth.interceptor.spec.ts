@@ -37,11 +37,13 @@ describe('authInterceptor', () => {
     expect(backend.expectOne('/api/v1/entries').request.headers.get('Authorization')).toBe('Bearer token-1');
   });
 
-  it('não põe o token no login nem fora da API', () => {
+  it('não põe o token no login, no cadastro nem fora da API', () => {
     void firstValueFrom(http.post('/api/v1/auth/login', {}));
+    void firstValueFrom(http.post('/api/v1/auth/register', {}));
     void firstValueFrom(http.get('/assets/x.json'));
 
     expect(backend.expectOne('/api/v1/auth/login').request.headers.has('Authorization')).toBe(false);
+    expect(backend.expectOne('/api/v1/auth/register').request.headers.has('Authorization')).toBe(false);
     expect(backend.expectOne('/assets/x.json').request.headers.has('Authorization')).toBe(false);
   });
 

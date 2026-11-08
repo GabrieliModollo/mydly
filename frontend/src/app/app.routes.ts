@@ -9,6 +9,12 @@ export const routes: Routes = [
     loadComponent: () => import('./login/login.page').then((m) => m.LoginPage),
   },
   {
+    path: 'cadastro',
+    title: 'MyDly · Criar conta',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./login/register.page').then((m) => m.RegisterPage),
+  },
+  {
     path: '',
     title: 'MyDly · Hoje',
     canActivate: [authGuard],

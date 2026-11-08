@@ -5,13 +5,16 @@ import { catchError, throwError } from 'rxjs';
 import { AuthApi } from './auth-api';
 import { AuthSession } from './session';
 
+/** Os pedidos à API que vão sem token. */
+const PUBLIC_URLS = new Set([AuthApi.LOGIN_URL, AuthApi.REGISTER_URL]);
+
 /**
- * Põe o token em todo pedido à API, menos no login. Uma recusa por falta de token ou token vencido
- * (401) encerra a sessão e leva ao login; quem fez o pedido recebe o erro mesmo assim e decide o que
- * fazer (a fila de lançamentos, por exemplo, guarda o lançamento para depois do login).
+ * Põe o token em todo pedido à API, menos no login e no cadastro. Uma recusa por falta de token ou
+ * token vencido (401) encerra a sessão e leva ao login; quem fez o pedido recebe o erro mesmo assim e
+ * decide o que fazer (a fila de lançamentos, por exemplo, guarda o lançamento para depois do login).
  */
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
-  if (!request.url.startsWith('/api/') || request.url === AuthApi.LOGIN_URL) {
+  if (!request.url.startsWith('/api/') || PUBLIC_URLS.has(request.url)) {
     return next(request);
   }
   const session = inject(AuthSession);

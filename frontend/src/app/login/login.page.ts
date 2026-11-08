@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { IonContent } from '@ionic/angular';
 import { firstValueFrom } from 'rxjs';
 import { AuthApi } from '../entries/auth-api';
@@ -8,12 +8,12 @@ import { AuthSession } from '../entries/session';
 import { loginErrorMessage } from './login-error';
 
 /**
- * Tela de login (ADR 0012). Ainda não há cadastro: quem visita entra na demonstração, com o usuário
- * público {@code demo}.
+ * Tela de login (ADR 0012). Daqui se cria uma conta (ADR 0018) ou se entra na demonstração, com o
+ * usuário público {@code demo}.
  */
 @Component({
   selector: 'app-login',
-  imports: [IonContent],
+  imports: [IonContent, RouterLink],
   templateUrl: './login.page.html',
   styleUrl: './login.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

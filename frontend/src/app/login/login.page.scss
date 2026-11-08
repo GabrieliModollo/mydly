@@ -46,6 +46,14 @@ ion-content {
   color: var(--mydly-ink);
 }
 
+.card__text,
+.hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--mydly-subtle);
+}
+
 .label {
   margin-top: 4px;
   font-size: 13px;
@@ -135,4 +143,24 @@ button:focus-visible,
 .field:focus-visible {
   outline: 3px solid var(--mydly-focus);
   outline-offset: 2px;
+}
+
+// Troca entre entrar e criar conta.
+.switch {
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  color: var(--mydly-subtle);
+
+  a {
+    font-weight: 700;
+    color: var(--mydly-ink);
+    text-underline-offset: 3px;
+  }
+
+  a:focus-visible {
+    outline: 3px solid var(--mydly-focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }

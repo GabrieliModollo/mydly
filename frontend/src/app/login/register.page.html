@@ -1,0 +1,61 @@
+<ion-content>
+  <main class="page">
+    <header class="brand">
+      <h1 class="brand__name">MyDly</h1>
+      <p class="brand__tagline">Escreva como falaria. O MyDly entende se é um gasto ou um hábito.</p>
+    </header>
+
+    <form class="card" (submit)="submit($event)" novalidate>
+      <h2 class="card__title">Criar conta</h2>
+      <p class="card__text">Seus lançamentos, metas e limites ficam só na sua conta.</p>
+
+      <!-- Sempre presente, para o leitor de tela anunciar o erro quando ele aparece. -->
+      <p class="error" role="alert">{{ error() }}</p>
+
+      <label class="label" for="register-username">Usuário</label>
+      <input
+        #username
+        id="register-username"
+        class="field"
+        type="text"
+        name="username"
+        autocomplete="username"
+        autocapitalize="none"
+        spellcheck="false"
+        maxlength="40"
+        aria-describedby="register-username-hint"
+        [attr.aria-invalid]="invalid() === 'username' ? true : null"
+      />
+      <p id="register-username-hint" class="hint">De 3 a 40 letras sem acento, números, ponto, hífen ou sublinhado.</p>
+
+      <label class="label" for="register-password">Senha</label>
+      <input
+        #password
+        id="register-password"
+        class="field"
+        type="password"
+        name="password"
+        autocomplete="new-password"
+        aria-describedby="register-password-hint"
+        [attr.aria-invalid]="invalid() === 'password' ? true : null"
+      />
+      <p id="register-password-hint" class="hint">Pelo menos {{ minPassword }} caracteres.</p>
+
+      <label class="label" for="register-confirmation">Repita a senha</label>
+      <input
+        #confirmation
+        id="register-confirmation"
+        class="field"
+        type="password"
+        name="confirmation"
+        autocomplete="new-password"
+        enterkeyhint="go"
+        [attr.aria-invalid]="invalid() === 'confirmation' ? true : null"
+      />
+
+      <button type="submit" class="primary" [disabled]="busy()">{{ busy() ? 'Criando…' : 'Criar conta' }}</button>
+    </form>
+
+    <p class="switch">Já tem conta? <a routerLink="/login" replaceUrl>Entrar</a></p>
+  </main>
+</ion-content>

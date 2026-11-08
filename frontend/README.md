@@ -36,7 +36,7 @@ src/app/
 │   ├── entries-api.ts      # chamadas HTTP dos lançamentos e do resumo do dia
 │   ├── weeks-api.ts        # resumo da semana
 │   ├── goals-api.ts        # metas de hábito, orçamentos e preferências
-│   ├── auth-api.ts         # login na API
+│   ├── auth-api.ts         # login e cadastro na API
 │   ├── session.ts          # quem está logado e o token, guardados no aparelho
 │   ├── auth.interceptor.ts # token em todo pedido à API; 401 leva ao login
 │   ├── auth.guard.ts       # telas do app só com sessão; o login só sem ela
@@ -52,7 +52,7 @@ src/app/
 │   ├── import.models.ts    # tipos da importação
 │   ├── entry-format.ts     # texto dos chips e resumo do dia (funções puras)
 │   └── random-id.ts        # UUID do lançamento, com alternativa fora de HTTPS
-├── login/                  # tela de login e a mensagem de erro (função pura)
+├── login/                  # telas de login e de cadastro, com as regras e as mensagens de erro (funções puras)
 ├── today/                  # tela "Hoje" e o formato da data do cabeçalho
 ├── summary/                # tela "Resumo" e a formatação da semana
 ├── goals/                  # aba "Metas", os painéis de meta e de limite e a formatação (funções puras)
@@ -65,7 +65,7 @@ src/theme/variables.css     # tokens do design.md: cores, fontes, tema escuro
 
 - **Id e data gerados no app** ([ADR 0006](../docs/adr/0006-id-do-cliente-e-occurred-at.md)). O lançamento aparece na lista assim que é enviado, como "Enviando…". Reenviar usa o mesmo id, e a API não duplica. Recusas da API (4xx) não oferecem reenvio, porque o resultado seria o mesmo.
 - **Fila offline no aparelho** ([ADR 0011](../docs/adr/0011-fila-offline-no-aparelho.md)). Sem rede, ou se o envio falhar por rede ou erro do servidor, o lançamento fica no `localStorage` como "Guardado no aparelho." e é enviado sozinho: quando a rede volta, quando o app volta para a frente, ao abrir o app e 30 segundos depois de uma falha. Vai um por vez, do mais antigo ao mais novo, e "Enviar agora" força a tentativa. Duas abas abertas não apagam a fila uma da outra. Só lançamentos novos entram na fila; confirmar um item ainda precisa de conexão.
-- **Login com o token guardado no aparelho** ([ADR 0012](../docs/adr/0012-login-com-jwt-e-dados-por-usuario.md)). A sessão (token, validade e usuário) fica no `localStorage` para o app abrir logado e lançar offline. Um 401 da API encerra a sessão e leva ao login; o lançamento que recebeu o 401 continua guardado e sai depois do login. A fila offline é de um usuário por vez: entrar com outra pessoa descarta a fila anterior, e "Sair" (aba Metas) apaga a fila de quem sai, com confirmação se há algo não enviado.
+- **Login com o token guardado no aparelho** ([ADR 0012](../docs/adr/0012-login-com-jwt-e-dados-por-usuario.md)). A sessão (token, validade e usuário) fica no `localStorage` para o app abrir logado e lançar offline. Um 401 da API encerra a sessão e leva ao login; o lançamento que recebeu o 401 continua guardado e sai depois do login. A tela de cadastro (`/cadastro`) confere as mesmas regras da API antes de enviar e entra com a conta nova logo depois ([ADR 0018](../docs/adr/0018-cadastro-de-conta.md)). A fila offline é de um usuário por vez: entrar com outra pessoa, inclusive com uma conta recém-criada, descarta a fila anterior, e "Sair" (aba Metas) apaga a fila de quem sai, com confirmação se há algo não enviado.
 - **Extrato pelo servidor** ([ADR 0014](../docs/adr/0014-importacao-de-extrato-e-reconciliacao.md)). O app só envia o arquivo (`multipart/form-data`) e mostra o resumo; a leitura do OFX ou CSV e a reconciliação acontecem na API. A importação precisa de internet: ela não entra na fila offline.
 - **Open Finance pelo widget do Pluggy** ([ADR 0015](../docs/adr/0015-open-finance-pelo-pluggy-so-sandbox.md)). Dependência `pluggy-connect-sdk` (MIT, do Pluggy), fixa na 2.14.2 e carregada com `import()` só ao conectar, para não pesar na abertura do app. O `zoid`, que ela usa, é CommonJS e está em `allowedCommonJsDependencies`. As chaves do Pluggy ficam no servidor; o app recebe só o connect token de 30 minutos.
 - **Sem zone.js.** O Angular 22 detecta mudanças por signals. Por isso o envio lê o texto direto do campo, sem depender do estado do botão. Um Enter logo depois da digitação seria ignorado se dependesse de o `[disabled]` do botão já ter sido atualizado.
