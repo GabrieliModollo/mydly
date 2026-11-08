@@ -26,7 +26,8 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 
 ## Ideias soltas (não priorizadas)
 
-- Nenhuma no momento: as ideias anteriores viraram as etapas 14 a 22.
+- **Boas-vindas que explicam o app**: ao entrar, uma explicação curta e fácil de ler de como o app funciona, no tom de "Aqui você pode simplesmente falar o que você fez: 'Fui à academia' :)".
+- **Easter eggs com rank**: easter eggs divertidos sobre rotinas e bons hábitos espalhados pelo app, com um sistema de rank para quem encontrar.
 
 ## Concluído
 
