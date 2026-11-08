@@ -36,7 +36,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * {@code Authorization: Bearer}. O token é um JWT assinado com HS256 pela própria API, que é ao mesmo
  * tempo quem emite e quem confere, então um segredo simétrico basta.
  *
- * <p>Sem cookie não há CSRF a proteger. Ficam abertos só o login, a saúde da aplicação e o Swagger.
+ * <p>Sem cookie não há CSRF a proteger. Ficam abertos só o login, o cadastro (ADR 0018), a saúde da aplicação e o Swagger.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AuthProperties.class)
@@ -53,6 +53,7 @@ class SecurityConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/error").permitAll()

@@ -6,7 +6,7 @@ API do MyDly em Java 21 + Spring Boot, organizada como monólito modular com Spr
 
 | Pacote | Responsabilidade |
 | --- | --- |
-| `com.mydly.accounts` | Usuários, login e token de acesso (JWT) |
+| `com.mydly.accounts` | Usuários, cadastro, login e token de acesso (JWT) |
 | `com.mydly.entries` | Lançamentos em texto livre e interpretação |
 | `com.mydly.finance` | Transações, categorias, orçamentos |
 | `com.mydly.routines` | Hábitos, registros diários, metas |
@@ -38,7 +38,7 @@ O Open Finance usa o Pluggy só quando `OPEN_FINANCE_CLIENT_ID` e `OPEN_FINANCE_
 
 O parser usa um LLM de fallback (Claude) só quando `LLM_API_KEY` está definida; sem ela, só as regras locais ([ADR 0013](../docs/adr/0013-llm-de-fallback-com-claude.md)). Os testes nunca chamam a API: o cliente é simulado.
 
-A API pede login ([ADR 0012](../docs/adr/0012-login-com-jwt-e-dados-por-usuario.md)). Entre com `POST /api/v1/auth/login` (usuário `demo`, senha `demo`) e mande o `accessToken` no header `Authorization: Bearer`; no Swagger, pelo botão Authorize. Sem `MYDLY_JWT_SECRET`, a API gera um segredo a cada subida, e os tokens deixam de valer quando ela reinicia.
+A API pede login ([ADR 0012](../docs/adr/0012-login-com-jwt-e-dados-por-usuario.md)). Entre com `POST /api/v1/auth/login` (usuário `demo`, senha `demo`), ou crie uma conta com `POST /api/v1/auth/register` ([ADR 0018](../docs/adr/0018-cadastro-de-conta.md)), que devolve o mesmo token, e mande o `accessToken` no header `Authorization: Bearer`; no Swagger, pelo botão Authorize. Sem `MYDLY_JWT_SECRET`, a API gera um segredo a cada subida, e os tokens deixam de valer quando ela reinicia.
 
 Para subir tudo em containers: `docker compose up --build` na raiz.
 

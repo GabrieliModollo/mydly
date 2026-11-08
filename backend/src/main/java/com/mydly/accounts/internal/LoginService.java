@@ -59,7 +59,8 @@ public class LoginService {
         return accounts.findById(id);
     }
 
-    private Token issue(Account account) {
+    /** Emite o token de uma conta; o cadastro usa para a pessoa já entrar. */
+    Token issue(Account account) {
         Instant now = clock.instant();
         Instant expiresAt = now.plus(properties.tokenTtl());
         JwtClaimsSet claims = JwtClaimsSet.builder()

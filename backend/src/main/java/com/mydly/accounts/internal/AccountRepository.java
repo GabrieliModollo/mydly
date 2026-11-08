@@ -33,7 +33,7 @@ public class AccountRepository {
                 .optional();
     }
 
-    /** Cria um usuário. Ainda não há cadastro pela API; os testes usam para ter um segundo usuário. */
+    /** Cria um usuário. Quem cadastra é o {@link RegistrationService}, que confere o nome e a senha antes. */
     public Account create(String username, String passwordHash) {
         Account account = new Account(UUID.randomUUID(), normalize(username), passwordHash);
         jdbc.sql("INSERT INTO app_user (id, username, password_hash) VALUES (:id, :username, :hash)")

@@ -24,8 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Login com usuário e senha (ADR 0012). Ainda não há cadastro: existe o usuário {@code demo}, criado
- * pela migração.
+ * Login com usuário e senha (ADR 0012). As contas vêm do cadastro ({@link RegistrationController}) e
+ * o usuário {@code demo} vem da migração.
  */
 @RestController
 @RequestMapping("/api/v1/auth")
