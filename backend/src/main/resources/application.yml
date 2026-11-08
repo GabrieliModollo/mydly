@@ -31,6 +31,10 @@ springdoc:
     path: /swagger-ui.html
 
 mydly:
+  open-finance:
+    # Chaves do time no Pluggy, só sandbox (ADR 0015). Vazias: o Open Finance fica desligado.
+    client-id: ${OPEN_FINANCE_CLIENT_ID:}
+    client-secret: ${OPEN_FINANCE_CLIENT_SECRET:}
   llm:
     # Chave da API da Anthropic para o LLM de fallback do parser (ADR 0013). Vazia: só regras locais.
     api-key: ${LLM_API_KEY:}
