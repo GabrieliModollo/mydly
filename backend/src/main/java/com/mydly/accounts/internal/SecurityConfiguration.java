@@ -4,6 +4,7 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.util.List;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
@@ -26,6 +27,9 @@ import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * Segurança da API (ADR 0012): sem sessão e sem cookie, cada pedido traz o token no header
@@ -45,6 +49,7 @@ class SecurityConfiguration {
     SecurityFilterChain api(HttpSecurity http) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
@@ -54,6 +59,24 @@ class SecurityConfiguration {
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))
                 .build();
+    }
+
+    /**
+     * CORS só para o app nativo (ADR 0016): no Capacitor, a página vem de {@code https://localhost}
+     * (Android) ou {@code capacitor://localhost} (iOS), e a API está em outro endereço. Na web, o app e a
+     * API ficam na mesma origem e o CORS nem entra em jogo. Sem cookie: o token vai no header.
+     */
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(AuthProperties properties) {
+        CorsConfiguration cors = new CorsConfiguration();
+        cors.setAllowedOrigins(properties.allowedOrigins());
+        cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "If-Match"));
+        cors.setExposedHeaders(List.of("ETag", "Location"));
+        cors.setAllowCredentials(false);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", cors);
+        return source;
     }
 
     @Bean
