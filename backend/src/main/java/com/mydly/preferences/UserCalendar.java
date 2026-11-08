@@ -14,7 +14,10 @@ import org.springframework.stereotype.Service;
 public class UserCalendar {
 
     /** Fuso do usuário até existir fuso por usuário; o mesmo da listagem de lançamentos. */
-    public static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
+    /** O fuso como texto, para anotações como o {@code zone} de uma tarefa agendada. */
+    public static final String ZONE_ID = "America/Sao_Paulo";
+
+    public static final ZoneId ZONE = ZoneId.of(ZONE_ID);
 
     private final Clock clock;
 

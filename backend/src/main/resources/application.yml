@@ -31,6 +31,10 @@ springdoc:
     path: /swagger-ui.html
 
 mydly:
+  notifications:
+    fcm:
+      # JSON da conta de serviço do projeto Firebase (ADR 0016). Vazio: nenhum push é enviado.
+      service-account-file: ${FCM_SERVICE_ACCOUNT_FILE:}
   open-finance:
     # Chaves do time no Pluggy, só sandbox (ADR 0015). Vazias: o Open Finance fica desligado.
     client-id: ${OPEN_FINANCE_CLIENT_ID:}

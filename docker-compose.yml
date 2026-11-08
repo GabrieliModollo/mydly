@@ -28,6 +28,8 @@ services:
       MYDLY_JWT_SECRET: ${MYDLY_JWT_SECRET:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       OPEN_FINANCE_CLIENT_ID: ${OPEN_FINANCE_CLIENT_ID:-}
+      # Caminho dentro do container; monte o JSON do Firebase em um volume para usar.
+      FCM_SERVICE_ACCOUNT_FILE: ${FCM_SERVICE_ACCOUNT_FILE:-}
       OPEN_FINANCE_CLIENT_SECRET: ${OPEN_FINANCE_CLIENT_SECRET:-}
     ports:
       - "8080:8080"
