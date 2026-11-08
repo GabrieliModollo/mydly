@@ -1,0 +1,49 @@
+@if (enabled()) {
+  <section class="card" aria-labelledby="open-finance-title">
+    <h2 id="open-finance-title" class="card__title">Conectar banco (teste)</h2>
+    <p class="card__note">
+      Conecte um banco de teste pelo Pluggy, com dados fictícios, para ver o Open Finance funcionando. Só bancos de teste
+      são aceitos. As transações entram como as do extrato: nada conta duas vezes.
+    </p>
+
+    @if (connections().length > 0) {
+      <ul class="rows" aria-label="Bancos conectados">
+        @for (connection of connections(); track connection.id) {
+          <li class="row">
+            <div class="row__main">
+              <span class="row__description">{{ connection.institution ?? 'Banco conectado' }}</span>
+            </div>
+            <span class="row__status">{{ connectionStatusLabel(connection) }} · {{ lastSyncLabel(connection) }}</span>
+            <div class="row__details">
+              <button
+                type="button"
+                class="link-button link-button--start"
+                [disabled]="busy() !== null"
+                [attr.aria-label]="label('Sincronizar', connection)"
+                (click)="sync(connection)"
+              >
+                {{ busy() === connection.id ? 'Sincronizando…' : 'Sincronizar' }}
+              </button>
+              <button
+                type="button"
+                class="link-button"
+                [disabled]="busy() !== null"
+                [attr.aria-label]="label('Desconectar', connection)"
+                (click)="disconnect(connection)"
+              >
+                Desconectar
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+
+    <button type="button" class="secondary" [disabled]="busy() !== null" (click)="connect()">
+      {{ busy() === 'connect' ? 'Conectando…' : 'Conectar banco de teste' }}
+    </button>
+
+    <p class="summary" role="status">{{ message() }}</p>
+    <p class="error" role="alert">{{ error() }}</p>
+  </section>
+}

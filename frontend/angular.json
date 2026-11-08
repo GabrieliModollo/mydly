@@ -26,6 +26,7 @@
           "options": {
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
+            "allowedCommonJsDependencies": ["zoid"],
             "inlineStyleLanguage": "scss",
             "assets": [
               {

@@ -8,16 +8,18 @@ import { ImportedTransaction } from '../entries/import.models';
 import { ImportsApi } from '../entries/imports-api';
 import { AppNav } from '../nav/app-nav';
 import { amountChip, importErrorMessage, importSummary, shortDate, statusLabel } from './import-format';
+import { OpenFinanceCard } from './open-finance-card';
 
 type LoadState = 'loading' | 'loaded' | 'error';
 
 /**
- * Tela "Extrato" (docs/design.md, ADR 0014): envia o extrato OFX ou CSV do banco e mostra as
- * transações importadas, com o que cada uma faz nos números e a opção de não contar.
+ * Tela "Extrato" (docs/design.md, ADR 0014 e ADR 0015): envia o extrato OFX ou CSV do banco, conecta
+ * um banco de teste pelo Open Finance e mostra as transações importadas, com o que cada uma faz nos
+ * números e a opção de não contar.
  */
 @Component({
   selector: 'app-imports',
-  imports: [AppNav, IonContent, IonFooter, IonHeader, IonIcon, IonSpinner, IonToolbar, RouterLink],
+  imports: [AppNav, IonContent, IonFooter, IonHeader, IonIcon, IonSpinner, IonToolbar, OpenFinanceCard, RouterLink],
   templateUrl: './imports.page.html',
   styleUrl: './imports.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

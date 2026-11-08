@@ -43,6 +43,8 @@ src/app/
 │   ├── outbox-storage.ts   # leitura e gravação da fila no localStorage
 │   ├── connectivity.ts     # rede do aparelho (eventos online/offline e volta para a frente)
 │   ├── imports-api.ts      # importação de extrato e as transações importadas
+│   ├── open-finance-api.ts # Open Finance: connect token, conexões, sincronizar e desconectar
+│   ├── pluggy-widget.ts    # o widget Pluggy Connect, carregado só quando vai ser aberto
 │   ├── import.models.ts    # tipos da importação
 │   ├── entry-format.ts     # texto dos chips e resumo do dia (funções puras)
 │   └── random-id.ts        # UUID do lançamento, com alternativa fora de HTTPS
@@ -50,7 +52,7 @@ src/app/
 ├── today/                  # tela "Hoje" e o formato da data do cabeçalho
 ├── summary/                # tela "Resumo" e a formatação da semana
 ├── goals/                  # aba "Metas", os painéis de meta e de limite e a formatação (funções puras)
-├── imports/                # tela "Extrato": importação de OFX ou CSV e a formatação (funções puras)
+├── imports/                # tela "Extrato": importação de OFX ou CSV, cartão de Open Finance e a formatação (funções puras)
 └── nav/                    # barra de navegação inferior (Hoje, Resumo, Metas)
 src/theme/variables.css     # tokens do design.md: cores, fontes, tema escuro
 ```
@@ -61,6 +63,7 @@ src/theme/variables.css     # tokens do design.md: cores, fontes, tema escuro
 - **Fila offline no aparelho** ([ADR 0011](../docs/adr/0011-fila-offline-no-aparelho.md)). Sem rede, ou se o envio falhar por rede ou erro do servidor, o lançamento fica no `localStorage` como "Guardado no aparelho." e é enviado sozinho: quando a rede volta, quando o app volta para a frente, ao abrir o app e 30 segundos depois de uma falha. Vai um por vez, do mais antigo ao mais novo, e "Enviar agora" força a tentativa. Duas abas abertas não apagam a fila uma da outra. Só lançamentos novos entram na fila; confirmar um item ainda precisa de conexão.
 - **Login com o token guardado no aparelho** ([ADR 0012](../docs/adr/0012-login-com-jwt-e-dados-por-usuario.md)). A sessão (token, validade e usuário) fica no `localStorage` para o app abrir logado e lançar offline. Um 401 da API encerra a sessão e leva ao login; o lançamento que recebeu o 401 continua guardado e sai depois do login. A fila offline é de um usuário por vez: entrar com outra pessoa descarta a fila anterior, e "Sair" (aba Metas) apaga a fila de quem sai, com confirmação se há algo não enviado.
 - **Extrato pelo servidor** ([ADR 0014](../docs/adr/0014-importacao-de-extrato-e-reconciliacao.md)). O app só envia o arquivo (`multipart/form-data`) e mostra o resumo; a leitura do OFX ou CSV e a reconciliação acontecem na API. A importação precisa de internet: ela não entra na fila offline.
+- **Open Finance pelo widget do Pluggy** ([ADR 0015](../docs/adr/0015-open-finance-pelo-pluggy-so-sandbox.md)). Dependência `pluggy-connect-sdk` (MIT, do Pluggy), fixa na 2.14.2 e carregada com `import()` só ao conectar, para não pesar na abertura do app. O `zoid`, que ela usa, é CommonJS e está em `allowedCommonJsDependencies`. As chaves do Pluggy ficam no servidor; o app recebe só o connect token de 30 minutos.
 - **Sem zone.js.** O Angular 22 detecta mudanças por signals. Por isso o envio lê o texto direto do campo, sem depender do estado do botão. Um Enter logo depois da digitação seria ignorado se dependesse de o `[disabled]` do botão já ter sido atualizado.
 - **Fontes servidas pelo próprio app** (Space Grotesk nos títulos e números, Inter no texto, via `@fontsource-variable`). Elas funcionam offline e não enviam o IP de quem usa o app ao Google Fonts (LGPD).
 - **Visual do [`design.md`](../docs/design.md), no modo `md` em todas as plataformas.** Saída é laranja e entrada é azul, nunca vermelho e verde, o par mais difícil para quem tem daltonismo. O rótulo sempre diz o tipo por escrito. O tema escuro deriva do claro com a mesma lógica de cor. Todo texto passa o contraste AA do WCAG nos dois temas, e a borda do campo passa os 3:1 exigidos para controles.

@@ -5,6 +5,7 @@ import { provideIonicAngular } from '@ionic/angular';
 import { Observable, of, throwError } from 'rxjs';
 import { ImportedTransaction, ImportResponse } from '../entries/import.models';
 import { ImportsApi } from '../entries/imports-api';
+import { OpenFinanceApi } from '../entries/open-finance-api';
 import { ImportsPage } from './imports.page';
 
 const IMPORTED: ImportedTransaction = {
@@ -37,6 +38,7 @@ describe('ImportsPage', () => {
       providers: [
         provideIonicAngular({ mode: 'md' }),
         provideRouter([]),
+        { provide: OpenFinanceApi, useValue: { status: () => of({ enabled: false, connections: [] }) } },
         {
           provide: ImportsApi,
           useValue: {

@@ -41,6 +41,8 @@
       <p class="error" role="alert">{{ error() }}</p>
     </form>
 
+    <app-open-finance-card (imported)="load()" />
+
     <section class="card" aria-labelledby="list-title">
       <h2 id="list-title" class="card__title">Últimos 60 dias</h2>
       @switch (loadState()) {

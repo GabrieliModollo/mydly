@@ -256,3 +256,31 @@ button:focus-visible {
   outline: 3px solid var(--mydly-focus);
   outline-offset: 2px;
 }
+
+// Botão de contorno do cartão de Open Finance, abaixo da ação principal da tela.
+.secondary {
+  min-height: 52px;
+  border: 1px solid var(--mydly-ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--mydly-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:disabled {
+    border-color: var(--mydly-line);
+    color: var(--mydly-muted);
+    cursor: progress;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--mydly-focus);
+    outline-offset: 2px;
+  }
+}
+
+.link-button--start {
+  margin-left: 0;
+}
