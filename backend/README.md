@@ -36,9 +36,11 @@ O push sai pelo Firebase Cloud Messaging só quando `FCM_SERVICE_ACCOUNT_FILE` a
 
 O Open Finance usa o Pluggy só quando `OPEN_FINANCE_CLIENT_ID` e `OPEN_FINANCE_CLIENT_SECRET` estão definidos ([ADR 0015](../docs/adr/0015-open-finance-pelo-pluggy-so-sandbox.md)). Os testes simulam a API do Pluggy.
 
-O parser usa um LLM de fallback (Claude) só quando `LLM_API_KEY` está definida; sem ela, só as regras locais ([ADR 0013](../docs/adr/0013-llm-de-fallback-com-claude.md)). Os testes nunca chamam a API: o cliente é simulado.
+O parser usa um LLM de fallback (Claude) só quando `LLM_API_KEY` está definida; sem ela, só as regras locais ([ADR 0013](../docs/adr/0013-llm-de-fallback-com-claude.md)). Os testes nunca chamam a API: o cliente é simulado. Cada usuário tem 30 chamadas por dia, e todos somados 300 (`LLM_DAILY_LIMIT_PER_USER` e `LLM_DAILY_LIMIT_TOTAL`); sem vaga, fica o que as regras entenderam ([ADR 0017](../docs/adr/0017-demonstracao-segura.md)).
 
-A API pede login ([ADR 0012](../docs/adr/0012-login-com-jwt-e-dados-por-usuario.md)). Entre com `POST /api/v1/auth/login` (usuário `demo`, senha `demo`), ou crie uma conta com `POST /api/v1/auth/register` ([ADR 0018](../docs/adr/0018-cadastro-de-conta.md)), que devolve o mesmo token, e mande o `accessToken` no header `Authorization: Bearer`; no Swagger, pelo botão Authorize. Sem `MYDLY_JWT_SECRET`, a API gera um segredo a cada subida, e os tokens deixam de valer quando ela reinicia.
+A API pede login ([ADR 0012](../docs/adr/0012-login-com-jwt-e-dados-por-usuario.md)). Entre com `POST /api/v1/auth/login` (usuário `demo`, senha `demo`), ou crie uma conta com `POST /api/v1/auth/register` ([ADR 0018](../docs/adr/0018-cadastro-de-conta.md)), que devolve o mesmo token, e mande o `accessToken` no header `Authorization: Bearer`; no Swagger, pelo botão Authorize. Sem `MYDLY_JWT_SECRET`, a API gera um segredo a cada subida, e os tokens deixam de valer quando ela reinicia. Cinco senhas erradas para um usuário, ou vinte de um mesmo endereço, em 15 minutos, bloqueiam o login até a janela acabar (429 com `Retry-After`); o usuário `demo`, de senha pública, só tem o limite por endereço.
+
+`MYDLY_DEMO_RESET=true` volta o usuário `demo` ao exemplo ao subir e todo dia às 4h de São Paulo: três semanas de lançamentos, metas e limites, e o resto dele apagado. Só para a demonstração publicada: no computador de quem desenvolve, apaga o que estiver no demo ([ADR 0017](../docs/adr/0017-demonstracao-segura.md)).
 
 Para subir tudo em containers: `docker compose up --build` na raiz.
 

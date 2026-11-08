@@ -130,8 +130,8 @@ flowchart LR
 
 | Módulo | Responsabilidade |
 | --- | --- |
-| `accounts` | Usuários, cadastro, login com senha e o token de acesso; diz aos controladores quem fez o pedido (`CurrentUser`) |
-| `entries` | Recebe o texto bruto, guarda sempre o original e coordena a interpretação |
+| `accounts` | Usuários, cadastro, login com senha, limite de tentativas e o token de acesso; diz aos controladores quem fez o pedido (`CurrentUser`) e publica o `DemoReset`, que cada módulo escuta para voltar o usuário demo ao exemplo |
+| `entries` | Recebe o texto bruto, guarda sempre o original e coordena a interpretação, com a cota diária do LLM por usuário |
 | `finance` | Transações, categorias, orçamentos |
 | `routines` | Hábitos, registros diários, metas |
 | `preferences` | Preferências do usuário (dia de início da semana) e o calendário dele (fuso e hoje) |
@@ -276,6 +276,7 @@ erDiagram
 - `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`). Uma transação importada que não casou com um lançamento conta como uma linha com `source = STATEMENT_IMPORT`, o id dela em `entry_id` e `item_index` zero.
 - `EXTERNAL_TRANSACTION` é do módulo `integrations`: cada linha de extrato importada, única por usuário, origem e id externo, com o status `IMPORTED` (conta nos números), `MATCHED` (ligada ao lançamento manual em `matched_entry_id`, não conta de novo) ou `IGNORED`. A reconciliação acontece na importação e, no outro sentido, quando um lançamento é aceito ou retirado depois ([ADR 0014](adr/0014-importacao-de-extrato-e-reconciliacao.md)).
 - `NOTIFICATION_DEVICE`, `notification_settings` e `notification_sent` são do módulo `notifications`: os aparelhos que recebem push (o token do Firebase é a chave, e passa para quem entrar no app por último), o que cada usuário quer receber e o que já foi enviado, para cada notificação sair uma vez só ([ADR 0016](adr/0016-apps-nativos-e-notificacoes-push.md)).
+- `llm_usage` é do módulo `entries`: quantas chamadas ao LLM cada usuário fez em cada dia de São Paulo, para a cota diária. Guarda só a contagem ([ADR 0017](adr/0017-demonstracao-segura.md)).
 - `OPEN_FINANCE_CONNECTION` é do módulo `integrations`: cada banco de teste conectado pelo Pluggy (o "item" dele), único no MyDly, com o status do item e a última sincronização. As transações dele entram por `EXTERNAL_TRANSACTION` com `source = OPEN_FINANCE` ([ADR 0015](adr/0015-open-finance-pelo-pluggy-so-sandbox.md)).
 
 ## App (frontend)
@@ -309,7 +310,8 @@ O app guarda dados financeiros e dados que podem ser de saúde (sono, dieta). Po
 - consentimento explícito no cadastro;
 - criptografia dos campos sensíveis em repouso;
 - exportação e exclusão de conta;
-- só o texto do lançamento vai para o LLM, sem identificar o usuário, e só quando as regras não o entenderam e há chave configurada;
+- só o texto do lançamento vai para o LLM, sem identificar o usuário, e só quando as regras não o entenderam e há chave configurada; a cota diária conta as chamadas por usuário, sem guardar o texto;
+- a demonstração publicada volta ao exemplo todo dia, e o que um visitante escreveu nela não fica mais que um dia;
 - "Sair" também tira o aparelho das notificações, e um aparelho só recebe as do usuário logado nele;
 - o texto de um lançamento fica no aparelho só até ser enviado, e "Sair" apaga a fila de quem sai;
 - só o hash BCrypt da senha fica no banco, e nem o nome de login nem a senha vão para log;

@@ -45,11 +45,26 @@ mydly:
     model: claude-opus-5-5
     # Quanto o lançamento espera o LLM antes de seguir com o que as regras entenderam.
     timeout: PT15S
+    # Cota de chamadas por dia, no fuso de São Paulo (ADR 0017). Sem vaga, fica o que as regras entenderam.
+    daily-limit:
+      per-user: ${LLM_DAILY_LIMIT_PER_USER:30}
+      total: ${LLM_DAILY_LIMIT_TOTAL:300}
   auth:
     # Segredo dos tokens (HS256), com pelo menos 32 bytes. Vazio gera um aleatório a cada subida, e os
     # tokens deixam de valer quando a aplicação reinicia (ADR 0012).
     jwt-secret: ${MYDLY_JWT_SECRET:}
     token-ttl: P7D
+    # Senhas erradas antes do bloqueio, que dura até a janela acabar (ADR 0017). Responde 429 com Retry-After.
+    login-limit:
+      max-failures-per-user: 5
+      max-failures-per-address: 20
+      window: PT15M
+  demo:
+    # Volta o usuário demo ao exemplo ao subir e todo dia às 4h de São Paulo (ADR 0017). Desligado por
+    # padrão: apaga tudo o que estiver no usuário demo. Ligue só na demonstração publicada.
+    reset-enabled: ${MYDLY_DEMO_RESET:false}
+    username: demo
+    reset-cron: "0 0 4 * * *"
   # O dia de início da semana é preferência do usuário, na tabela preferences (ADR 0010).
   events:
     # Nova tentativa dos eventos entre módulos que ficaram sem concluir (ADR 0008).
