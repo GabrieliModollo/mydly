@@ -4,7 +4,7 @@
 
 O MyDly é um **monólito modular** em Java + Spring Boot, com um app web e mobile que funciona offline e sincroniza depois. Cada módulo tem fronteira própria e se comunica com os outros por eventos de domínio, o que permite extrair um módulo para um serviço separado no futuro sem reescrever o resto.
 
-Toda a API, menos o login, exige um token de acesso (JWT) emitido pela própria API, e cada dado tem dono: um usuário só vê e muda o que é seu ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)).
+Toda a API, menos o login e o cadastro, exige um token de acesso (JWT) emitido pela própria API, e cada dado tem dono: um usuário só vê e muda o que é seu ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)). Qualquer pessoa cria uma conta, que começa vazia ([ADR 0018](adr/0018-cadastro-de-conta.md)).
 
 ## Fluxo de um lançamento
 
@@ -130,7 +130,7 @@ flowchart LR
 
 | Módulo | Responsabilidade |
 | --- | --- |
-| `accounts` | Usuários, login com senha e o token de acesso; diz aos controladores quem fez o pedido (`CurrentUser`) |
+| `accounts` | Usuários, cadastro, login com senha e o token de acesso; diz aos controladores quem fez o pedido (`CurrentUser`) |
 | `entries` | Recebe o texto bruto, guarda sempre o original e coordena a interpretação |
 | `finance` | Transações, categorias, orçamentos |
 | `routines` | Hábitos, registros diários, metas |
@@ -270,7 +270,7 @@ erDiagram
 - `Entry.item_state` guarda o estado e a revisão de cada item ([ADR 0008](adr/0008-eventos-com-registro-e-revisao-por-item.md)).
 - `TRANSACTION` é a tabela `finance_transaction`, e ela e `HABIT_LOG` têm uma linha por item de lançamento (`entry_id` + `item_index`), com `revision` e `active` para aplicar os eventos na ordem certa.
 - `Habit.polarity` diferencia hábitos bons ("dormi bem") de ruins ("pedi delivery 3x"), e `Habit.measure` diz se o hábito se mede em volume, em duração ou não se mede. Por enquanto o catálogo é fixo, criado por migração; hábitos do usuário (`USER`) entram depois.
-- `APP_USER` é do módulo `accounts`, e as outras tabelas guardam o dono em `user_id`, sem chave estrangeira entre módulos. Os dados que existiam antes do login são do usuário `demo`, criado pela migração ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)).
+- `APP_USER` é do módulo `accounts`, e as outras tabelas guardam o dono em `user_id`, sem chave estrangeira entre módulos. Os dados que existiam antes do login são do usuário `demo`, criado pela migração ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)); as outras contas vêm do cadastro, com o nome único e em minúsculas ([ADR 0018](adr/0018-cadastro-de-conta.md)).
 - `HABIT_GOAL` e `BUDGET` são versões: a chave é `(user_id, habit_code, valid_from)` e `(user_id, category, valid_from)`, e a versão vigente num dia é a de maior `valid_from` até ele. A versão de remoção tem `kind = NONE` na meta e período e limite nulos no orçamento ([ADR 0010](adr/0010-metas-e-orcamentos-versionados.md)).
 - `PREFERENCES` tem uma linha por usuário, criada quando ele muda algo; sem linha, a semana começa na segunda.
 - `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`). Uma transação importada que não casou com um lançamento conta como uma linha com `source = STATEMENT_IMPORT`, o id dela em `entry_id` e `item_index` zero.
@@ -296,7 +296,7 @@ flowchart LR
 
 - **App nativo.** O mesmo código vira os apps Android e iOS pelo Capacitor. Lá a página vem do aparelho, então um interceptador põe o endereço da API (`MYDLY_API_URL`, do build) na frente de `/api/...`, e a API aceita por CORS as origens `https://localhost` e `capacitor://localhost` ([ADR 0016](adr/0016-apps-nativos-e-notificacoes-push.md)).
 - **Open Finance.** O app pede ao servidor um connect token e abre o widget do Pluggy, que fala direto com o banco de teste; o servidor recebe só o id do item, confere que é de sandbox e do mesmo usuário, e importa ([ADR 0015](adr/0015-open-finance-pelo-pluggy-so-sandbox.md)).
-- **Login.** A tela de login troca usuário e senha por um token, guardado no aparelho com a validade. Um interceptador põe o token em todo pedido à API, e um 401 encerra a sessão e leva ao login ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)).
+- **Login e cadastro.** A tela de login troca usuário e senha por um token, guardado no aparelho com a validade; a de cadastro (`/cadastro`) cria a conta e devolve o mesmo token, e a pessoa já entra ([ADR 0018](adr/0018-cadastro-de-conta.md)). Um interceptador põe o token em todo pedido à API, e um 401 encerra a sessão e leva ao login ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)).
 - **Mesma origem.** O app chama `/api/...`. No desenvolvimento, o proxy do `ng serve` encaminha ao `localhost:8080`; no `docker compose`, o nginx que serve o app encaminha ao backend. Não há CORS.
 - **Envio otimista.** O lançamento aparece na lista como "Enviando…" com o id e a data gerados no app. Se a rede falhar, o reenvio usa o mesmo id, e a API não duplica ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)).
 - **Fila offline.** Sem rede, ou com o servidor fora, o lançamento fica no `localStorage` do aparelho (`mydly.outbox.v1`) e é enviado quando a conexão volta, ao abrir o app e 30 segundos depois de uma falha, um por vez e do mais antigo ao mais novo. O parser continua só no servidor: um lançamento guardado aparece sem chips até ser enviado ([ADR 0011](adr/0011-fila-offline-no-aparelho.md)).
