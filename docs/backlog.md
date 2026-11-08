@@ -8,13 +8,13 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 
 | # | Etapa | Escopo | Notas |
 | --- | --- | --- | --- |
-| — | Nenhuma | A próxima é a etapa 13 | |
+| — | Nenhuma | Todas as etapas planejadas foram concluídas; as próximas saem das ideias abaixo | |
 
 ## Próximas
 
 | # | Prioridade | Etapa | Escopo | Por que agora |
 | --- | --- | --- | --- | --- |
-| 13 | Baixa | Apps Android e iOS | Build com Capacitor, notificações push | Depois que o fluxo web estiver redondo |
+| — | — | Nenhuma etapa planejada | Escolher nas ideias soltas | |
 
 ## Ideias soltas (não priorizadas)
 
@@ -33,6 +33,9 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 - Guardar a revisão do item na ligação da reconciliação, para ignorar eventos antigos reenviados fora de ordem.
 - Sincronização automática do Open Finance (agendada ou pelo webhook do Pluggy) e aviso de "reconecte o banco" fora da tela Extrato.
 - Conferir o Open Finance contra o sandbox do Pluggy de verdade, com as chaves do time.
+- Push no iOS: num Mac, adicionar o SDK do Firebase ao projeto iOS para trocar o token do APNs pelo do Firebase, ligar a capacidade Push Notifications e compilar.
+- Conferir o push de ponta a ponta com um projeto Firebase (o `google-services.json` no app e a conta de serviço no backend).
+- Ícone e tela de abertura do MyDly nos apps (hoje são os padrões do Capacitor), e o build de release assinado.
 
 ## Concluído
 

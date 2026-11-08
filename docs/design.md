@@ -83,8 +83,9 @@ Chip "Precisa confirmar", título "Quanto foi?", a frase original, campo de valo
 3. Cartão "Orçamentos": as categorias fixas com o limite ("R$ 100,00 por semana") ou "Sem limite", uma barra de 8 px (verde-água abaixo de 80%, laranja a partir dele) com `role="progressbar"` e o gasto por escrito ("R$ 85,00 de R$ 100,00 · 85%, perto do limite").
 4. Cartão "Semana": `select` com label "Início da semana" e a nota de que as semanas passadas também passam a ser contadas assim.
 5. Cartão "Extrato do banco", com a explicação curta e o link "Importar extrato", que abre a tela Extrato.
-6. Cartão "Conta", sempre presente: "Você entrou como demo." e o link "Sair". Com lançamentos guardados no aparelho, "Sair" mostra antes o aviso no laranja das saídas ("2 lançamentos ainda não foram enviados. Sair apaga esses lançamentos deste aparelho.", `role="alert"`) com "Sair mesmo assim" e "Cancelar".
-7. Estados vazios explicativos ("Nenhuma meta ainda. Escolha um hábito, como 2 L de água por dia ...", "Nenhum limite ainda. ... o MyDly avisa quando o gasto chega a 80%"). Depois de salvar, uma região `role="status"` anuncia "Meta de Hidratação salva.".
+6. Cartão "Notificações", só no app Android e iOS: a explicação curta e o link "Ativar notificações", que pede a permissão do sistema. Ativado, mostra as três caixas de seleção, cada uma com o rótulo (15 px 600, alvo de 44 px) e a dica ligada por `aria-describedby` ("Quando uma categoria chega a 80% do limite e quando passa dele.", "Às 21h, se você não lançou nada no dia.", "No último dia da semana, à noite, no tom que você escolheu."), e o link "Desativar neste aparelho". A permissão negada e a falha ao salvar aparecem no laranja das saídas (`role="alert"`).
+7. Cartão "Conta", sempre presente: "Você entrou como demo." e o link "Sair". Com lançamentos guardados no aparelho, "Sair" mostra antes o aviso no laranja das saídas ("2 lançamentos ainda não foram enviados. Sair apaga esses lançamentos deste aparelho.", `role="alert"`) com "Sair mesmo assim" e "Cancelar".
+8. Estados vazios explicativos ("Nenhuma meta ainda. Escolha um hábito, como 2 L de água por dia ...", "Nenhum limite ainda. ... o MyDly avisa quando o gasto chega a 80%"). Depois de salvar, uma região `role="status"` anuncia "Meta de Hidratação salva.".
 
 ### Extrato
 

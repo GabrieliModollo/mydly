@@ -137,7 +137,7 @@ flowchart LR
 | `preferences` | Preferências do usuário (dia de início da semana) e o calendário dele (fuso e hoje) |
 | `insights` | Estatísticas, streaks, cruzamentos rotina × finanças, mensagens |
 | `integrations` | Fontes externas de transação atrás da porta `TransactionSource` (extrato OFX e CSV, e Open Finance pelo Pluggy só no sandbox) e reconciliação com os lançamentos manuais |
-| `notifications` | Push e lembretes |
+| `notifications` | Push pelo Firebase: alerta de orçamento, lembrete do dia e resumo da semana, em tarefas agendadas que só leem APIs públicas |
 
 ## Modelo de dados (núcleo)
 
@@ -154,6 +154,7 @@ erDiagram
     APP_USER ||--o{ INSIGHT : recebe
     APP_USER ||--o{ EXTERNAL_TRANSACTION : importa
     APP_USER ||--o{ OPEN_FINANCE_CONNECTION : conecta
+    APP_USER ||--o{ NOTIFICATION_DEVICE : recebe
     EXTERNAL_TRANSACTION |o--o| TRANSACTION : "conta como (IMPORTED) ou casa com (MATCHED)"
 
     APP_USER {
@@ -248,6 +249,11 @@ erDiagram
         string status
         timestamp last_synced_at
     }
+    NOTIFICATION_DEVICE {
+        string token
+        uuid user_id
+        string platform
+    }
     INSIGHT {
         uuid id
         string kind
@@ -269,6 +275,7 @@ erDiagram
 - `PREFERENCES` tem uma linha por usuário, criada quando ele muda algo; sem linha, a semana começa na segunda.
 - `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`). Uma transação importada que não casou com um lançamento conta como uma linha com `source = STATEMENT_IMPORT`, o id dela em `entry_id` e `item_index` zero.
 - `EXTERNAL_TRANSACTION` é do módulo `integrations`: cada linha de extrato importada, única por usuário, origem e id externo, com o status `IMPORTED` (conta nos números), `MATCHED` (ligada ao lançamento manual em `matched_entry_id`, não conta de novo) ou `IGNORED`. A reconciliação acontece na importação e, no outro sentido, quando um lançamento é aceito ou retirado depois ([ADR 0014](adr/0014-importacao-de-extrato-e-reconciliacao.md)).
+- `NOTIFICATION_DEVICE`, `notification_settings` e `notification_sent` são do módulo `notifications`: os aparelhos que recebem push (o token do Firebase é a chave, e passa para quem entrar no app por último), o que cada usuário quer receber e o que já foi enviado, para cada notificação sair uma vez só ([ADR 0016](adr/0016-apps-nativos-e-notificacoes-push.md)).
 - `OPEN_FINANCE_CONNECTION` é do módulo `integrations`: cada banco de teste conectado pelo Pluggy (o "item" dele), único no MyDly, com o status do item e a última sincronização. As transações dele entram por `EXTERNAL_TRANSACTION` com `source = OPEN_FINANCE` ([ADR 0015](adr/0015-open-finance-pelo-pluggy-so-sandbox.md)).
 
 ## App (frontend)
@@ -287,6 +294,7 @@ flowchart LR
     Proxy --> Backend["API Spring Boot"]
 ```
 
+- **App nativo.** O mesmo código vira os apps Android e iOS pelo Capacitor. Lá a página vem do aparelho, então um interceptador põe o endereço da API (`MYDLY_API_URL`, do build) na frente de `/api/...`, e a API aceita por CORS as origens `https://localhost` e `capacitor://localhost` ([ADR 0016](adr/0016-apps-nativos-e-notificacoes-push.md)).
 - **Open Finance.** O app pede ao servidor um connect token e abre o widget do Pluggy, que fala direto com o banco de teste; o servidor recebe só o id do item, confere que é de sandbox e do mesmo usuário, e importa ([ADR 0015](adr/0015-open-finance-pelo-pluggy-so-sandbox.md)).
 - **Login.** A tela de login troca usuário e senha por um token, guardado no aparelho com a validade. Um interceptador põe o token em todo pedido à API, e um 401 encerra a sessão e leva ao login ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)).
 - **Mesma origem.** O app chama `/api/...`. No desenvolvimento, o proxy do `ng serve` encaminha ao `localhost:8080`; no `docker compose`, o nginx que serve o app encaminha ao backend. Não há CORS.
@@ -302,6 +310,7 @@ O app guarda dados financeiros e dados que podem ser de saúde (sono, dieta). Po
 - criptografia dos campos sensíveis em repouso;
 - exportação e exclusão de conta;
 - só o texto do lançamento vai para o LLM, sem identificar o usuário, e só quando as regras não o entenderam e há chave configurada;
+- "Sair" também tira o aparelho das notificações, e um aparelho só recebe as do usuário logado nele;
 - o texto de um lançamento fica no aparelho só até ser enviado, e "Sair" apaga a fila de quem sai;
 - só o hash BCrypt da senha fica no banco, e nem o nome de login nem a senha vão para log;
 - a fonte do app é servida por ele mesmo, sem chamadas a serviços de terceiros como o Google Fonts.

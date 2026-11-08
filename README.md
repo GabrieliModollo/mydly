@@ -38,11 +38,12 @@ flowchart LR
         routines["routines"]
         insights["insights"]
         integrations["integrations"]
-        notifications["notifications"]
+        notifications["notifications<br/>push"]
     end
     API --> API_MOD
     entries -->|"fallback, com chave"| LLM["Claude<br/>(API da Anthropic)"]
     integrations --> OF["Open Finance<br/>(Pluggy, só sandbox)"]
+    notifications --> FCM["Firebase Cloud Messaging"]
     API_MOD --> DB[("PostgreSQL")]
 ```
 
@@ -80,6 +81,20 @@ Abra o app em <http://localhost:8100> e toque em **Entrar na demonstração** (u
 Na aba **Metas**, o link **Importar extrato** recebe o extrato do banco em OFX ou CSV. Cada transação entra nos seus números uma vez só: o que você já lançou no app (mesmo valor, de um dia antes a três dias depois) fica ligado ao lançamento e não conta duas vezes, e importar o mesmo arquivo de novo não duplica nada. Uma transferência entre contas suas pode ser marcada como "Não contar" ([ADR 0014](docs/adr/0014-importacao-de-extrato-e-reconciliacao.md)).
 
 Na mesma tela, com as chaves de um time no [Pluggy](https://dashboard.pluggy.ai) em `OPEN_FINANCE_CLIENT_ID` e `OPEN_FINANCE_CLIENT_SECRET`, aparece **Conectar banco de teste**: o widget do Pluggy conecta o banco fictício do sandbox, e as transações dele entram pela mesma reconciliação. Só bancos de teste são aceitos ([ADR 0015](docs/adr/0015-open-finance-pelo-pluggy-so-sandbox.md)).
+
+### App Android e iOS
+
+O mesmo app roda no Android e no iOS pelo Capacitor ([ADR 0016](docs/adr/0016-apps-nativos-e-notificacoes-push.md)). Com o backend rodando no computador e o Android SDK instalado:
+
+```bash
+cd frontend
+npm run build:native          # API em http://10.0.2.2:8080, o computador visto do emulador
+cd android && ./gradlew assembleDebug
+```
+
+Num celular de verdade, use `MYDLY_API_URL=http://<IP do computador>:8080 npm run build:native`. O APK fica em `frontend/android/app/build/outputs/apk/debug/`. O projeto iOS (`frontend/ios`) abre no Xcode, num Mac.
+
+No app, a aba **Metas** ganha **Notificações**: alerta de orçamento (80% e acima do limite), lembrete às 21h quando nada foi lançado no dia e o resumo da semana no último dia dela. Elas saem pelo Firebase: crie um projeto, ponha o `google-services.json` em `frontend/android/app/` e aponte `FCM_SERVICE_ACCOUNT_FILE` para o JSON da conta de serviço. Sem isso, o app funciona igual, sem push.
 
 Por padrão, o parser usa só regras locais, e o que elas não entendem vira uma pergunta. Para que o Claude interprete essas frases ("gastei cinquenta reais na padaria"), defina `LLM_API_KEY` no `.env` com uma chave da API da Anthropic. Só o texto dos lançamentos duvidosos é enviado ([ADR 0013](docs/adr/0013-llm-de-fallback-com-claude.md)).
 
@@ -129,3 +144,4 @@ O detalhamento e a prioridade de cada etapa estão em [`docs/backlog.md`](docs/b
 | [0013](docs/adr/0013-llm-de-fallback-com-claude.md) | LLM de fallback com o Claude, só para o que as regras não entenderam |
 | [0014](docs/adr/0014-importacao-de-extrato-e-reconciliacao.md) | Importação de extrato OFX e CSV, com reconciliação nos dois sentidos |
 | [0015](docs/adr/0015-open-finance-pelo-pluggy-so-sandbox.md) | Open Finance pelo Pluggy, só no sandbox |
+| [0016](docs/adr/0016-apps-nativos-e-notificacoes-push.md) | Apps Android e iOS com Capacitor e notificações push pelo Firebase |
