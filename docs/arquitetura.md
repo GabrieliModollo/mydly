@@ -136,7 +136,7 @@ flowchart LR
 | `routines` | Hábitos, registros diários, metas |
 | `preferences` | Preferências do usuário (dia de início da semana) e o calendário dele (fuso e hoje) |
 | `insights` | Estatísticas, streaks, cruzamentos rotina × finanças, mensagens |
-| `integrations` | Fontes externas de transação atrás da porta `TransactionSource` (extrato OFX e CSV; Open Finance depois) e reconciliação com os lançamentos manuais |
+| `integrations` | Fontes externas de transação atrás da porta `TransactionSource` (extrato OFX e CSV, e Open Finance pelo Pluggy só no sandbox) e reconciliação com os lançamentos manuais |
 | `notifications` | Push e lembretes |
 
 ## Modelo de dados (núcleo)
@@ -153,6 +153,7 @@ erDiagram
     APP_USER ||--o| PREFERENCES : tem
     APP_USER ||--o{ INSIGHT : recebe
     APP_USER ||--o{ EXTERNAL_TRANSACTION : importa
+    APP_USER ||--o{ OPEN_FINANCE_CONNECTION : conecta
     EXTERNAL_TRANSACTION |o--o| TRANSACTION : "conta como (IMPORTED) ou casa com (MATCHED)"
 
     APP_USER {
@@ -239,6 +240,14 @@ erDiagram
         int matched_item_index
         bigint revision
     }
+    OPEN_FINANCE_CONNECTION {
+        uuid id
+        uuid user_id
+        string item_id
+        string institution
+        string status
+        timestamp last_synced_at
+    }
     INSIGHT {
         uuid id
         string kind
@@ -260,6 +269,7 @@ erDiagram
 - `PREFERENCES` tem uma linha por usuário, criada quando ele muda algo; sem linha, a semana começa na segunda.
 - `Transaction.source` registra a origem (`MANUAL`, `STATEMENT_IMPORT`, `OPEN_FINANCE`). Uma transação importada que não casou com um lançamento conta como uma linha com `source = STATEMENT_IMPORT`, o id dela em `entry_id` e `item_index` zero.
 - `EXTERNAL_TRANSACTION` é do módulo `integrations`: cada linha de extrato importada, única por usuário, origem e id externo, com o status `IMPORTED` (conta nos números), `MATCHED` (ligada ao lançamento manual em `matched_entry_id`, não conta de novo) ou `IGNORED`. A reconciliação acontece na importação e, no outro sentido, quando um lançamento é aceito ou retirado depois ([ADR 0014](adr/0014-importacao-de-extrato-e-reconciliacao.md)).
+- `OPEN_FINANCE_CONNECTION` é do módulo `integrations`: cada banco de teste conectado pelo Pluggy (o "item" dele), único no MyDly, com o status do item e a última sincronização. As transações dele entram por `EXTERNAL_TRANSACTION` com `source = OPEN_FINANCE` ([ADR 0015](adr/0015-open-finance-pelo-pluggy-so-sandbox.md)).
 
 ## App (frontend)
 
@@ -277,6 +287,7 @@ flowchart LR
     Proxy --> Backend["API Spring Boot"]
 ```
 
+- **Open Finance.** O app pede ao servidor um connect token e abre o widget do Pluggy, que fala direto com o banco de teste; o servidor recebe só o id do item, confere que é de sandbox e do mesmo usuário, e importa ([ADR 0015](adr/0015-open-finance-pelo-pluggy-so-sandbox.md)).
 - **Login.** A tela de login troca usuário e senha por um token, guardado no aparelho com a validade. Um interceptador põe o token em todo pedido à API, e um 401 encerra a sessão e leva ao login ([ADR 0012](adr/0012-login-com-jwt-e-dados-por-usuario.md)).
 - **Mesma origem.** O app chama `/api/...`. No desenvolvimento, o proxy do `ng serve` encaminha ao `localhost:8080`; no `docker compose`, o nginx que serve o app encaminha ao backend. Não há CORS.
 - **Envio otimista.** O lançamento aparece na lista como "Enviando…" com o id e a data gerados no app. Se a rede falhar, o reenvio usa o mesmo id, e a API não duplica ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)).

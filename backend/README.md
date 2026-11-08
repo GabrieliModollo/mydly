@@ -12,7 +12,7 @@ API do MyDly em Java 21 + Spring Boot, organizada como monólito modular com Spr
 | `com.mydly.routines` | Hábitos, registros diários, metas |
 | `com.mydly.preferences` | Preferências do usuário e o calendário dele |
 | `com.mydly.insights` | Estatísticas, streaks, mensagens |
-| `com.mydly.integrations` | Importação de extrato OFX e CSV (e Open Finance depois) e reconciliação com os lançamentos |
+| `com.mydly.integrations` | Importação de extrato OFX e CSV, Open Finance pelo Pluggy (só sandbox) e reconciliação com os lançamentos |
 | `com.mydly.notifications` | Push e lembretes |
 
 As fronteiras são verificadas pelo teste `ModularityTests`, que também gera a documentação dos módulos em `target/spring-modulith-docs`.
@@ -31,6 +31,8 @@ mvn spring-boot:run
 ```
 
 Saúde da aplicação: <http://localhost:8080/actuator/health>. API e exemplos: <http://localhost:8080/swagger-ui.html>.
+
+O Open Finance usa o Pluggy só quando `OPEN_FINANCE_CLIENT_ID` e `OPEN_FINANCE_CLIENT_SECRET` estão definidos ([ADR 0015](../docs/adr/0015-open-finance-pelo-pluggy-so-sandbox.md)). Os testes simulam a API do Pluggy.
 
 O parser usa um LLM de fallback (Claude) só quando `LLM_API_KEY` está definida; sem ela, só as regras locais ([ADR 0013](../docs/adr/0013-llm-de-fallback-com-claude.md)). Os testes nunca chamam a API: o cliente é simulado.
 

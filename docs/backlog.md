@@ -8,13 +8,12 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 
 | # | Etapa | Escopo | Notas |
 | --- | --- | --- | --- |
-| — | Nenhuma | A próxima é a etapa 12 | |
+| — | Nenhuma | A próxima é a etapa 13 | |
 
 ## Próximas
 
 | # | Prioridade | Etapa | Escopo | Por que agora |
 | --- | --- | --- | --- | --- |
-| 12 | Baixa | Open Finance (sandbox) | Adaptador do agregador, só com dados fictícios | Demonstração da integração |
 | 13 | Baixa | Apps Android e iOS | Build com Capacitor, notificações push | Depois que o fluxo web estiver redondo |
 
 ## Ideias soltas (não priorizadas)
@@ -32,6 +31,8 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 - Limite de chamadas ao LLM por usuário.
 - Categoria das transações importadas pela descrição do banco (hoje ficam sem categoria).
 - Guardar a revisão do item na ligação da reconciliação, para ignorar eventos antigos reenviados fora de ordem.
+- Sincronização automática do Open Finance (agendada ou pelo webhook do Pluggy) e aviso de "reconecte o banco" fora da tela Extrato.
+- Conferir o Open Finance contra o sandbox do Pluggy de verdade, com as chaves do time.
 
 ## Concluído
 
@@ -53,3 +54,4 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 | Usuário e autenticação (módulo `accounts`, login com JWT HS256 emitido pela API, usuário demo, `user_id` em todos os dados e eventos, isolamento entre usuários, tela de login, token no aparelho, fila offline por usuário e "Sair", ADR 0012) | `41b36b8`, `750ac35`, `71b5fb6` e o commit de documentação seguinte |
 | LLM como fallback (`HybridEntryParser`, Claude pelo SDK oficial só para os itens abaixo do limiar, saída estruturada validada campo a campo, só o texto do lançamento, regras de volta em qualquer falha, desligado sem `LLM_API_KEY`, ADR 0013) | `7b79f3d` e o commit de documentação seguinte |
 | Importação de extrato (porta `TransactionSource` com OFX 1.x e 2.x e CSV, id externo único por usuário, reconciliação com lançamentos manuais na importação e depois deles, "Não contar", números pela API `ExternalTransactions` de finance, tela Extrato, ADR 0014) | `a18b93b`, `03f3293` e o commit de documentação seguinte |
+| Open Finance no sandbox (Pluggy, connect token ligado ao usuário, widget Pluggy Connect, só itens de sandbox, `/v2/transactions` pelo cursor, mesma importação e reconciliação do extrato, sincronizar e desconectar, ADR 0015) | `b92901c`, `2bc09c5` e o commit de documentação seguinte |

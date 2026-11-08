@@ -42,7 +42,7 @@ flowchart LR
     end
     API --> API_MOD
     entries -->|"fallback, com chave"| LLM["Claude<br/>(API da Anthropic)"]
-    integrations --> OF["Open Finance<br/>(sandbox do agregador)"]
+    integrations --> OF["Open Finance<br/>(Pluggy, só sandbox)"]
     API_MOD --> DB[("PostgreSQL")]
 ```
 
@@ -78,6 +78,8 @@ docker compose up --build
 Abra o app em <http://localhost:8100> e toque em **Entrar na demonstração** (usuário `demo`, senha `demo`). Os dados da demonstração são compartilhados, então não escreva nada pessoal. Depois escreva, por exemplo, "50 reais" ou "bebi 2 litros de água". O lançamento aparece na lista com o que o MyDly entendeu. Quando ele não tem certeza ("Comprei pão", sem valor), o item mostra "Quanto foi? →", que abre um painel para você informar o valor e a categoria ou dizer que não foi um gasto. Uma frase como "Fui à academia e gastei 30 no açaí" vira dois itens, cada um na sua linha. Os cartões "Gasto hoje" e "Hábitos cumpridos" vêm dos módulos de finanças e hábitos: "Não comi besteira" conta como hábito cumprido, e "Tomei 2 energéticos" aparece como deslize. Se o MyDly entender algo errado, toque em "Não foi isso" para tirar o item dos números e corrigir. Na aba **Resumo**, a semana aparece com os hábitos dia a dia, os gastos por categoria e uma mensagem no tom que você escolher (Gentil, Direto ou Bronca), inclusive o cruzamento de sono e gastos quando há dias suficientes para ele não ser acaso. Na aba **Metas**, você define uma meta por hábito (2 L de água por dia, academia 4 dias por semana ou, num hábito para evitar, delivery no máximo 2 dias), um limite de gasto por categoria (por semana ou por mês) e o dia em que a sua semana começa. O Hoje mostra o progresso das metas do dia ("Hidratação 1,5 / 2 L") e avisa quando uma categoria chega a 80% do limite; o Resumo compara a semana com a meta ("3 de 4") e marca o limite nas barras de gasto. Mudar uma meta vale de hoje em diante: os dias que já passaram continuam com a meta que valia neles. Sem internet, o lançamento fica guardado no aparelho ("Guardado no aparelho.") e é enviado sozinho quando a conexão volta, com a data e a hora em que você escreveu, mesmo que o app tenha sido fechado no meio.
 
 Na aba **Metas**, o link **Importar extrato** recebe o extrato do banco em OFX ou CSV. Cada transação entra nos seus números uma vez só: o que você já lançou no app (mesmo valor, de um dia antes a três dias depois) fica ligado ao lançamento e não conta duas vezes, e importar o mesmo arquivo de novo não duplica nada. Uma transferência entre contas suas pode ser marcada como "Não contar" ([ADR 0014](docs/adr/0014-importacao-de-extrato-e-reconciliacao.md)).
+
+Na mesma tela, com as chaves de um time no [Pluggy](https://dashboard.pluggy.ai) em `OPEN_FINANCE_CLIENT_ID` e `OPEN_FINANCE_CLIENT_SECRET`, aparece **Conectar banco de teste**: o widget do Pluggy conecta o banco fictício do sandbox, e as transações dele entram pela mesma reconciliação. Só bancos de teste são aceitos ([ADR 0015](docs/adr/0015-open-finance-pelo-pluggy-so-sandbox.md)).
 
 Por padrão, o parser usa só regras locais, e o que elas não entendem vira uma pergunta. Para que o Claude interprete essas frases ("gastei cinquenta reais na padaria"), defina `LLM_API_KEY` no `.env` com uma chave da API da Anthropic. Só o texto dos lançamentos duvidosos é enviado ([ADR 0013](docs/adr/0013-llm-de-fallback-com-claude.md)).
 
@@ -126,3 +128,4 @@ O detalhamento e a prioridade de cada etapa estão em [`docs/backlog.md`](docs/b
 | [0012](docs/adr/0012-login-com-jwt-e-dados-por-usuario.md) | Login com JWT emitido pela própria API e dados separados por usuário |
 | [0013](docs/adr/0013-llm-de-fallback-com-claude.md) | LLM de fallback com o Claude, só para o que as regras não entenderam |
 | [0014](docs/adr/0014-importacao-de-extrato-e-reconciliacao.md) | Importação de extrato OFX e CSV, com reconciliação nos dois sentidos |
+| [0015](docs/adr/0015-open-finance-pelo-pluggy-so-sandbox.md) | Open Finance pelo Pluggy, só no sandbox |
