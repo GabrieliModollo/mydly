@@ -10,6 +10,7 @@ import {
 import { provideRouter } from '@angular/router';
 import { provideIonicAngular } from '@ionic/angular';
 import { routes } from './app.routes';
+import { apiBaseInterceptor } from './entries/api-base.interceptor';
 import { authInterceptor } from './entries/auth.interceptor';
 
 registerLocaleData(localePt, 'pt-BR');
@@ -18,8 +19,9 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    // Token em todo pedido à API e volta ao login quando ela responde 401 (ADR 0012).
-    provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
+    // Token em todo pedido à API e volta ao login quando ela responde 401 (ADR 0012). Depois, no app
+    // nativo, o endereço da API na frente do caminho (ADR 0016).
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor, apiBaseInterceptor])),
     // "md" em todas as plataformas: o visual do MyDly é próprio, não o padrão de cada sistema.
     provideIonicAngular({ mode: 'md' }),
     { provide: LOCALE_ID, useValue: 'pt-BR' },

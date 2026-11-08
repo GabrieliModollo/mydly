@@ -24,6 +24,7 @@ import {
 import { addIcons } from 'ionicons';
 import { alertCircleOutline, arrowUp, cloudOfflineOutline, refreshOutline } from 'ionicons/icons';
 import { Connectivity } from '../entries/connectivity';
+import { PushService } from '../entries/push';
 import { EntriesStore, NOW } from '../entries/entries-store';
 import { chipsForItem, formatMoney, offlineNotice } from '../entries/entry-format';
 import { EntryItemResponse, EntryResponse, ResolveItemRequest } from '../entries/entry.models';
@@ -70,6 +71,7 @@ const EXAMPLES = [
 export class TodayPage implements OnInit {
   protected readonly store = inject(EntriesStore);
   protected readonly connectivity = inject(Connectivity);
+  private readonly push = inject(PushService);
   private readonly now = inject(NOW);
   protected readonly todayLabel = formatDayLabel(this.now(), inject(LOCALE_ID));
   protected readonly examples = EXAMPLES;
@@ -98,6 +100,8 @@ export class TodayPage implements OnInit {
 
   ngOnInit(): void {
     void this.store.load();
+    // No app nativo, registra o aparelho de novo se a pessoa ativou as notificações (ADR 0016).
+    void this.push.resume();
   }
 
   /**

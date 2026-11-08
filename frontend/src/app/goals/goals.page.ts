@@ -28,6 +28,8 @@ import {
   progressWidth,
 } from './goal-format';
 import { HabitGoalSheet } from './habit-goal-sheet';
+import { NotificationsCard } from './notifications-card';
+import { PushService } from '../entries/push';
 
 type LoadState = 'loading' | 'loaded' | 'error';
 
@@ -48,6 +50,7 @@ type LoadState = 'loading' | 'loaded' | 'error';
     IonModal,
     IonSpinner,
     IonToolbar,
+    NotificationsCard,
     RouterLink,
   ],
   templateUrl: './goals.page.html',
@@ -58,6 +61,7 @@ export class GoalsPage implements OnInit {
   private readonly api = inject(GoalsApi);
   private readonly session = inject(AuthSession);
   private readonly router = inject(Router);
+  private readonly push = inject(PushService);
   protected readonly store = inject(EntriesStore);
 
   protected readonly username = computed(() => this.session.user()?.username ?? '');
@@ -145,9 +149,13 @@ export class GoalsPage implements OnInit {
     }
   }
 
-  /** Apaga deste aparelho a fila de quem sai, encerra a sessão e volta ao login (LGPD, ADR 0012). */
+  /**
+   * Apaga deste aparelho a fila de quem sai, para de mandar notificações para ele (enquanto a sessão
+   * ainda vale), encerra a sessão e volta ao login (LGPD, ADR 0012 e ADR 0016).
+   */
   protected async logout(): Promise<void> {
     this.confirmingLogout.set(false);
+    await this.push.disable();
     this.store.forgetUser();
     this.session.end();
     await this.router.navigateByUrl('/login', { replaceUrl: true });

@@ -23,6 +23,7 @@ Para rodar tudo em containers, use `docker compose up --build` na raiz e abra <h
 | `npm test -- --watch=false` | Testes unitários (Vitest) |
 | `npm run lint` | ESLint, com as regras de acessibilidade dos templates |
 | `npm run build` | Build de produção em `dist/mydly/browser` |
+| `npm run build:native` | Build para os apps, com a API de `MYDLY_API_URL`, e `cap sync` |
 
 ## Organização
 
@@ -45,6 +46,9 @@ src/app/
 │   ├── imports-api.ts      # importação de extrato e as transações importadas
 │   ├── open-finance-api.ts # Open Finance: connect token, conexões, sincronizar e desconectar
 │   ├── pluggy-widget.ts    # o widget Pluggy Connect, carregado só quando vai ser aberto
+│   ├── notifications-api.ts # aparelhos e escolhas das notificações push
+│   ├── push.ts             # push no app nativo: permissão, registro e toque na notificação
+│   ├── api-base.interceptor.ts # endereço da API no app nativo
 │   ├── import.models.ts    # tipos da importação
 │   ├── entry-format.ts     # texto dos chips e resumo do dia (funções puras)
 │   └── random-id.ts        # UUID do lançamento, com alternativa fora de HTTPS
@@ -71,5 +75,6 @@ src/theme/variables.css     # tokens do design.md: cores, fontes, tema escuro
 - **Os cartões de resumo vêm do resumo do dia da API** (`GET /api/v1/days/{data}/summary`), que lê os módulos de finanças e de hábitos. Assim, um item retirado com "Não foi isso" sai dos números, "Hábitos cumpridos" já aplica a polaridade (hábito ruim evitado conta) e o mesmo resumo traz o progresso das metas diárias e os alertas de orçamento. O app pede o resumo de novo depois de cada lançamento ou resolução, e ao voltar para a aba.
 - **Metas e limites valem de hoje em diante, decididos no servidor** ([ADR 0010](../docs/adr/0010-metas-e-orcamentos-versionados.md)). O app não manda data ao salvar uma meta. Os tipos de meta e as unidades que cada hábito aceita vêm da API (`allowedKinds`, `allowedUnits`), e a recusa (400) aparece no painel com a mensagem dela. Depois de trocar o dia de início da semana, o Resumo volta a navegar a partir de `/weeks/current`, porque um início de semana antigo deixa de valer.
 - **Progresso nunca só por cor.** Toda barra tem o valor por escrito e `role="progressbar"` com `aria-valuetext`; a marca do limite no Resumo tem a linha "Limite da semana: ..." logo abaixo.
-- **Capacitor configurado, mas só para web.** Android e iOS entram numa etapa futura (`npx cap add android`).
+- **Apps Android e iOS pelo Capacitor** ([ADR 0016](../docs/adr/0016-apps-nativos-e-notificacoes-push.md)). Os projetos `android/` e `ios/` são gerados pelo Capacitor e ficam no repositório. `npm run build:native` gera o endereço da API a partir de `MYDLY_API_URL` (padrão `http://10.0.2.2:8080`, o computador visto do emulador), compila e sincroniza. Só o build de debug do Android aceita HTTP sem TLS. Dependências: `@capacitor/android` e `@capacitor/ios` 8.6.0 (a versão do núcleo) e o plugin oficial `@capacitor/push-notifications` 8.1.3.
+- **Notificações push** pelo plugin oficial: o cartão "Notificações" da aba Metas só aparece no app nativo, pede a permissão ao ativar e manda o token do Firebase para a API. "Sair" tira o aparelho antes de encerrar a sessão, e o aparelho é registrado de novo a cada abertura, porque o token pode mudar.
 

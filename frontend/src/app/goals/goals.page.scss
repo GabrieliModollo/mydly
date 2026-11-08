@@ -252,3 +252,47 @@ a.link-button {
     outline-offset: 2px;
   }
 }
+
+// Notificações (ADR 0016): caixas de seleção nativas, com o alvo de toque no rótulo inteiro.
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toggle {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  column-gap: 10px;
+  align-items: center;
+}
+
+.toggle__input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--mydly-ink);
+
+  &:focus-visible {
+    outline: 3px solid var(--mydly-focus);
+    outline-offset: 2px;
+  }
+}
+
+.toggle__label {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--mydly-ink);
+  cursor: pointer;
+}
+
+.toggle__hint {
+  grid-column: 2;
+  margin-top: -8px;
+}

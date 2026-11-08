@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Só no build de debug (ADR 0016): deixa o app falar com o backend sem TLS no computador de quem
+  desenvolve (http://10.0.2.2:8080 no emulador, ou o IP da rede num celular). O build de release não
+  tem este arquivo e só fala HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

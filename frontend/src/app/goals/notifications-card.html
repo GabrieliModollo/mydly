@@ -1,0 +1,37 @@
+@if (push.available) {
+  <section class="card" aria-labelledby="notifications-title">
+    <h2 id="notifications-title" class="card__title">Notificações</h2>
+    @if (push.enabled()) {
+      @if (settings(); as current) {
+        <ul class="toggles" aria-label="O que receber">
+          @for (option of options; track option.key) {
+            <li class="toggle">
+              <input
+                type="checkbox"
+                class="toggle__input"
+                [id]="'notify-' + option.key"
+                [attr.aria-describedby]="'notify-' + option.key + '-hint'"
+                [checked]="current[option.key]"
+                (change)="toggle(option.key, $event)"
+              />
+              <label class="toggle__label" [for]="'notify-' + option.key">{{ option.label }}</label>
+              <p class="card__note toggle__hint" [id]="'notify-' + option.key + '-hint'">{{ option.hint }}</p>
+            </li>
+          }
+        </ul>
+      }
+      <button type="button" class="link-button account__logout" [disabled]="busy()" (click)="disable()">
+        Desativar neste aparelho
+      </button>
+    } @else {
+      <p class="card__note">
+        Alerta de orçamento, lembrete do dia e resumo da semana. Você escolhe quais depois de ativar.
+      </p>
+      <button type="button" class="link-button account__logout" [disabled]="busy()" (click)="enable()">
+        {{ busy() ? 'Ativando…' : 'Ativar notificações' }}
+      </button>
+    }
+    <p class="sr-only" role="status">{{ message() }}</p>
+    <p class="account__warning" role="alert" [hidden]="!error()">{{ error() }}</p>
+  </section>
+}

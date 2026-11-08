@@ -42,3 +42,10 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Gerado por scripts/native-env.mjs a partir de MYDLY_API_URL (ADR 0016)
+/src/environments/environment.native.ts
+
+# Configuração do Firebase do app Android (fica com cada pessoa, não no repositório)
+/android/app/google-services.json
+/ios/App/App/GoogleService-Info.plist

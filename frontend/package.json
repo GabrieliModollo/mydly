@@ -7,7 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "build:native": "node scripts/native-env.mjs && ng build --configuration native && npx cap sync"
   },
   "private": true,
   "packageManager": "npm@11.19.0",
@@ -18,7 +19,10 @@
     "@angular/forms": "^22.2.0",
     "@angular/platform-browser": "^22.2.0",
     "@angular/router": "^22.2.0",
+    "@capacitor/android": "8.6.0",
     "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "8.6.0",
+    "@capacitor/push-notifications": "8.1.3",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/space-grotesk": "^5.3.0",
     "@ionic/angular": "^9.0.10",
