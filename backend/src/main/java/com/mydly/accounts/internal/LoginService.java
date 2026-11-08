@@ -25,6 +25,7 @@ public class LoginService {
     private final JwtEncoder encoder;
     private final AuthProperties properties;
     private final Clock clock;
+    private final LoginAttempts attempts;
     /**
      * Hash de uma senha qualquer, conferido quando o usuário não existe: a resposta demora o mesmo
      * tanto com usuário inexistente e com senha errada, e o tempo não revela quem tem conta.
@@ -32,12 +33,13 @@ public class LoginService {
     private final String unknownUserHash;
 
     LoginService(AccountRepository accounts, PasswordEncoder passwords, JwtEncoder encoder, AuthProperties properties,
-                 Clock clock) {
+                 Clock clock, LoginAttempts attempts) {
         this.accounts = accounts;
         this.passwords = passwords;
         this.encoder = encoder;
         this.properties = properties;
         this.clock = clock;
+        this.attempts = attempts;
         this.unknownUserHash = passwords.encode(UUID.randomUUID().toString());
     }
 
@@ -45,13 +47,28 @@ public class LoginService {
     public record Token(String value, Instant expiresAt, Account account) {
     }
 
-    /** O token do usuário, ou vazio quando o usuário não existe ou a senha não confere. */
+    /**
+     * O token do usuário, ou vazio quando o usuário não existe ou a senha não confere.
+     *
+     * @param address o endereço de origem do pedido, para o limite de tentativas; pode ser nulo
+     * @throws LoginBlockedException depois de senhas erradas demais do usuário ou do endereço
+     *                               (ADR 0017); a senha nem chega a ser conferida
+     */
     @Transactional(readOnly = true)
-    public Optional<Token> login(String username, String password) {
+    public Optional<Token> login(String username, String password, String address) {
+        attempts.blockedFor(username, address).ifPresent(retryAfter -> {
+            throw new LoginBlockedException(retryAfter);
+        });
         Optional<Account> account = accounts.findByUsername(username);
         String hash = account.map(Account::passwordHash).orElse(unknownUserHash);
         boolean matches = password != null && passwords.matches(password, hash);
-        return account.filter(found -> matches).map(this::issue);
+        Optional<Token> token = account.filter(found -> matches).map(this::issue);
+        if (token.isPresent()) {
+            attempts.succeeded(username);
+        } else {
+            attempts.failed(username, address);
+        }
+        return token;
     }
 
     @Transactional(readOnly = true)

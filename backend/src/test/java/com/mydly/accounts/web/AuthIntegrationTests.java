@@ -1,7 +1,9 @@
 package com.mydly.accounts.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.emptyOrNullString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -18,6 +20,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,6 +37,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -88,6 +92,29 @@ class AuthIntegrationTests {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value("Usuário ou senha incorretos."))
                 .andExpect(jsonPath("$.accessToken").doesNotExist());
+    }
+
+    @Test
+    void senhasErradasDemaisDao429ComRetryAfter() throws Exception {
+        // Um usuário e um endereço só deste teste, para o bloqueio não atingir os outros.
+        String username = "tentativas-" + UUID.randomUUID().toString().substring(0, 8);
+        // Pelo app nativo, que só lê o Retry-After se o CORS o expuser.
+        RequestPostProcessor from = request -> {
+            request.setRemoteAddr("192.0.2.14");
+            request.addHeader(HttpHeaders.ORIGIN, "capacitor://localhost");
+            return request;
+        };
+        for (int i = 0; i < 5; i++) {
+            login(username, "errada", from).andExpect(status().isUnauthorized());
+        }
+
+        login(username, "errada", from)
+                .andExpect(status().isTooManyRequests())
+                // A janela é de 15 minutos e começou na primeira falha, há menos de um minuto.
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, matchesPattern("8[4-9][0-9]|900")))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, containsString("Retry-After")))
+                .andExpect(jsonPath("$.detail").value("Muitas tentativas de login. Tente de novo em alguns minutos."));
+        login("demo", "demo").andExpect(status().isOk());
     }
 
     @Test
@@ -156,8 +183,12 @@ class AuthIntegrationTests {
     }
 
     private ResultActions login(String username, String password) throws Exception {
+        return login(username, password, request -> request);
+    }
+
+    private ResultActions login(String username, String password, RequestPostProcessor from) throws Exception {
         String body = json.writeValueAsString(Map.of("username", username, "password", password));
-        return mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(body));
+        return mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(body).with(from));
     }
 
     private String token(String username, String password) throws Exception {

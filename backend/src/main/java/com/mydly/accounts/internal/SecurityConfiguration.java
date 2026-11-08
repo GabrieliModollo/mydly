@@ -73,7 +73,7 @@ class SecurityConfiguration {
         cors.setAllowedOrigins(properties.allowedOrigins());
         cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "If-Match"));
-        cors.setExposedHeaders(List.of("ETag", "Location"));
+        cors.setExposedHeaders(List.of("ETag", "Location", "Retry-After"));
         cors.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", cors);

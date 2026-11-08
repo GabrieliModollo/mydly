@@ -2,6 +2,7 @@ package com.mydly.accounts.web;
 
 import com.mydly.accounts.CurrentUser;
 import com.mydly.accounts.internal.Account;
+import com.mydly.accounts.internal.LoginBlockedException;
 import com.mydly.accounts.internal.LoginService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -10,12 +11,17 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,11 +57,21 @@ class AuthController {
             responses = {
                     @ApiResponse(responseCode = "200", description = "Login feito"),
                     @ApiResponse(responseCode = "400", description = "Usuário ou senha em branco"),
-                    @ApiResponse(responseCode = "401", description = "Usuário ou senha incorretos")})
-    LoginResponse login(@Valid @RequestBody LoginRequest request) {
-        return logins.login(request.username(), request.password())
+                    @ApiResponse(responseCode = "401", description = "Usuário ou senha incorretos"),
+                    @ApiResponse(responseCode = "429", description = "Senhas erradas demais; o header Retry-After "
+                            + "diz em quantos segundos tentar de novo")})
+    LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+        return logins.login(request.username(), request.password(), http.getRemoteAddr())
                 .map(token -> new LoginResponse(token.value(), "Bearer", token.expiresAt(), UserResponse.of(token.account())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuário ou senha incorretos."));
+    }
+
+    @ExceptionHandler
+    ResponseEntity<ProblemDetail> blocked(LoginBlockedException blocked) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS,
+                "Muitas tentativas de login. Tente de novo em alguns minutos.");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(blocked.retryAfterSeconds())).body(problem);
     }
 
     @GetMapping("/me")
