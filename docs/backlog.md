@@ -8,34 +8,25 @@ Ao concluir uma etapa, mova-a para **Concluído** com o commit correspondente e 
 
 | # | Etapa | Escopo | Notas |
 | --- | --- | --- | --- |
-| — | Nenhuma | Todas as etapas planejadas foram concluídas; as próximas saem das ideias abaixo | |
+| — | Nenhuma | A próxima é a etapa 14 | |
 
 ## Próximas
 
 | # | Prioridade | Etapa | Escopo | Por que agora |
 | --- | --- | --- | --- | --- |
-| — | — | Nenhuma etapa planejada | Escolher nas ideias soltas | |
+| 14 | Alta | Demonstração segura | Dados fictícios da demo restaurados todo dia (com uma semana de exemplo, para o Resumo e as metas aparecerem cheios), limite de tentativas de login e limite de chamadas ao LLM por usuário | Pré-requisito para publicar: visitantes compartilham o usuário demo, e o login e o LLM ficam expostos |
+| 15 | Alta | Publicar a demo | Backend, PostgreSQL e app web num provedor com HTTPS, segredos fora do repositório (JWT, LLM, Pluggy, Firebase), deploy pelo GitHub Actions e o endereço no README. O provedor é decisão da autora | O motivo das etapas 9 e 14; a etapa ainda não existia, só as ideias que dependem dela |
+| 16 | Média | Integrações conferidas de verdade | Com as contas criadas pela autora: Open Finance contra o sandbox do Pluggy e push de ponta a ponta com um projeto Firebase (`google-services.json` no app, conta de serviço no backend); corrigir o que vier diferente da documentação | O código das etapas 12 e 13 só foi testado com o Pluggy e o Firebase simulados |
+| 17 | Média | Qualidade do parser medida | Origem de cada item (regras ou LLM) no `parsed_json` e um conjunto de avaliação com frases reais anonimizadas, rodado no CI sem rede para as regras e sob demanda para o LLM | Medir acertos antes de trocar modelo, esforço ou prompt (ADR 0013) |
+| 18 | Média | Extrato mais completo | Categoria das transações importadas pela descrição do banco, sincronização automática do Open Finance (agendada ou pelo webhook do Pluggy) com aviso de "reconecte o banco" fora da tela Extrato, e a revisão do item guardada na ligação da reconciliação | Transação importada sem categoria não aparece nos orçamentos dela; e a limitação conhecida do ADR 0014 |
+| 19 | Média | Contas de verdade | Cadastro pela API, troca e recuperação de senha, refresh token curto com revogação e fuso horário por usuário | Sair da demo compartilhada para contas próprias (ADR 0012 deixou isso de fora) |
+| 20 | Baixa | Offline completo | Service worker para abrir o app web sem internet e as confirmações ("Quanto foi?", "Não foi isso") também na fila offline, com tratamento de conflito | Fecha o que o ADR 0011 deixou de fora |
+| 21 | Baixa | Apps prontos para a loja | Ícone e tela de abertura do MyDly, builds de release assinados e, num Mac, o push no iOS (SDK do Firebase para trocar o token do APNs, capacidade Push Notifications) | O que o ADR 0016 deixou para depois |
+| 22 | Baixa | Rotina mais rica | Horário entendido no texto ("acordei às 6h" como horário de acordar) e gráfico de peso a partir de lançamentos com kg, mostrado só para quem pedir e fora das mensagens, que não falam de corpo nem de peso (ADR 0009) | Ideias de produto sem dependência das outras etapas |
 
 ## Ideias soltas (não priorizadas)
 
-- Horário do lançamento entendido no texto ("acordei às 6h" como horário de acordar).
-- Gráfico de peso a partir de lançamentos com kg.
-- Service worker para abrir o app web do zero sem internet (hoje a fila funciona com o app já aberto; no app nativo os arquivos já vêm no pacote).
-- Confirmações ("Quanto foi?", "Não foi isso") também na fila offline, com tratamento de conflito.
-- Cadastro de usuário pela API, troca e recuperação de senha.
-- Refresh token curto com revogação, e limite de tentativas de login.
-- Restaurar os dados da demonstração todo dia, para visitantes não herdarem o que outros escreveram.
-- Fuso horário por usuário (hoje todo mundo usa America/Sao_Paulo).
-- Conjunto de avaliação do LLM do parser com frases reais anonimizadas, para medir acertos antes de trocar modelo, esforço ou prompt.
-- Origem de cada item (regras ou LLM) no `parsed_json`, para reprocessar e medir.
-- Limite de chamadas ao LLM por usuário.
-- Categoria das transações importadas pela descrição do banco (hoje ficam sem categoria).
-- Guardar a revisão do item na ligação da reconciliação, para ignorar eventos antigos reenviados fora de ordem.
-- Sincronização automática do Open Finance (agendada ou pelo webhook do Pluggy) e aviso de "reconecte o banco" fora da tela Extrato.
-- Conferir o Open Finance contra o sandbox do Pluggy de verdade, com as chaves do time.
-- Push no iOS: num Mac, adicionar o SDK do Firebase ao projeto iOS para trocar o token do APNs pelo do Firebase, ligar a capacidade Push Notifications e compilar.
-- Conferir o push de ponta a ponta com um projeto Firebase (o `google-services.json` no app e a conta de serviço no backend).
-- Ícone e tela de abertura do MyDly nos apps (hoje são os padrões do Capacitor), e o build de release assinado.
+- Nenhuma no momento: as ideias anteriores viraram as etapas 14 a 22.
 
 ## Concluído
 
