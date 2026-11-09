@@ -63,7 +63,7 @@ class WeekSummaryController {
         UUID userId = currentUser.id();
         DayOfWeek firstDay = weeks.firstDayOfWeek(userId);
         if (start.getDayOfWeek() != firstDay) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A semana começa em " + firstDay + ".");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A semana começa " + dayName(firstDay) + ".");
         }
         return summary(userId, start, tone);
     }
@@ -79,5 +79,18 @@ class WeekSummaryController {
     @Target(ElementType.PARAMETER)
     @Parameter(description = "Tom das mensagens: gentle, direct (padrão) ou scold")
     @interface ToneParameter {
+    }
+
+    /** {@code na segunda} ou {@code no domingo}, para a mensagem de erro. */
+    static String dayName(DayOfWeek day) {
+        return switch (day) {
+            case MONDAY -> "na segunda";
+            case TUESDAY -> "na terça";
+            case WEDNESDAY -> "na quarta";
+            case THURSDAY -> "na quinta";
+            case FRIDAY -> "na sexta";
+            case SATURDAY -> "no sábado";
+            case SUNDAY -> "no domingo";
+        };
     }
 }

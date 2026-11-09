@@ -92,7 +92,8 @@ class SundayWeekIntegrationTests {
 
     @Test
     void segundaNaoEInicioDeSemanaQuandoElaComecaNoDomingo() throws Exception {
-        mvc.perform(get("/api/v1/weeks/{start}/summary", "2038-06-07")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/weeks/{start}/summary", "2038-06-07")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("A semana começa no domingo."));
     }
 
     /**
