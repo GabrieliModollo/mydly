@@ -55,9 +55,13 @@ Cada tipo tem fundo e texto próprios; as cores diferem também em luminosidade,
 4. Aviso "Sem conexão" acima da lista, quando o aparelho está offline, com quantos lançamentos esperam ("Sem conexão. 2 lançamentos guardados no aparelho, enviados quando a internet voltar."), no fundo e no texto neutros, dentro de uma região `role="status"`. Sem conexão, o aviso "Não foi possível carregar" não aparece, porque repetiria o mesmo problema.
 5. Lista do dia, mais recente primeiro: texto original do lançamento, horário à direita e uma linha de chips por item. Um item pendente mostra o link "Quanto foi? →". Um item aceito mostra a ação discreta "Não foi isso" (cinza, peso 500), que o tira dos números e abre o painel para corrigir; um item descartado mostra "Desfazer". Um lançamento guardado no aparelho (sem internet ou com o servidor fora) não tem chips: mostra um ícone de nuvem riscada, "Guardado no aparelho." e, com rede, o link "Enviar agora", com a borda do cartão tracejada em `--mydly-field-border`. Se for de outro dia, o horário vem com a data ("04/11, 17:00").
 6. Campo de lançamento fixo embaixo, estilo chat ("O que aconteceu?"), com botão redondo no acento; envio também com Enter.
+
+Acima da lista do dia, a seção "Ficou para confirmar" mostra os lançamentos de dias anteriores que ainda têm item pendente, com a data e a hora ("07/11, 21:33") e o mesmo "Quanto foi? →"; ela some quando não há nenhum. Enquanto o resumo do dia não chega, os cartões mostram um traço, e não "R$ 0,00". Se o dia vira com o app aberto, o cabeçalho, os cartões e a lista passam para o dia novo.
 7. Barra de navegação: Hoje, Resumo e Metas.
 
 ### Confirmar lançamento (painel inferior sobre "Hoje")
+
+O mesmo painel confirma um item pendente e corrige um item reaberto com "Não foi isso". As pílulas "Um gasto", "Uma entrada" e "Uma rotina" sempre aparecem, já com o tipo entendido escolhido, e o título e a ação secundária seguem o tipo: "Quanto foi?" e "Não foi um gasto", "Quanto entrou?" e "Não foi uma entrada", "Como foi?" e "Não foi uma rotina", ou "O que foi isso?" e "Não era nada" num item sem tipo. Numa rotina, o painel pergunta "Aconteceu?" (pílulas "Aconteceu" e "Não aconteceu") e tem os campos opcionais de quantidade e unidade, já preenchidos com o que tinha sido entendido.
 
 Chip "Precisa confirmar", título "Quanto foi?", a frase original, campo de valor grande com "R$", valores rápidos, categoria sugerida em pílulas selecionáveis, botão principal "Salvar gasto" (acento) e ação secundária "Não foi um gasto". O painel tem a altura do conteúdo, sem faixa vazia embaixo, e rola por dentro quando passa de 90% da tela; os painéis de meta e de limite em Metas seguem o mesmo formato.
 

@@ -302,6 +302,7 @@ flowchart LR
 - **Envio otimista.** O lançamento aparece na lista como "Enviando…" com o id e a data gerados no app. Se a rede falhar, o reenvio usa o mesmo id, e a API não duplica ([ADR 0006](adr/0006-id-do-cliente-e-occurred-at.md)).
 - **Fila offline.** Sem rede, ou com o servidor fora, o lançamento fica no `localStorage` do aparelho (`mydly.outbox.v1`) e é enviado quando a conexão volta, ao abrir o app e 30 segundos depois de uma falha, um por vez e do mais antigo ao mais novo. O parser continua só no servidor: um lançamento guardado aparece sem chips até ser enviado ([ADR 0011](adr/0011-fila-offline-no-aparelho.md)).
 - **Listagem do dia.** O `GET /api/v1/entries?date=AAAA-MM-DD` filtra pelo `occurred_at` no fuso `America/Sao_Paulo`, até existir fuso por usuário. Sem `date`, vale hoje.
+- **Pendentes de outros dias.** O `GET /api/v1/entries/pending` traz os lançamentos de antes de hoje que ainda têm item para confirmar, até 50, para um "Quanto foi?" de ontem não ficar pendente para sempre. O app os mostra em "Ficou para confirmar", na tela Hoje.
 
 ## Privacidade (LGPD)
 
