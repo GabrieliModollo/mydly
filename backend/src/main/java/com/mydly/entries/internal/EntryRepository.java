@@ -17,4 +17,8 @@ interface EntryRepository extends JpaRepository<Entry, UUID> {
      */
     List<Entry> findByUserIdAndOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtDesc(UUID userId,
             Instant start, Instant end);
+
+    /** Os lançamentos do usuário ainda com algum item para confirmar, escritos antes de {@code before}. */
+    List<Entry> findTop50ByUserIdAndStatusAndOccurredAtLessThanOrderByOccurredAtDesc(UUID userId, EntryStatus status,
+            Instant before);
 }

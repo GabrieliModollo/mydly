@@ -228,6 +228,18 @@ public class EntryService {
                 start, end);
     }
 
+    /**
+     * Os lançamentos de dias anteriores que ainda têm item para confirmar, do mais recente para o mais
+     * antigo, até 50. Sem isso, um "Quanto foi?" de ontem ficaria pendente para sempre: a tela Hoje só
+     * lista o dia atual.
+     */
+    @Transactional(readOnly = true)
+    public List<Entry> pendingBeforeToday(UUID userId) {
+        Instant startOfToday = LocalDate.now(clock.withZone(USER_ZONE)).atStartOfDay(USER_ZONE).toInstant();
+        return repository.findTop50ByUserIdAndStatusAndOccurredAtLessThanOrderByOccurredAtDesc(userId,
+                EntryStatus.NEEDS_INPUT, startOfToday);
+    }
+
     private static CreateResult compareWithExisting(UUID userId, Entry existing, String text, Instant occurredAt) {
         if (!existing.getUserId().equals(userId)) {
             return new CreateResult(Outcome.CONFLICT, null);

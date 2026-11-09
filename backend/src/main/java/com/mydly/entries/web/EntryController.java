@@ -94,6 +94,15 @@ class EntryController {
         return service.listByDay(currentUser.id(), date).stream().map(EntryResponse::from).toList();
     }
 
+    @GetMapping("/pending")
+    @Operation(summary = "Lista os lançamentos de outros dias que ainda pedem confirmação",
+            description = "Os lançamentos escritos antes de hoje (no fuso America/Sao_Paulo) com algum item "
+                    + "pendente, do mais recente para o mais antigo, até 50. Os de hoje vêm na listagem do dia.",
+            responses = @ApiResponse(responseCode = "200", description = "Lançamentos pendentes (pode ser vazio)"))
+    List<EntryResponse> pending() {
+        return service.pendingBeforeToday(currentUser.id()).stream().map(EntryResponse::from).toList();
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Busca um lançamento pelo id", responses = {
             @ApiResponse(responseCode = "200", description = "Lançamento encontrado"),
