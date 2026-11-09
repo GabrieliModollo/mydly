@@ -5,14 +5,30 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Painel "Quanto foi?". O Ionic move o modal para a raiz do app, então o estilo fica aqui. */
+/*
+ * Painéis de baixo ("Quanto foi?", meta e limite). O Ionic move o modal para a raiz do app, então o
+ * estilo fica aqui. A altura é a do conteúdo (a "folha de altura automática" do Ionic): com uma altura
+ * fixa, o painel mais baixo que ela deixava uma faixa vazia embaixo. Conteúdo maior que a tela rola
+ * dentro do painel.
+ */
 ion-modal.confirm-modal {
+  --height: auto;
   --background: var(--mydly-surface);
   --border-radius: 22px;
 }
 
+ion-modal.confirm-modal .ion-page {
+  position: relative;
+  display: block;
+  contain: content;
+}
+
 .confirm-modal__content {
-  --background: var(--mydly-surface);
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--mydly-surface);
 }
 
 /* Visível só para leitores de tela. */

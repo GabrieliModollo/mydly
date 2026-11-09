@@ -178,12 +178,12 @@
 <ion-modal
   class="confirm-modal"
   [isOpen]="confirming() !== null"
-  [initialBreakpoint]="0.85"
-  [breakpoints]="[0, 0.85, 1]"
+  [initialBreakpoint]="1"
+  [breakpoints]="[0, 1]"
   (didDismiss)="confirming.set(null)"
 >
   <ng-template>
-    <ion-content class="confirm-modal__content">
+    <div class="confirm-modal__content">
       @if (confirming(); as target) {
         <app-confirm-sheet
           [entry]="target.entry"
@@ -192,7 +192,7 @@
           (closed)="confirming.set(null)"
         />
       }
-    </ion-content>
+    </div>
   </ng-template>
 </ion-modal>
 

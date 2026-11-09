@@ -176,13 +176,13 @@
 <ion-modal
   class="confirm-modal"
   [isOpen]="editingHabit() !== null"
-  [initialBreakpoint]="0.85"
-  [breakpoints]="[0, 0.85, 1]"
+  [initialBreakpoint]="1"
+  [breakpoints]="[0, 1]"
   (didPresent)="onPresented()"
   (didDismiss)="closeSheet()"
 >
   <ng-template>
-    <ion-content class="confirm-modal__content">
+    <div class="confirm-modal__content">
       @if (editingHabit(); as habit) {
         <app-habit-goal-sheet
           [habit]="habit"
@@ -193,20 +193,20 @@
           (closed)="closeSheet()"
         />
       }
-    </ion-content>
+    </div>
   </ng-template>
 </ion-modal>
 
 <ion-modal
   class="confirm-modal"
   [isOpen]="editingBudget() !== null"
-  [initialBreakpoint]="0.85"
-  [breakpoints]="[0, 0.85, 1]"
+  [initialBreakpoint]="1"
+  [breakpoints]="[0, 1]"
   (didPresent)="onPresented()"
   (didDismiss)="closeSheet()"
 >
   <ng-template>
-    <ion-content class="confirm-modal__content">
+    <div class="confirm-modal__content">
       @if (editingBudget(); as budget) {
         <app-budget-sheet
           [budget]="budget"
@@ -217,7 +217,7 @@
           (closed)="closeSheet()"
         />
       }
-    </ion-content>
+    </div>
   </ng-template>
 </ion-modal>
 

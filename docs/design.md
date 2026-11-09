@@ -59,7 +59,7 @@ Cada tipo tem fundo e texto próprios; as cores diferem também em luminosidade,
 
 ### Confirmar lançamento (painel inferior sobre "Hoje")
 
-Chip "Precisa confirmar", título "Quanto foi?", a frase original, campo de valor grande com "R$", valores rápidos, categoria sugerida em pílulas selecionáveis, botão principal "Salvar gasto" (acento) e ação secundária "Não foi um gasto".
+Chip "Precisa confirmar", título "Quanto foi?", a frase original, campo de valor grande com "R$", valores rápidos, categoria sugerida em pílulas selecionáveis, botão principal "Salvar gasto" (acento) e ação secundária "Não foi um gasto". O painel tem a altura do conteúdo, sem faixa vazia embaixo, e rola por dentro quando passa de 90% da tela; os painéis de meta e de limite em Metas seguem o mesmo formato.
 
 ### Resumo da semana
 
