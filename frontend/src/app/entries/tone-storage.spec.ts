@@ -47,4 +47,20 @@ describe('tom guardado no aparelho', () => {
     expect(loadTone(blocked)).toBe('direct');
     expect(() => saveTone('gentle', blocked)).not.toThrow();
   });
+
+  it('localStorage que lança erro só de ser lido não quebra o app', () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get: () => {
+        throw new Error('SecurityError');
+      },
+    });
+    try {
+      expect(loadTone()).toBe('direct');
+      expect(() => saveTone('gentle')).not.toThrow();
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', original!);
+    }
+  });
 });

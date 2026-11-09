@@ -2,7 +2,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideIonicAngular } from '@ionic/angular';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, of, Subject, throwError } from 'rxjs';
+import { NotificationSettings, NotificationsApi } from '../entries/notifications-api';
 import { Tone, WeekSummaryResponse } from '../entries/week.models';
 import { WeeksApi } from '../entries/weeks-api';
 import { SummaryPage } from './summary.page';
@@ -38,6 +39,9 @@ describe('SummaryPage', () => {
   let fixture: ComponentFixture<SummaryPage>;
   let calls: [string | null, Tone][];
   let respond: (monday: string | null, tone: Tone) => Observable<WeekSummaryResponse>;
+  let settingsReads: number;
+  let savedSettings: NotificationSettings[];
+  let settingsResponse: () => Observable<NotificationSettings>;
 
   async function open(): Promise<HTMLElement> {
     TestBed.configureTestingModule({
@@ -45,6 +49,19 @@ describe('SummaryPage', () => {
       providers: [
         provideRouter([]),
         provideIonicAngular({ mode: 'md' }),
+        {
+          provide: NotificationsApi,
+          useValue: {
+            settings: () => {
+              settingsReads++;
+              return settingsResponse();
+            },
+            saveSettings: (settings: NotificationSettings) => {
+              savedSettings.push(settings);
+              return of(settings);
+            },
+          },
+        },
         {
           provide: WeeksApi,
           useValue: {
@@ -75,6 +92,10 @@ describe('SummaryPage', () => {
     localStorage.clear();
     calls = [];
     respond = (monday) => of(week(monday ?? '2026-11-02'));
+    settingsReads = 0;
+    savedSettings = [];
+    settingsResponse = () =>
+      of({ budgetAlerts: true, dailyReminder: false, weeklySummary: true, tone: 'direct' as Tone });
   });
 
   it('abre a semana atual no tom "Direto" com a mensagem principal no cartão escuro', async () => {
@@ -96,6 +117,46 @@ describe('SummaryPage', () => {
     expect(calls.at(-1)).toEqual([null, 'scold']);
     expect(localStorage.getItem('mydly.tone')).toBe('scold');
     expect(button(root, 'Bronca').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('trocar o tom leva o mesmo tom para o resumo da semana por push', async () => {
+    const root = await open();
+
+    button(root, 'Bronca').click();
+    await fixture.whenStable();
+
+    expect(savedSettings).toEqual([{ budgetAlerts: true, dailyReminder: false, weeklySummary: true, tone: 'scold' }]);
+  });
+
+  it('sem conseguir ler as notificações, trocar o tom continua funcionando', async () => {
+    settingsResponse = () => throwError(() => new Error('offline'));
+    const root = await open();
+
+    button(root, 'Gentil').click();
+    await fixture.whenStable();
+
+    expect(settingsReads).toBe(1);
+    expect(savedSettings).toEqual([]);
+    expect(calls.at(-1)).toEqual([null, 'gentle']);
+  });
+
+  it('uma resposta antiga que chega depois da mais nova não substitui a semana', async () => {
+    const slow = new Subject<WeekSummaryResponse>();
+    respond = (monday, tone) => (tone === 'gentle' ? slow : of(week(monday ?? '2026-11-02')));
+    const root = await open();
+
+    button(root, 'Gentil').click();
+    await fixture.whenStable();
+    respond = (monday) =>
+      of(week(monday ?? '2026-11-02', { insights: [{ kind: 'OVERVIEW', text: 'Mensagem da bronca.', numbers: {} }] }));
+    button(root, 'Bronca').click();
+    await fixture.whenStable();
+    slow.next(week('2026-11-02', { insights: [{ kind: 'OVERVIEW', text: 'Mensagem antiga gentil.', numbers: {} }] }));
+    slow.complete();
+    await fixture.whenStable();
+
+    expect(root.textContent).toContain('Mensagem da bronca.');
+    expect(root.textContent).not.toContain('Mensagem antiga gentil.');
   });
 
   it('usa o tom guardado no aparelho', async () => {

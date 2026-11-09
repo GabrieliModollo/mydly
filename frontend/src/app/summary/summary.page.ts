@@ -4,6 +4,7 @@ import { IonContent, IonFooter, IonHeader, IonIcon, IonSpinner, IonToolbar } fro
 import { addIcons } from 'ionicons';
 import { chevronBackOutline, chevronForwardOutline, cloudOfflineOutline } from 'ionicons/icons';
 import { firstValueFrom } from 'rxjs';
+import { NotificationsApi } from '../entries/notifications-api';
 import { loadTone, saveTone } from '../entries/tone-storage';
 import { Tone, WeekInsight, WeekSummaryResponse } from '../entries/week.models';
 import { WeeksApi } from '../entries/weeks-api';
@@ -36,6 +37,9 @@ type LoadState = 'loading' | 'loaded' | 'error';
 })
 export class SummaryPage implements OnInit {
   private readonly api = inject(WeeksApi);
+  private readonly notifications = inject(NotificationsApi);
+  /** Número do último pedido: uma resposta que chega depois de um pedido mais novo é ignorada. */
+  private requests = 0;
 
   protected readonly toneOptions = TONE_OPTIONS;
   protected readonly habitDescription = habitDescription;
@@ -104,6 +108,22 @@ export class SummaryPage implements OnInit {
     this.tone.set(tone);
     saveTone(tone);
     void this.load();
+    void this.syncPushTone(tone);
+  }
+
+  /**
+   * O resumo da semana por push sai no mesmo tom do Resumo: a escolha vai também para as preferências
+   * de notificação (ADR 0016). Numa falha, fica para a próxima troca de tom ou de notificação.
+   */
+  private async syncPushTone(tone: Tone): Promise<void> {
+    try {
+      const current = await firstValueFrom(this.notifications.settings());
+      if (current.tone !== tone) {
+        await firstValueFrom(this.notifications.saveSettings({ ...current, tone }));
+      }
+    } catch {
+      // Sem rede ou sem sessão: o tom do push continua o anterior até a próxima troca.
+    }
   }
 
   protected previousWeek(): void {
@@ -124,15 +144,23 @@ export class SummaryPage implements OnInit {
   }
 
   protected async load(): Promise<void> {
+    const request = ++this.requests;
     this.loadState.set('loading');
     try {
       const week = await firstValueFrom(this.api.summary(this.start(), this.tone()));
+      // Trocar de tom ou de semana rápido faz pedidos em paralelo: só o mais novo vale.
+      if (request !== this.requests) {
+        return;
+      }
       if (this.start() === null) {
         this.currentStart.set(week.weekStart);
       }
       this.week.set(week);
       this.loadState.set('loaded');
     } catch (error) {
+      if (request !== this.requests) {
+        return;
+      }
       // O início guardado deixou de ser início de semana (o dia de início mudou na aba Metas): volta para
       // a semana atual, que a API acha pelas preferências novas.
       if (error instanceof HttpErrorResponse && error.status === 400 && this.start() !== null) {
