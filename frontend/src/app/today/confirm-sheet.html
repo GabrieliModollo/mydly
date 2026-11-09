@@ -9,21 +9,63 @@
   <h2 id="confirm-title" class="sheet__title">{{ title() }}</h2>
   <blockquote class="sheet__quote">{{ quote() }}</blockquote>
 
-  @if (unknown()) {
+  <fieldset class="choice">
+    <legend class="label">Isso foi…</legend>
+    <div class="pills">
+      <button type="button" class="pill" [attr.aria-pressed]="kind() === 'EXPENSE'" (click)="chooseKind('EXPENSE')">
+        Um gasto
+      </button>
+      <button type="button" class="pill" [attr.aria-pressed]="kind() === 'INCOME'" (click)="chooseKind('INCOME')">
+        Uma entrada
+      </button>
+      <button type="button" class="pill" [attr.aria-pressed]="kind() === 'ROUTINE'" (click)="chooseKind('ROUTINE')">
+        Uma rotina
+      </button>
+    </div>
+  </fieldset>
+
+  @if (kind() === 'ROUTINE') {
     <fieldset class="choice">
-      <legend class="label">Isso foi…</legend>
+      <legend class="label">Aconteceu?</legend>
       <div class="pills">
-        <button type="button" class="pill" [attr.aria-pressed]="kind() === 'EXPENSE'" (click)="chooseKind('EXPENSE')">
-          Um gasto
+        <button type="button" class="pill" [attr.aria-pressed]="outcome() === 'DONE'" (click)="chooseOutcome('DONE')">
+          Aconteceu
         </button>
-        <button type="button" class="pill" [attr.aria-pressed]="kind() === 'INCOME'" (click)="chooseKind('INCOME')">
-          Uma entrada
-        </button>
-        <button type="button" class="pill" [attr.aria-pressed]="kind() === 'ROUTINE'" (click)="chooseKind('ROUTINE')">
-          Uma rotina
+        <button type="button" class="pill" [attr.aria-pressed]="outcome() === 'MISSED'" (click)="chooseOutcome('MISSED')">
+          Não aconteceu
         </button>
       </div>
     </fieldset>
+
+    <div class="quantity">
+      <div class="quantity__field">
+        <label class="label" for="confirm-quantity">Quantidade (opcional)</label>
+        <input
+          id="confirm-quantity"
+          class="field"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          placeholder="2"
+          [attr.aria-invalid]="showQuantityError()"
+          [attr.aria-describedby]="showQuantityError() ? 'confirm-quantity-error' : null"
+          [value]="quantityText()"
+          (input)="onQuantityInput($event)"
+        />
+      </div>
+      <div class="quantity__field">
+        <label class="label" for="confirm-unit">Unidade</label>
+        <select id="confirm-unit" class="field" [value]="unit() ?? ''" (change)="onUnitChange($event)">
+          <option value="" [selected]="unit() === null">Sem unidade</option>
+          @for (option of units; track option[0]) {
+            <option [value]="option[0]" [selected]="unit() === option[0]">{{ option[1] }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    @if (showQuantityError()) {
+      <p id="confirm-quantity-error" class="error" role="alert">Use um número como 2 ou 1,5.</p>
+    }
   }
 
   @if (isFinance()) {

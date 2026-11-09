@@ -631,9 +631,74 @@ describe('EntriesStore', () => {
     });
   });
 
+  describe('outros dias e virada do dia', () => {
+    const YESTERDAY = '2026-11-04T12:00:00.000Z';
+    const CONFIRM = { action: 'CONFIRM_FINANCE', amount: 8.5, direction: 'EXPENSE', category: 'FOOD' } as const;
+
+    it('os pendentes de outros dias ficam fora da lista de hoje e saem quando confirmados', async () => {
+      const loading = store.loadEarlierPending();
+      http.expectOne(`${URL}/pending`).flush([{ ...pending('old'), occurredAt: YESTERDAY }]);
+      await loading;
+
+      expect(store.earlierPending().map((entry) => entry.id)).toEqual(['old']);
+      expect(store.timeline()).toEqual([]);
+
+      const resolving = store.resolve('old', 0, CONFIRM);
+      http.expectOne(`${URL}/old/items/0/resolution`).flush({ ...confirmed('old', 1), occurredAt: YESTERDAY });
+      expect(await resolving).toBe('ok');
+
+      expect(store.earlierPending()).toEqual([]);
+      expect(store.timeline()).toEqual([]);
+    });
+
+    it('sem conseguir buscar os pendentes, a lista fica como estava', async () => {
+      const loading = store.loadEarlierPending();
+      http.expectOne(`${URL}/pending`).error(new ProgressEvent('error'));
+      await loading;
+
+      expect(store.earlierPending()).toEqual([]);
+    });
+
+    it('no mesmo dia, conferir o dia não faz nada', () => {
+      store.checkDay();
+
+      expect(store.today()).toBe('2026-11-05');
+      http.expectNone(URL);
+    });
+
+    it('a virada do dia com o app aberto troca o dia, apaga os cartões e carrega o dia novo', async () => {
+      const loading = store.load();
+      http.expectOne(URL).flush([saved('a', '50 reais')]);
+      await loading;
+      http.expectOne(SUMMARY_URL).flush(summary(50));
+      await tick();
+      expect(store.summaryLoaded()).toBe(true);
+
+      // 00h30 de 6/11 em São Paulo.
+      now = '2026-11-06T03:30:00.000Z';
+      store.checkDay();
+
+      expect(store.today()).toBe('2026-11-06');
+      expect(store.summaryLoaded()).toBe(false);
+      expect(store.timeline()).toEqual([]);
+      http.expectOne(URL).flush([]);
+      await tick();
+      http.expectOne('/api/v1/days/2026-11-06/summary').flush(summary(0));
+      await tick();
+      http.expectOne(`${URL}/pending`).flush([]);
+      await tick();
+      expect(store.summaryLoaded()).toBe(true);
+    });
+  });
+
   describe('applyResolution', () => {
     it('confirmar como rotina troca o tipo e marca como cumprida', () => {
-      const result = applyResolution(pending('p'), 0, { action: 'CONFIRM_ROUTINE' });
+      const result = applyResolution(pending('p'), 0, {
+        action: 'CONFIRM_ROUTINE',
+        outcome: 'DONE',
+        quantity: null,
+        unit: null,
+      });
 
       expect(result.items[0]).toMatchObject({
         type: 'ROUTINE',
@@ -641,8 +706,21 @@ describe('EntriesStore', () => {
         direction: null,
         category: null,
         amount: null,
+        quantity: null,
+        unit: null,
         resolvedByUser: true,
       });
+    });
+
+    it('confirmar como rotina guarda se aconteceu, a quantidade e a unidade', () => {
+      const result = applyResolution(pending('p'), 0, {
+        action: 'CONFIRM_ROUTINE',
+        outcome: 'MISSED',
+        quantity: 2,
+        unit: 'L',
+      });
+
+      expect(result.items[0]).toMatchObject({ type: 'ROUTINE', outcome: 'MISSED', quantity: 2, unit: 'L' });
     });
 
     it('só muda o item indicado e mantém o status enquanto houver pendência', () => {

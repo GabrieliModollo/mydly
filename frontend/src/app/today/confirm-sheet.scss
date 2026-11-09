@@ -116,6 +116,34 @@
   font-variant-numeric: tabular-nums;
 }
 
+.quantity {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--mydly-field-border);
+  border-radius: var(--mydly-radius);
+  background: var(--mydly-surface);
+  color: var(--mydly-ink);
+  font: inherit;
+  font-size: 16px;
+
+  &:focus-visible {
+    outline: 3px solid var(--mydly-focus);
+    outline-offset: 2px;
+  }
+
+  &[aria-invalid='true'] {
+    border-color: var(--mydly-expense-text);
+  }
+}
+
 .error {
   margin: 0;
   font-size: 13px;

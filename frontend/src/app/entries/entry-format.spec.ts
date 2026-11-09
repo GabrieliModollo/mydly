@@ -1,4 +1,4 @@
-import { chipsFor, chipsForItem, dayInSaoPaulo, formatMoney, formatQuantity, itemChip, logoutWarning, offlineNotice, parseAmount, summaryFrom } from './entry-format';
+import { chipsFor, chipsForItem, dayInSaoPaulo, formatMoney, formatQuantity, itemChip, logoutWarning, offlineNotice, parseAmount, parseQuantity, pendingLabel, summaryFrom } from './entry-format';
 import { EntryItemResponse, EntryResponse, ItemHabit } from './entry.models';
 
 function item(overrides: Partial<EntryItemResponse>): EntryItemResponse {
@@ -208,8 +208,31 @@ describe('parseAmount', () => {
     expect(parseAmount(text)).toBe(expected);
   });
 
-  it.each(['', 'abc', '0', '0,00', '-5', '8,505', '1,2,3', '12.34.5'])('"%s" não é um valor válido', (text) => {
-    expect(parseAmount(text)).toBeNull();
+  it.each(['', 'abc', '0', '0,00', '-5', '8,505', '1,2,3', '12.34.5', '50.000.000.000'])(
+    '"%s" não é um valor válido',
+    (text) => {
+      expect(parseAmount(text)).toBeNull();
+    },
+  );
+
+  it('aceita até o máximo da API', () => {
+    expect(parseAmount('9.999.999.999,99')).toBe(9_999_999_999.99);
+  });
+});
+
+describe('parseQuantity', () => {
+  it.each([
+    ['2', 2],
+    ['1,5', 1.5],
+    ['0.25', 0.25],
+    ['', null],
+    ['  ', null],
+  ])('"%s" vira %s', (text, expected) => {
+    expect(parseQuantity(text)).toBe(expected);
+  });
+
+  it.each(['abc', '0', '2 litros', '1,2345', '-1', '1000000000'])('"%s" é inválido', (text) => {
+    expect(parseQuantity(text)).toBeUndefined();
   });
 });
 
@@ -229,5 +252,18 @@ describe('logoutWarning', () => {
     [3, '3 lançamentos ainda não foram enviados. Sair apaga esses lançamentos deste aparelho.'],
   ])('%i não enviado(s)', (waiting, expected) => {
     expect(logoutWarning(waiting)).toBe(expected);
+  });
+});
+
+describe('pendingLabel', () => {
+  const base = { direction: null, outcome: null, category: null, amount: null } as const;
+
+  it.each([
+    [{ ...base, type: 'FINANCE', direction: 'EXPENSE' }, 'Quanto foi?'],
+    [{ ...base, type: 'FINANCE', direction: 'INCOME' }, 'Quanto entrou?'],
+    [{ ...base, type: 'ROUTINE', outcome: 'MISSED' }, 'Como foi?'],
+    [{ ...base, type: 'UNKNOWN' }, 'O que foi isso?'],
+  ])('%o vira "%s"', (item, expected) => {
+    expect(pendingLabel(item as unknown as EntryItemResponse)).toBe(expected);
   });
 });

@@ -220,6 +220,17 @@ ion-footer {
   cursor: pointer;
 }
 
+.earlier {
+  margin-bottom: 20px;
+}
+
+.earlier__title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mydly-muted);
+}
+
 .timeline {
   display: grid;
   gap: 10px;

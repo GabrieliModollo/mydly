@@ -62,7 +62,7 @@ export interface CreateEntryRequest {
 
 export type ResolveItemRequest =
   | { action: 'CONFIRM_FINANCE'; amount: number; direction: Direction; category: Category | null }
-  | { action: 'CONFIRM_ROUTINE' }
+  | { action: 'CONFIRM_ROUTINE'; outcome: RoutineOutcome; quantity: number | null; unit: string | null }
   | { action: 'DISMISS' }
   | { action: 'REOPEN' };
 

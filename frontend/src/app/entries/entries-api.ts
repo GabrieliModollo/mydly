@@ -20,6 +20,14 @@ export class EntriesApi {
     return this.http.get<EntryResponse[]>(EntriesApi.BASE_URL);
   }
 
+  /**
+   * Lançamentos de dias anteriores que ainda pedem confirmação, do mais recente ao mais antigo. Sem
+   * eles, um "Quanto foi?" de ontem ficaria pendente para sempre.
+   */
+  listPending(): Observable<EntryResponse[]> {
+    return this.http.get<EntryResponse[]>(`${EntriesApi.BASE_URL}/pending`);
+  }
+
   /** Resumo de um dia ({@code AAAA-MM-DD}): gasto, hábitos cumpridos, deslizes e o hábito de cada item. */
   daySummary(date: string): Observable<DaySummaryResponse> {
     return this.http.get<DaySummaryResponse>(`/api/v1/days/${date}/summary`);

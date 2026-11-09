@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
   inject,
   LOCALE_ID,
@@ -26,7 +27,7 @@ import { alertCircleOutline, arrowUp, cloudOfflineOutline, refreshOutline } from
 import { Connectivity } from '../entries/connectivity';
 import { PushService } from '../entries/push';
 import { EntriesStore, NOW } from '../entries/entries-store';
-import { chipsForItem, formatMoney, offlineNotice } from '../entries/entry-format';
+import { chipsForItem, formatMoney, offlineNotice, pendingLabel } from '../entries/entry-format';
 import { EntryItemResponse, EntryResponse, ResolveItemRequest } from '../entries/entry.models';
 import {
   budgetAlertLabel,
@@ -73,9 +74,15 @@ export class TodayPage implements OnInit {
   protected readonly connectivity = inject(Connectivity);
   private readonly push = inject(PushService);
   private readonly now = inject(NOW);
-  protected readonly todayLabel = formatDayLabel(this.now(), inject(LOCALE_ID));
+  private readonly locale = inject(LOCALE_ID);
+  /** "Domingo, 8 de novembro"; acompanha a virada do dia com o app aberto. */
+  protected readonly todayLabel = computed(() => {
+    this.store.today();
+    return formatDayLabel(this.now(), this.locale);
+  });
   protected readonly examples = EXAMPLES;
   protected readonly chipsForItem = chipsForItem;
+  protected readonly pendingLabel = pendingLabel;
   protected readonly formatMoney = formatMoney;
   protected readonly offlineNotice = offlineNotice;
   protected readonly dailyProgressLabel = dailyProgressLabel;
@@ -100,6 +107,7 @@ export class TodayPage implements OnInit {
 
   ngOnInit(): void {
     void this.store.load();
+    void this.store.loadEarlierPending();
     // No app nativo, registra o aparelho de novo se a pessoa ativou as notificações (ADR 0016).
     void this.push.resume();
   }
@@ -110,9 +118,16 @@ export class TodayPage implements OnInit {
    */
   ionViewWillEnter(): void {
     if (this.entered) {
+      this.store.checkDay();
       void (this.store.needsLoad() ? this.store.load() : this.store.refreshSummary());
+      void this.store.loadEarlierPending();
     }
     this.entered = true;
+  }
+
+  /** Data curta de um lançamento de outro dia: {@code 07/11, 21:33}. */
+  protected earlierFormat(): string {
+    return "dd/MM, HH:mm";
   }
 
   protected timeFormat(occurredAt: string): string {
@@ -207,7 +222,8 @@ export class TodayPage implements OnInit {
   }
 
   protected async refresh(event: RefresherCustomEvent): Promise<void> {
-    await this.store.load();
+    this.store.checkDay();
+    await Promise.all([this.store.load(), this.store.loadEarlierPending()]);
     await event.target.complete();
   }
 }

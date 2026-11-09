@@ -74,6 +74,11 @@ describe('TodayPage', () => {
       habitFor: () => undefined,
       dailyGoals: signal([]),
       budgetAlerts: signal([]),
+      today: signal('2026-11-05'),
+      earlierPending: signal([]),
+      summaryLoaded: signal(true),
+      loadEarlierPending: async () => undefined,
+      checkDay: () => undefined,
     };
     TestBed.configureTestingModule({
       imports: [TodayPage],
@@ -225,6 +230,11 @@ describe('TodayPage · confirmação', () => {
       habitFor: () => undefined,
       dailyGoals: signal([]),
       budgetAlerts: signal([]),
+      today: signal('2026-11-05'),
+      earlierPending: signal([]),
+      summaryLoaded: signal(true),
+      loadEarlierPending: async () => undefined,
+      checkDay: () => undefined,
     };
     TestBed.configureTestingModule({
       imports: [TodayPage],
@@ -431,6 +441,11 @@ describe('TodayPage · metas e orçamento', () => {
       habitFor: () => undefined,
       dailyGoals: signal(dailyGoals),
       budgetAlerts: signal(budgetAlerts),
+      today: signal('2026-11-05'),
+      earlierPending: signal([]),
+      summaryLoaded: signal(true),
+      loadEarlierPending: async () => undefined,
+      checkDay: () => undefined,
     };
     TestBed.configureTestingModule({
       imports: [TodayPage],
@@ -500,3 +515,65 @@ describe('TodayPage · metas e orçamento', () => {
   });
 });
 
+describe('TodayPage, outros dias e carregamento', () => {
+  async function open(changes: Partial<EntriesStore>): Promise<HTMLElement> {
+    const store: Partial<EntriesStore> = {
+      loadState: signal('loaded'),
+      timeline: signal([]),
+      waitingCount: signal(0),
+      summary: signal({ spent: 0, habitsDone: 0 }),
+      load: async () => undefined,
+      find: () => PENDING,
+      habitFor: () => undefined,
+      dailyGoals: signal([]),
+      budgetAlerts: signal([]),
+      today: signal('2026-11-06'),
+      earlierPending: signal([]),
+      summaryLoaded: signal(true),
+      loadEarlierPending: async () => undefined,
+      checkDay: () => undefined,
+      ...changes,
+    };
+    TestBed.configureTestingModule({
+      imports: [TodayPage],
+      providers: [
+        provideIonicAngular({ mode: 'md' }),
+        provideRouter([]),
+        { provide: LOCALE_ID, useValue: 'pt-BR' },
+        { provide: EntriesStore, useValue: store },
+        { provide: Connectivity, useValue: { online: signal(true) } },
+        { provide: NOW, useValue: () => new Date('2026-11-06T12:00:00Z') },
+      ],
+    });
+    const fixture = TestBed.createComponent(TodayPage);
+    await fixture.whenStable();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('mostra os pendentes de outros dias com a data e o "Quanto foi?"', async () => {
+    const root = await open({
+      earlierPending: signal([{ id: 'p', text: 'Comprei pão', occurredAt: PENDING.occurredAt, sync: 'synced', entry: PENDING }]),
+    });
+
+    const section = root.querySelector('[aria-labelledby="earlier-title"]');
+    expect(section?.textContent).toContain('Ficou para confirmar');
+    expect(section?.textContent).toContain('Comprei pão');
+    expect(section?.textContent).toContain('05/11');
+    expect([...section!.querySelectorAll('button')].some((b) => b.textContent?.includes('Quanto foi?'))).toBe(true);
+  });
+
+  it('sem pendentes de outros dias, a seção não aparece', async () => {
+    const root = await open({});
+
+    expect(root.querySelector('[aria-labelledby="earlier-title"]')).toBeNull();
+  });
+
+  it('enquanto o resumo do dia não chega, os cartões mostram um traço, e não R$ 0,00', async () => {
+    const root = await open({ summaryLoaded: signal(false) });
+
+    const cards = root.querySelector('[aria-label="Resumo de hoje"]')!;
+    expect(cards.textContent).not.toContain('R$');
+    expect(cards.textContent).toContain('—');
+    expect(cards.textContent).toContain('Carregando');
+  });
+});

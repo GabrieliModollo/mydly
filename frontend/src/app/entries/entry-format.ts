@@ -13,9 +13,12 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   OTHER: 'Outros',
 };
 
+/** O maior valor que a API aceita: o que cabe na coluna de valor do banco. */
+export const MAX_AMOUNT = 9_999_999_999.99;
+
 /**
  * Valor digitado pelo usuário em reais: {@code 8,50}, {@code 8.5}, {@code 1.250,90} ou {@code R$ 12}.
- * Devolve {@code null} quando não é um valor positivo com até duas casas decimais.
+ * Devolve {@code null} quando não é um valor positivo com até duas casas decimais e até {@link MAX_AMOUNT}.
  */
 export function parseAmount(text: string): number | null {
   const cleaned = text.replace(/r\$/i, '').replace(/\s/g, '');
@@ -30,7 +33,37 @@ export function parseAmount(text: string): number | null {
     return null;
   }
   const value = Number(normalized);
-  return value > 0 ? value : null;
+  return value > 0 && value <= MAX_AMOUNT ? value : null;
+}
+
+/**
+ * Quantidade digitada: {@code 2}, {@code 1,5} ou {@code 0.5}, com até três casas decimais. Vazio é
+ * "sem quantidade" ({@code undefined} fica para o inválido).
+ */
+export function parseQuantity(text: string): number | null | undefined {
+  const cleaned = text.replace(/\s/g, '');
+  if (cleaned === '') {
+    return null;
+  }
+  if (!/^\d+([.,]\d{1,3})?$/.test(cleaned)) {
+    return undefined;
+  }
+  const value = Number(cleaned.replace(',', '.'));
+  return value > 0 && value < 1_000_000_000 ? value : undefined;
+}
+
+/**
+ * O link de um item pendente, pelo tipo que o MyDly entendeu: o mesmo título do painel que ele abre.
+ * Uma rotina reaberta com "Não foi isso" não pergunta "Quanto foi?".
+ */
+export function pendingLabel(item: EntryItemResponse): string {
+  if (item.type === 'ROUTINE') {
+    return 'Como foi?';
+  }
+  if (item.type === 'FINANCE') {
+    return item.direction === 'INCOME' ? 'Quanto entrou?' : 'Quanto foi?';
+  }
+  return 'O que foi isso?';
 }
 
 /** Tom visual de um chip; cada um tem fundo e texto próprios no tema (docs/design.md). */

@@ -19,6 +19,12 @@ export const NEW_ENTRY_ID = new InjectionToken<() => string>('NEW_ENTRY_ID', {
 // O relógio mora em now.ts (a sessão também usa); continua exportado daqui para quem já importava.
 export { NOW };
 
+/** De quanto em quanto tempo o app confere se o dia virou com ele aberto. Substituível nos testes. */
+export const DAY_CHECK_MS = new InjectionToken<number>('DAY_CHECK_MS', {
+  providedIn: 'root',
+  factory: () => 60_000,
+});
+
 /** Espera entre uma falha de envio e a próxima tentativa automática. Substituível nos testes. */
 export const RETRY_DELAY_MS = new InjectionToken<number>('RETRY_DELAY_MS', {
   providedIn: 'root',
@@ -84,13 +90,35 @@ export class EntriesStore {
   readonly loadState = signal<LoadState>('idle');
 
   /**
+   * O dia de hoje em São Paulo ({@code AAAA-MM-DD}). Muda quando o relógio passa da meia-noite com o
+   * app aberto ({@link checkDay}), e a lista, os cartões e o cabeçalho mudam junto.
+   */
+  readonly today = signal(dayInSaoPaulo(this.now()));
+
+  /**
    * Lançamentos do mais recente para o mais antigo: os de hoje e os que ainda não foram enviados,
    * mesmo que sejam de outro dia. Um lançamento de ontem sai da lista assim que chega ao servidor.
    */
   readonly timeline = computed(() => {
-    const today = dayInSaoPaulo(this.now());
+    const today = this.today();
     return this.entries()
       .filter((entry) => entry.sync !== 'synced' || dayInSaoPaulo(new Date(entry.occurredAt)) === today)
+      .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+  });
+
+  /**
+   * Lançamentos de dias anteriores que ainda pedem confirmação, do mais recente ao mais antigo. Saem
+   * daqui assim que o último item pendente é resolvido.
+   */
+  readonly earlierPending = computed(() => {
+    const today = this.today();
+    return this.entries()
+      .filter(
+        (entry) =>
+          entry.sync === 'synced' &&
+          entry.entry?.needsConfirmation === true &&
+          dayInSaoPaulo(new Date(entry.occurredAt)) < today,
+      )
       .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
   });
 
@@ -114,11 +142,61 @@ export class EntriesStore {
       }
     };
     view?.addEventListener('storage', onStorage);
+    // O dia pode virar com o app aberto: confere de tempos em tempos e sempre que a aba volta a aparecer.
+    const doc = inject(DOCUMENT);
+    const onVisible = () => {
+      if (doc.visibilityState === 'visible') {
+        this.checkDay();
+      }
+    };
+    doc.addEventListener('visibilitychange', onVisible);
+    const dayTimer = setInterval(() => this.checkDay(), inject(DAY_CHECK_MS));
     inject(DestroyRef).onDestroy(() => {
       stopListening();
       view?.removeEventListener('storage', onStorage);
+      doc.removeEventListener('visibilitychange', onVisible);
+      clearInterval(dayTimer);
       clearTimeout(this.retryTimer);
     });
+  }
+
+  /**
+   * Confere se o dia virou. Se virou, os cartões do dia anterior somem na hora e a lista do dia novo
+   * é carregada, com os pendentes de ontem passando para "de outros dias".
+   */
+  checkDay(): void {
+    const day = dayInSaoPaulo(this.now());
+    if (day === this.today()) {
+      return;
+    }
+    this.today.set(day);
+    this.daySummary.set(null);
+    if (this.owner && this.session.isLoggedIn() && this.loadState() !== 'idle') {
+      void this.load().then(() => this.loadEarlierPending());
+    }
+  }
+
+  /**
+   * Busca os lançamentos de dias anteriores que ainda pedem confirmação. Numa falha, a lista fica como
+   * estava: eles voltam na próxima carga.
+   */
+  async loadEarlierPending(): Promise<void> {
+    try {
+      const pending = await firstValueFrom(this.api.listPending());
+      const ids = new Set(pending.map((entry) => entry.id));
+      ids.forEach((id) => this.known.add(id));
+      const today = this.today();
+      this.change((list) => [
+        ...list.filter(
+          (entry) =>
+            !ids.has(entry.id) &&
+            !(entry.sync === 'synced' && dayInSaoPaulo(new Date(entry.occurredAt)) < today && entry.entry?.needsConfirmation),
+        ),
+        ...pending.map(toSynced),
+      ]);
+    } catch {
+      // Ficam para a próxima carga.
+    }
   }
 
   /** Resumo do dia vindo da API (finance e routines); {@code null} até a primeira resposta. */
@@ -127,6 +205,9 @@ export class EntriesStore {
 
   /** Totais dos cartões: o que vale em finance e routines, sem os itens retirados com "Não foi isso". */
   readonly summary = computed(() => summaryFrom(this.daySummary()));
+
+  /** O resumo do dia já chegou; antes disso os cartões mostram um traço, e não um R$ 0,00 que não é verdade. */
+  readonly summaryLoaded = computed(() => this.daySummary() !== null);
 
   /** Progresso das metas diárias de quantidade de hoje ("Hidratação 1,5 / 2 L"). */
   readonly dailyGoals = computed(() => this.daySummary()?.dailyGoals ?? []);
@@ -152,7 +233,7 @@ export class EntriesStore {
   async refreshSummary(): Promise<void> {
     const request = ++this.summaryRequests;
     try {
-      const summary = await firstValueFrom(this.api.daySummary(dayInSaoPaulo(this.now())));
+      const summary = await firstValueFrom(this.api.daySummary(this.today()));
       // Uma resposta antiga que chega depois de uma mais nova não sobrescreve os cartões.
       if (request === this.summaryRequests) {
         this.daySummary.set(summary);
@@ -454,9 +535,11 @@ export function applyResolution(entry: EntryResponse, index: number, request: Re
           ...resolved,
           type: 'ROUTINE',
           direction: null,
-          outcome: 'DONE',
+          outcome: request.outcome,
           category: null,
           amount: null,
+          quantity: request.quantity,
+          unit: request.quantity === null ? null : request.unit,
           confidence: 1,
           state: 'ACCEPTED_BY_USER',
         };

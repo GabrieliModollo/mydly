@@ -154,7 +154,7 @@ describe('ConfirmSheet', () => {
     await fixture.whenStable();
     button(root, 'Salvar rotina').click();
 
-    expect(emitted).toEqual([{ action: 'CONFIRM_ROUTINE' }]);
+    expect(emitted).toEqual([{ action: 'CONFIRM_ROUTINE', outcome: 'DONE', quantity: null, unit: null }]);
   });
 
   it('item não entendido pode virar gasto', async () => {
@@ -166,7 +166,81 @@ describe('ConfirmSheet', () => {
     button(root, 'Salvar gasto').click();
 
     expect(emitted).toEqual([{ action: 'CONFIRM_FINANCE', amount: 12, direction: 'EXPENSE', category: null }]);
-    expect(button(root, 'Não era nada')).toBeTruthy();
+    expect(button(root, 'Não foi um gasto')).toBeTruthy();
+  });
+
+  it('item não entendido, ainda sem tipo, pode ser descartado como nada', async () => {
+    const root = await open(entryWith({ type: 'UNKNOWN', direction: null, category: null }));
+
+    button(root, 'Não era nada').click();
+
+    expect(emitted).toEqual([{ action: 'DISMISS' }]);
+  });
+
+  it('rotina reaberta com "Não foi isso" mantém se aconteceu, a quantidade e a unidade', async () => {
+    const root = await open(
+      entryWith({ type: 'ROUTINE', direction: null, category: null, outcome: 'MISSED', quantity: 2, unit: 'L' }),
+    );
+
+    expect(root.querySelector('h2')?.textContent).toContain('Como foi?');
+    expect(root.querySelector('#confirm-amount')).toBeNull();
+    expect(button(root, 'Não aconteceu').getAttribute('aria-pressed')).toBe('true');
+    expect(root.querySelector<HTMLInputElement>('#confirm-quantity')?.value).toBe('2');
+    expect(root.querySelector<HTMLSelectElement>('#confirm-unit')?.value).toBe('L');
+    expect(button(root, 'Não foi uma rotina')).toBeTruthy();
+
+    button(root, 'Salvar rotina').click();
+
+    expect(emitted).toEqual([{ action: 'CONFIRM_ROUTINE', outcome: 'MISSED', quantity: 2, unit: 'L' }]);
+  });
+
+  it('rotina corrigida para cumprida e com outra quantidade', async () => {
+    const root = await open(
+      entryWith({ type: 'ROUTINE', direction: null, category: null, outcome: 'MISSED', quantity: 2, unit: 'L' }),
+    );
+
+    button(root, 'Aconteceu').click();
+    const quantity = root.querySelector<HTMLInputElement>('#confirm-quantity')!;
+    quantity.value = '1,5';
+    quantity.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    button(root, 'Salvar rotina').click();
+
+    expect(emitted).toEqual([{ action: 'CONFIRM_ROUTINE', outcome: 'DONE', quantity: 1.5, unit: 'L' }]);
+  });
+
+  it('quantidade inválida não deixa salvar', async () => {
+    const root = await open(entryWith({ type: 'ROUTINE', direction: null, category: null, outcome: 'DONE' }));
+
+    const quantity = root.querySelector<HTMLInputElement>('#confirm-quantity')!;
+    quantity.value = '2 litros';
+    quantity.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    expect(button(root, 'Salvar rotina').disabled).toBe(true);
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain('1,5');
+  });
+
+  it('um gasto pode virar entrada, com o título e o botão dela', async () => {
+    const root = await open(entryWith({ amount: 50 }));
+
+    button(root, 'Uma entrada').click();
+    await fixture.whenStable();
+
+    expect(root.querySelector('h2')?.textContent).toContain('Quanto entrou?');
+    expect(button(root, 'Não foi uma entrada')).toBeTruthy();
+    button(root, 'Salvar entrada').click();
+    expect(emitted).toEqual([{ action: 'CONFIRM_FINANCE', amount: 50, direction: 'INCOME', category: 'FOOD' }]);
+  });
+
+  it('um gasto pode virar rotina', async () => {
+    const root = await open(entryWith({ amount: 50 }));
+
+    button(root, 'Uma rotina').click();
+    await fixture.whenStable();
+    button(root, 'Salvar rotina').click();
+
+    expect(emitted).toEqual([{ action: 'CONFIRM_ROUTINE', outcome: 'DONE', quantity: null, unit: null }]);
   });
 
   it('fecha pelo botão de fechar, sem resolver', async () => {

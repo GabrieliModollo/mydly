@@ -1,7 +1,7 @@
 <ion-header class="ion-no-border">
   <ion-toolbar>
     <div class="header">
-      <p class="header__date">{{ todayLabel }}</p>
+      <p class="header__date">{{ todayLabel() }}</p>
       <h1 class="header__title">Hoje</h1>
     </div>
   </ion-toolbar>
@@ -16,11 +16,23 @@
     <section class="summary" aria-label="Resumo de hoje">
       <div class="summary__card">
         <p class="summary__label">Gasto hoje</p>
-        <p class="summary__value">{{ formatMoney(store.summary().spent) }}</p>
+        <p class="summary__value">
+          @if (store.summaryLoaded()) {
+            {{ formatMoney(store.summary().spent) }}
+          } @else {
+            <span aria-hidden="true">—</span><span class="sr-only">Carregando</span>
+          }
+        </p>
       </div>
       <div class="summary__card">
         <p class="summary__label">Hábitos cumpridos</p>
-        <p class="summary__value">{{ store.summary().habitsDone }}</p>
+        <p class="summary__value">
+          @if (store.summaryLoaded()) {
+            {{ store.summary().habitsDone }}
+          } @else {
+            <span aria-hidden="true">—</span><span class="sr-only">Carregando</span>
+          }
+        </p>
         @if (store.dailyGoals().length > 0) {
           <ul class="goals" aria-label="Metas de hoje">
             @for (goal of store.dailyGoals(); track goal.habit) {
@@ -82,6 +94,41 @@
       </div>
     }
 
+    @if (store.earlierPending().length > 0) {
+      <section class="earlier" aria-labelledby="earlier-title">
+        <h2 id="earlier-title" class="earlier__title">Ficou para confirmar</h2>
+        <ul class="timeline" aria-label="Lançamentos de outros dias para confirmar">
+          @for (item of store.earlierPending(); track item.id) {
+            @if (item.entry; as saved) {
+              <li class="entry">
+                <div class="entry__head">
+                  <p class="entry__text">{{ item.text }}</p>
+                  <time class="entry__time" [attr.datetime]="item.occurredAt">{{
+                    item.occurredAt | date: earlierFormat()
+                  }}</time>
+                </div>
+                @for (parsed of saved.items; track $index; let index = $index) {
+                  @if (parsed.needsConfirmation) {
+                    <div class="item">
+                      <ul class="chips" aria-label="O que o MyDly entendeu">
+                        @for (chip of chipsForItem(parsed); track $index) {
+                          <li class="chip" [attr.data-tone]="chip.tone">{{ chip.label }}</li>
+                        }
+                      </ul>
+                      <button type="button" class="link-button" (click)="openConfirm(saved, index)">
+                        {{ pendingLabel(parsed) }}
+                        <span aria-hidden="true">→</span>
+                      </button>
+                    </div>
+                  }
+                }
+              </li>
+            }
+          }
+        </ul>
+      </section>
+    }
+
     @if (store.timeline().length === 0) {
       @if (store.loadState() === 'loading') {
         <div class="loading">
@@ -129,7 +176,7 @@
                   </ul>
                   @if (parsed.needsConfirmation) {
                     <button type="button" class="link-button" (click)="openConfirm(saved, index)">
-                      {{ parsed.type === 'UNKNOWN' ? 'O que foi isso?' : 'Quanto foi?' }}
+                      {{ pendingLabel(parsed) }}
                       <span aria-hidden="true">→</span>
                     </button>
                   } @else if (parsed.canReopen) {
