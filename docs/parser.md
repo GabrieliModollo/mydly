@@ -43,9 +43,15 @@ As regras são avaliadas em ordem, e a primeira que casa decide:
 
 **Sinais de finança.** Os de saída são gastei, gastou, gasto, paguei, pagou, comprei, comprou, custou e torrei. Os de entrada são recebi, recebeu, recebido, recebida, ganhei, salário, reembolso e reembolsado. A palavra "caiu" só conta como entrada quando a frase tem número, para "o celular caiu" não virar finança.
 
-**Direção.** É `INCOME` quando aparece um sinal de entrada e `EXPENSE` em qualquer outro caso.
+**Direção.** Vale o primeiro sinal de finança da frase, que é o da oração principal: é `INCOME` quando ele é de entrada e `EXPENSE` quando é de saída ou quando não há nenhum. Em "Paguei o salário da diarista: 200 reais", "Gastei 30 reais no presente que ganhei" e "Paguei 50 reais de reembolso" o verbo de gasto vem antes, e é gasto; em "Recebi 50 reais de reembolso do que paguei", é entrada.
 
-**Números.** O parser aceita o formato brasileiro (`1.250,90` vira 1250,90) e o ponto decimal (`2.5`). Um ponto seguido de exatamente três dígitos é separador de milhar (`1.250` vira 1250).
+**Números.** O parser aceita o formato brasileiro (`1.250,90` vira 1250,90), o ponto decimal (`2.5`) e o formato americano com vírgula de milhar e ponto decimal (`1,000.50` vira 1000,50). Um ponto seguido de exatamente três dígitos é separador de milhar (`1.250` vira 1250).
+
+**Valores que não podem ser gravados.** Um valor zero, com mais de duas casas decimais (`10,555 reais`) ou acima de R$ 9.999.999.999,99 (o que cabe na coluna do banco) é tratado como não dito: a finança fica sem valor, com o texto inteiro e confiança 0,40, e o app pergunta. O mesmo vale para quantidades acima de 999.999.999 ou com mais de três casas, que ficam como rotina sem quantidade. Um valor que não cabe faria o evento para `finance` falhar para sempre. A API recusa os mesmos valores numa confirmação (`CONFIRM_FINANCE` e `CONFIRM_ROUTINE`).
+
+**Horários e intervalos.** "às 6h" e "pelas 22h30" são horários e somem antes das regras. Um intervalo vira a duração: "de 14h às 16h" é 2 h, "de 14h30 às 16h" é 1,5 h e "das 23h às 7h" passa da meia-noite e dá 8 h. Horas com minutos colados são horas decimais: "7h30" é 7,5 h, e não 7 h.
+
+**Faixa de valor.** "entre 40 e 50" não diz quanto foi: a faixa some, a finança fica sem valor e o app pergunta. O "e" da faixa não divide a frase.
 
 **Finança negada (regra 1b).** "Não gastei nada hoje" nunca vira um gasto nem uma entrada, com ou sem valor. O parser não modela um "dia sem gastos", então a frase vai para o fallback com confiança baixa. É melhor perguntar do que registrar um gasto que não existiu.
 
@@ -77,7 +83,7 @@ Uma frase pode contar mais de uma coisa: "Fui à academia e gastei 30 no açaí"
 - **Verbo de ação** é um verbo no passado em primeira pessoa: termina em "-ei" (estudei, meditei, tomei) ou é um irregular comum (fui, fiz, bebi, comi, dormi, li...). Os sinais de finança são os da regra 2 em diante (gastei, paguei, recebi, salário...).
 - **Verbo de falta sozinho não é âncora.** Em "Fui à academia, não faltei", o "não faltei" fala da academia, e a frase fica com um item.
 - **O valor completa a parte anterior quando ela ainda não tem valor.** "Comprei pão e leite por 12 reais" é um gasto só, de R$ 12. Já "Comprei 2 pães e 1 leite" também é um item só, porque o gasto não tem valor e o "1 leite" é parte da mesma compra.
-- **"mas" e "porém" não dividem.** Eles separam a oração principal para a negação (veja abaixo), mas "Fui à academia mas não treinei perna" é um item só.
+- **"mas" e "porém" só dividem quando o que vem depois é dinheiro.** "Não fui à academia mas gastei 30 no açaí" vira uma rotina não cumprida e um gasto em Alimentação. Já "Fui à academia mas não treinei perna" é um item só: o "mas" só separa a oração principal para a negação (veja abaixo).
 
 **Herança.** A parte sem verbo é interpretada com o verbo do item anterior. Depois de um gasto ela é outro gasto, e depois de uma entrada é outra entrada ("Recebi 100 reais e 50 do freela"). Depois de uma rotina com quantidade, ela é outra rotina: com a própria unidade ("e 1 litro de suco"), com a unidade da anterior quando não diz a sua ("Bebi 2 litros de água e 1 de suco" dá 1 L, confiança 0,70), ou como contagem ("Fiz 30 flexões e 20 abdominais"). O cumprido ou não vem junto com o verbo herdado. Se o item anterior não tem valor nem quantidade (um gasto negado, por exemplo), não há o que herdar, e a parte se junta a ele.
 

@@ -31,9 +31,6 @@ record LlmReading(int index, String type, String direction, BigDecimal amount, S
     /** Leitura incerta ou incompleta: o app continua perguntando, já com a sugestão do LLM no painel. */
     static final double CONFIDENCE_UNSURE = 0.45;
 
-    /** O maior valor que cabe em {@code finance_transaction.amount} (12 dígitos e 2 casas). */
-    private static final BigDecimal MAX_AMOUNT = new BigDecimal("9999999999.99");
-
     /**
      * O item que esta leitura vira, com o trecho original como descrição: o texto do LLM nunca é
      * guardado. Vazio quando o LLM não soube ({@code UNKNOWN}) ou devolveu algo fora do formato; aí
@@ -61,7 +58,7 @@ record LlmReading(int index, String type, String direction, BigDecimal amount, S
 
     private ParsedEntry routine(String description) {
         RoutineOutcome parsedOutcome = outcome == null ? RoutineOutcome.DONE : RoutineOutcome.valueOf(outcome);
-        BigDecimal validQuantity = quantity != null && quantity.signum() > 0 ? quantity.stripTrailingZeros() : null;
+        BigDecimal validQuantity = ParsedEntry.validQuantity(quantity);
         String validUnit = validQuantity != null && unit != null && ParsedEntry.UNITS.contains(unit) ? unit : null;
         return ParsedEntry.routine(parsedOutcome, validQuantity, validUnit, description,
                 clear ? CONFIDENCE_CLEAR : CONFIDENCE_UNSURE);
@@ -69,10 +66,6 @@ record LlmReading(int index, String type, String direction, BigDecimal amount, S
 
     /** Valor positivo com até duas casas e que cabe na coluna; outro valor é tratado como não dito. */
     private BigDecimal validAmount() {
-        if (amount == null || amount.signum() <= 0 || amount.compareTo(MAX_AMOUNT) > 0) {
-            return null;
-        }
-        BigDecimal stripped = amount.stripTrailingZeros();
-        return stripped.scale() > 2 ? null : stripped.setScale(Math.max(stripped.scale(), 0));
+        return ParsedEntry.validAmount(amount);
     }
 }

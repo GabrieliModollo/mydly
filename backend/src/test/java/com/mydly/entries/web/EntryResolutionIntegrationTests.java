@@ -207,6 +207,25 @@ class EntryResolutionIntegrationTests {
     }
 
     @Test
+    void valorQueNaoCabeNaColunaDevolve400() throws Exception {
+        UUID id = create("Comprei pão");
+
+        resolve(id, 0, "\"0\"", """
+                {"action": "CONFIRM_FINANCE", "amount": 50000000000}""")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("O valor passa do máximo aceito (R$ 9.999.999.999,99)."));
+    }
+
+    @Test
+    void quantidadeQueNaoCabeNaColunaDevolve400() throws Exception {
+        UUID id = create("Comprei pão");
+
+        resolve(id, 0, "\"0\"", """
+                {"action": "CONFIRM_ROUTINE", "quantity": 99999999999, "unit": "L"}""")
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void valorComMaisDeDuasCasasDevolve400() throws Exception {
         UUID id = create("Comprei pão");
 

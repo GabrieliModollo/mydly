@@ -109,6 +109,30 @@ class RuleBasedEntryParserTests {
             '   '                                    | UNKNOWN |         |       |     |      | BAIXA
             # Sem letras nem números não há o que interpretar.
             ?!                                       | UNKNOWN |         |       |     |      | BAIXA
+            # Valor que não pode ser gravado vira finança sem valor, e o app pergunta.
+            Gastei 50000000000 reais                 | FINANCE | EXPENSE |       |     |      | BAIXA
+            Gastei 0 reais                           | FINANCE | EXPENSE |       |     |      | BAIXA
+            Gastei 10,555 reais                      | FINANCE | EXPENSE |       |     |      | BAIXA
+            Bebi 99999999999 litros                  | ROUTINE |         |       |     |      | MEDIA
+            # Vírgula de milhar e ponto decimal: formato americano.
+            R$ 1,000.50                              | FINANCE | EXPENSE | 1000.50 |   |      | ALTA
+            # Faixa de valor não diz quanto foi.
+            Gastei entre 40 e 50 reais               | FINANCE | EXPENSE |       |     |      | BAIXA
+            Gastei entre 40 e 50 no mercado          | FINANCE | EXPENSE |       |     |      | BAIXA
+            # A direção é a do primeiro verbo de finança, o da oração principal.
+            Paguei o salário da diarista: 200 reais  | FINANCE | EXPENSE | 200   |     |      | ALTA
+            Gastei 30 reais no presente que ganhei   | FINANCE | EXPENSE | 30    |     |      | ALTA
+            Paguei 50 reais de reembolso             | FINANCE | EXPENSE | 50    |     |      | ALTA
+            Recebi 50 reais de reembolso do que paguei | FINANCE | INCOME | 50   |     |      | ALTA
+            # Intervalo de horário vira duração, passando da meia-noite se precisar.
+            Estudei de 14h às 16h                    | ROUTINE |         |       | 2   | h    | ALTA
+            Estudei de 14h30 às 16h                  | ROUTINE |         |       | 1.5 | h    | ALTA
+            Dormi das 23h às 7h                      | ROUTINE |         |       | 8   | h    | ALTA
+            # Horas com minutos colados.
+            Dormi 7h30                               | ROUTINE |         |       | 7.5 | h    | ALTA
+            Estudei 1h45                             | ROUTINE |         |       | 1.75| h    | ALTA
+            # Horário com minutos colados continua sendo horário.
+            Acordei às 6h30                          | ROUTINE |         |       |     |      | MEDIA
             """)
     void trataCasosDeBorda(String text, EntryType type, Direction direction, BigDecimal amount,
                            BigDecimal quantity, String unit, Confidence confidence) {
@@ -296,8 +320,12 @@ class RuleBasedEntryParserTests {
             # A negação em outra oração fala de outra coisa e não é item.
             Bebi água, não refrigerante                       | ROUTINE
             Fui à academia, não faltei                        | ROUTINE
-            # "mas" separa a oração principal, mas não cria item.
+            # "mas" separa a oração principal, mas só cria item quando o que vem depois é dinheiro.
             Fui à academia mas não treinei perna              | ROUTINE
+            Não fui à academia mas gastei 30 no açaí          | ROUTINE FINANCE
+            Fui à academia, mas paguei 20 reais de estacionamento | ROUTINE FINANCE
+            # O "e" de uma faixa ou de um intervalo de horário não separa.
+            Gastei entre 40 e 50 no mercado                   | FINANCE
             # A vírgula do decimal não separa.
             Paguei 12,50 no estacionamento                    | FINANCE
             # O "aí" de "açaí" não é separador.
@@ -340,6 +368,25 @@ class RuleBasedEntryParserTests {
 
         assertParsed(result, type, direction, amount, quantity, unit, confidence);
         assertThat(result.description()).as("a descrição guarda o texto original").isEqualTo(text);
+    }
+
+    @Test
+    void masSeparaOGastoDaRotinaNaoCumprida() {
+        List<ParsedEntry> items = parser.parse("Não fui à academia mas gastei 30 no açaí");
+
+        assertThat(items.get(0).outcome()).isEqualTo(RoutineOutcome.MISSED);
+        assertThat(items.get(0).description()).isEqualTo("Não fui à academia");
+        assertThat(items.get(1).amount()).isEqualByComparingTo("30");
+        assertThat(items.get(1).category()).isEqualTo(Category.FOOD);
+    }
+
+    @Test
+    void valorQueNaoCabeNaColunaGuardaOTextoParaPerguntar() {
+        ParsedEntry item = single("Gastei 50000000000 reais");
+
+        assertThat(item.amount()).isNull();
+        assertThat(item.description()).isEqualTo("Gastei 50000000000 reais");
+        assertThat(item.needsConfirmation()).isTrue();
     }
 
     @Test

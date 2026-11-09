@@ -46,6 +46,34 @@ public record ParsedEntry(
     /** Unidades normalizadas aceitas em {@code unit}. */
     public static final Set<String> UNITS = Set.of("L", "mL", "h", "min", "km", "kg", "copo");
 
+    /** O maior valor que cabe em {@code finance_transaction.amount}: 12 dígitos com 2 casas decimais. */
+    public static final BigDecimal MAX_AMOUNT = new BigDecimal("9999999999.99");
+
+    /** A maior quantidade que cabe em {@code habit_log.quantity}: 12 dígitos com 3 casas decimais. */
+    public static final BigDecimal MAX_QUANTITY = new BigDecimal("999999999.999");
+
+    /**
+     * O valor sem zeros à direita quando ele pode ser gravado: maior que zero, até {@link #MAX_AMOUNT}
+     * e com no máximo duas casas decimais. Fora disso, {@code null}: o valor é tratado como não dito, e
+     * o app pergunta. Um valor que não cabe na coluna faria o evento falhar para sempre.
+     */
+    public static BigDecimal validAmount(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0 || amount.compareTo(MAX_AMOUNT) > 0) {
+            return null;
+        }
+        BigDecimal stripped = amount.stripTrailingZeros();
+        return stripped.scale() > 2 ? null : stripped.setScale(Math.max(stripped.scale(), 0));
+    }
+
+    /** A quantidade sem zeros à direita quando ela pode ser gravada: maior que zero, até {@link #MAX_QUANTITY} e com até três casas. */
+    public static BigDecimal validQuantity(BigDecimal quantity) {
+        if (quantity == null || quantity.signum() <= 0 || quantity.compareTo(MAX_QUANTITY) > 0) {
+            return null;
+        }
+        BigDecimal stripped = quantity.stripTrailingZeros();
+        return stripped.scale() > 3 ? null : stripped.setScale(Math.max(stripped.scale(), 0));
+    }
+
     public ParsedEntry {
         Objects.requireNonNull(type, "type");
         if (type == EntryType.ROUTINE && outcome == null) {

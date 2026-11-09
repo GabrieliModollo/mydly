@@ -183,6 +183,9 @@ public class EntryService {
                     if (command.amount().stripTrailingZeros().scale() > 2) {
                         throw invalid("O valor aceita no máximo duas casas decimais.");
                     }
+                    if (command.amount().compareTo(ParsedEntry.MAX_AMOUNT) > 0) {
+                        throw invalid("O valor passa do máximo aceito (R$ 9.999.999.999,99).");
+                    }
                     Direction direction = command.direction() != null ? command.direction() : Direction.EXPENSE;
                     yield ItemResolution.confirmed(ParsedEntry.finance(direction, command.amount(), command.category(),
                             description, ParsedEntry.CONFIRMED_BY_USER));
@@ -190,6 +193,9 @@ public class EntryService {
                 case CONFIRM_ROUTINE -> {
                     if (command.quantity() != null && command.quantity().signum() <= 0) {
                         throw invalid("A quantidade precisa ser maior que zero.");
+                    }
+                    if (command.quantity() != null && ParsedEntry.validQuantity(command.quantity()) == null) {
+                        throw invalid("A quantidade aceita até 999.999.999 com no máximo três casas decimais.");
                     }
                     RoutineOutcome outcome = command.outcome() != null ? command.outcome() : RoutineOutcome.DONE;
                     yield ItemResolution.confirmed(ParsedEntry.routine(outcome, command.quantity(), command.unit(),

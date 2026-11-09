@@ -81,10 +81,12 @@ class RuleBasedEntryParser implements EntryParser {
     static final int MAX_ITEMS = 5;
 
     /**
-     * Número em formato brasileiro ({@code 1.250,90}, {@code 50,90}, {@code 50}) ou com ponto
-     * decimal ({@code 2.5}). As alternativas vêm da mais específica para a mais genérica.
+     * Número em formato brasileiro ({@code 1.250,90}, {@code 50,90}, {@code 50}), com ponto
+     * decimal ({@code 2.5}) ou no formato americano, com vírgula de milhar e ponto decimal
+     * ({@code 1,000.50}). As alternativas vêm da mais específica para a mais genérica.
      */
-    private static final String NUMBER = "(?<![\\w.,])(\\d{1,3}(?:\\.\\d{3})+(?:,\\d+)?|\\d+,\\d+|\\d+\\.\\d+|\\d+)(?!\\d)";
+    private static final String NUMBER = "(?<![\\w.,])(\\d{1,3}(?:,\\d{3})+\\.\\d+|\\d{1,3}(?:\\.\\d{3})+(?:,\\d+)?"
+            + "|\\d+,\\d+|\\d+\\.\\d+|\\d+)(?!\\d)";
 
     private static final String MONEY_WORD = "(?:reais|real|contos?)";
     private static final Pattern MONEY_BEFORE = Pattern.compile("r\\$\\s*" + NUMBER);
@@ -120,6 +122,23 @@ class RuleBasedEntryParser implements EntryParser {
     private static final Pattern REAIS_AND_CENTS = Pattern.compile(
             INTEGER + "(\\s*(?:reais|real|contos?))?\\s+e\\s+(\\d{1,2})(\\s*centavos?)?" + WORD_END, ANY_CASE);
 
+    /**
+     * Intervalo de horário: {@code de 14h às 16h} e {@code das 23h às 7h} viram a duração (2 h e 8 h).
+     * Sem isso, {@code 14h} seria lido como 14 horas.
+     */
+    private static final Pattern TIME_RANGE = Pattern.compile(
+            "(?<![\\p{L}\\p{N}])(?:de|das)\\s+(\\d{1,2})\\s*h(\\d{2})?\\s+(?:às|as|a|até|ate)\\s+(\\d{1,2})\\s*h(\\d{2})?"
+                    + WORD_END, ANY_CASE);
+    /** Horas com minutos colados: {@code 7h30} é 7,5 h, e não 7 h. */
+    private static final Pattern COMPACT_HOURS = Pattern.compile(
+            "(?<![\\p{L}\\p{N}.,])(\\d{1,2})h(\\d{2})" + WORD_END, ANY_CASE);
+    /** Faixa de valor: {@code entre 40 e 50} não diz quanto foi, e o app pergunta. */
+    private static final Pattern RANGE = Pattern.compile(
+            "(?<![\\p{L}\\p{N}])entre\\s+\\d+(?:[.,]\\d+)?(?:\\s*(?:reais|real|contos?))?\\s+e\\s+\\d+(?:[.,]\\d+)?" + WORD_END,
+            ANY_CASE);
+    /** O que fica no lugar de uma faixa: sem número, mas com o sinal de que havia um. */
+    private static final String RANGE_REPLACEMENT = "entre valores";
+
     /** Horário do relógio: {@code às 6h}, {@code das 7 horas}, {@code pelas 22h30}. */
     private static final Pattern CLOCK_TIME = Pattern.compile(
             "\\b(?:as|das|pelas)\\s+" + NUMBER + "\\s*(?:horas?|hrs?|h)(?:\\d{1,2})?\\b");
@@ -153,6 +172,14 @@ class RuleBasedEntryParser implements EntryParser {
     private static final String CONTRAST = wholeWord("mas|porém|porem");
 
     private static final Pattern ITEM_BREAK = Pattern.compile(ITEM_SEPARATORS,
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /**
+     * Separadores de item mais o contraste. O contraste só separa itens quando o que vem depois dele é
+     * dinheiro: {@code não fui à academia mas gastei 30 no açaí} são dois itens, e
+     * {@code fui à academia mas não treinei perna} continua um só.
+     */
+    private static final Pattern ITEM_OR_CONTRAST = Pattern.compile(ITEM_SEPARATORS + "|(" + CONTRAST + ")",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     /** Separa a oração principal do resto: em {@code fui à academia, não faltei} só a primeira conta. */
@@ -256,12 +283,13 @@ class RuleBasedEntryParser implements EntryParser {
     private static List<Span> split(String text) {
         List<Span> parts = new ArrayList<>();
         List<Compound> compounds = findCompounds(text);
-        Matcher separator = ITEM_BREAK.matcher(text);
+        Matcher separator = ITEM_OR_CONTRAST.matcher(text);
         int start = 0;
         boolean more = true;
         while (more) {
             more = separator.find();
-            while (more && insideCompound(compounds, separator.start())) {
+            while (more && (insideCompound(compounds, separator.start())
+                    || separator.group(1) != null && !moneyFollows(text, separator.end()))) {
                 more = separator.find();
             }
             int end = more ? separator.start() : text.length();
@@ -280,6 +308,14 @@ class RuleBasedEntryParser implements EntryParser {
             }
         }
         return parts;
+    }
+
+    /** O trecho depois do contraste, até o próximo separador, fala de dinheiro. */
+    private static boolean moneyFollows(String text, int from) {
+        Matcher next = ITEM_BREAK.matcher(text);
+        int end = next.find(from) ? next.start() : text.length();
+        String rest = clean(text.substring(from, end));
+        return hasFinanceSignal(rest) || findFirst(rest, MONEY_BEFORE, MONEY_AFTER) != null;
     }
 
     private static boolean insideCompound(List<Compound> compounds, int position) {
@@ -321,13 +357,13 @@ class RuleBasedEntryParser implements EntryParser {
         }
         Matcher quantity = QUANTITY_WITH_UNIT.matcher(normalized);
         if (quantity.find()) {
-            return ParsedEntry.routine(previous.outcome(), toDecimal(quantity.group(1)), UNITS.get(quantity.group(2)),
-                    original, CONFIDENCE_UNIT);
+            return routine(previous.outcome(), quantity.group(1), UNITS.get(quantity.group(2)), original, original,
+                    CONFIDENCE_UNIT);
         }
         Matcher number = ANY_NUMBER.matcher(normalized);
         number.find();
         String unit = previous.unit();
-        return ParsedEntry.routine(previous.outcome(), toDecimal(number.group(1)), unit, original,
+        return routine(previous.outcome(), number.group(1), unit, original, original,
                 unit != null ? CONFIDENCE_INHERITED_UNIT : CONFIDENCE_ROUTINE_COUNT);
     }
 
@@ -359,6 +395,22 @@ class RuleBasedEntryParser implements EntryParser {
      */
     private static List<Compound> findCompounds(String text) {
         List<Compound> found = new ArrayList<>();
+        Matcher range = RANGE.matcher(text);
+        while (range.find()) {
+            found.add(new Compound(range.start(), range.end(), RANGE_REPLACEMENT));
+        }
+        Matcher interval = TIME_RANGE.matcher(text);
+        while (interval.find()) {
+            found.add(new Compound(interval.start(), interval.end(), duration(interval)));
+        }
+        Matcher compact = COMPACT_HOURS.matcher(text);
+        while (compact.find()) {
+            int minutes = Integer.parseInt(compact.group(2));
+            if (minutes < 60) {
+                found.add(new Compound(compact.start(), compact.end(),
+                        format(hours(compact.group(1), compact.group(2))) + " h"));
+            }
+        }
         Matcher half = HALF_UNIT.matcher(text);
         while (half.find()) {
             found.add(new Compound(half.start(), half.end(),
@@ -388,6 +440,32 @@ class RuleBasedEntryParser implements EntryParser {
             }
         }
         return disjoint;
+    }
+
+    /**
+     * A duração de um intervalo de horário, passando da meia-noite quando o fim vem antes do começo
+     * ({@code das 23h às 7h} são 8 h). Um intervalo inválido some do texto, como um horário.
+     */
+    private static String duration(Matcher interval) {
+        String startMinutes = interval.group(2) == null ? "00" : interval.group(2);
+        String endMinutes = interval.group(4) == null ? "00" : interval.group(4);
+        if (Integer.parseInt(interval.group(1)) > 23 || Integer.parseInt(interval.group(3)) > 23
+                || Integer.parseInt(startMinutes) > 59 || Integer.parseInt(endMinutes) > 59) {
+            return " ";
+        }
+        BigDecimal start = hours(interval.group(1), startMinutes);
+        BigDecimal end = hours(interval.group(3), endMinutes);
+        BigDecimal length = end.subtract(start);
+        if (length.signum() < 0) {
+            length = length.add(BigDecimal.valueOf(24));
+        }
+        return length.signum() == 0 ? " " : format(length) + " h";
+    }
+
+    /** Horas e minutos em horas decimais, com duas casas: 7 e 30 viram 7,5. */
+    private static BigDecimal hours(String hours, String minutes) {
+        return new BigDecimal(hours).add(
+                new BigDecimal(minutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
     }
 
     /** {@code 1.5} → {@code 1,5}; sem zeros à direita. */
@@ -464,19 +542,19 @@ class RuleBasedEntryParser implements EntryParser {
 
         Matcher money = findFirst(normalized, MONEY_BEFORE, MONEY_AFTER);
         if (money != null) {
-            return ParsedEntry.finance(direction, toDecimal(money.group(1)),
-                    describe(original, normalized, money), CONFIDENCE_MONEY_MARKER);
+            return finance(direction, money.group(1), describe(original, normalized, money), original,
+                    CONFIDENCE_MONEY_MARKER);
         }
 
         Matcher quantity = QUANTITY_WITH_UNIT.matcher(normalized);
         if (quantity.find()) {
-            return ParsedEntry.routine(outcome, toDecimal(quantity.group(1)), UNITS.get(quantity.group(2)),
-                    describe(original, normalized, quantity), CONFIDENCE_UNIT);
+            return routine(outcome, quantity.group(1), UNITS.get(quantity.group(2)),
+                    describe(original, normalized, quantity), original, CONFIDENCE_UNIT);
         }
 
         Matcher alone = ONLY_NUMBER.matcher(normalized);
         if (alone.matches()) {
-            return ParsedEntry.finance(direction, toDecimal(alone.group(1)), null, CONFIDENCE_NUMBER_ALONE);
+            return finance(direction, alone.group(1), null, original, CONFIDENCE_NUMBER_ALONE);
         }
 
         Matcher number = ANY_NUMBER.matcher(normalized);
@@ -485,11 +563,10 @@ class RuleBasedEntryParser implements EntryParser {
             if (hasFinanceSignal(normalized) || INCOME_SIGNAL_WITH_NUMBER.matcher(normalized).find()) {
                 return followedByNoun
                         ? ParsedEntry.finance(direction, null, original, CONFIDENCE_FINANCE_WITHOUT_AMOUNT)
-                        : ParsedEntry.finance(direction, toDecimal(number.group(1)), original,
-                                CONFIDENCE_FINANCE_VERB_WITH_AMOUNT);
+                        : finance(direction, number.group(1), original, original, CONFIDENCE_FINANCE_VERB_WITH_AMOUNT);
             }
             return followedByNoun
-                    ? ParsedEntry.routine(outcome, toDecimal(number.group(1)), null, original, CONFIDENCE_ROUTINE_COUNT)
+                    ? routine(outcome, number.group(1), null, original, original, CONFIDENCE_ROUTINE_COUNT)
                     : ParsedEntry.unknown(original, CONFIDENCE_NUMBER_WITHOUT_CONTEXT);
         }
 
@@ -497,6 +574,27 @@ class RuleBasedEntryParser implements EntryParser {
             return ParsedEntry.finance(direction, null, original, CONFIDENCE_FINANCE_WITHOUT_AMOUNT);
         }
         return ParsedEntry.routine(outcome, null, null, original, CONFIDENCE_ROUTINE_WITHOUT_NUMBER);
+    }
+
+    /**
+     * Finança com o valor lido, ou sem valor quando ele não pode ser gravado (zero, mais de duas casas
+     * ou acima do máximo): aí o app pergunta, com o texto inteiro como descrição.
+     */
+    private static ParsedEntry finance(Direction direction, String number, String description, String original,
+                                       double confidence) {
+        BigDecimal amount = ParsedEntry.validAmount(toDecimal(number));
+        return amount != null
+                ? ParsedEntry.finance(direction, amount, description, confidence)
+                : ParsedEntry.finance(direction, null, original, CONFIDENCE_FINANCE_WITHOUT_AMOUNT);
+    }
+
+    /** Rotina com a quantidade lida, ou sem quantidade (e sem unidade) quando ela não pode ser gravada. */
+    private static ParsedEntry routine(RoutineOutcome outcome, String number, String unit, String description,
+                                       String original, double confidence) {
+        BigDecimal quantity = ParsedEntry.validQuantity(toDecimal(number));
+        return quantity != null
+                ? ParsedEntry.routine(outcome, quantity, unit, description, confidence)
+                : ParsedEntry.routine(outcome, null, null, original, CONFIDENCE_ROUTINE_WITHOUT_NUMBER);
     }
 
     /** Minúsculas e sem acentos, para as regras não dependerem de como o usuário digitou. */
@@ -531,10 +629,20 @@ class RuleBasedEntryParser implements EntryParser {
         return EXPENSE_SIGNAL.matcher(text).find() || INCOME_SIGNAL.matcher(text).find();
     }
 
+    /**
+     * Entrada ou saída pelo primeiro sinal de finança da frase, que é o da oração principal: em
+     * {@code paguei o salário da diarista} e {@code gastei 30 no presente que ganhei} o verbo de gasto
+     * vem antes, e é gasto.
+     */
     private static Direction direction(String text) {
-        return INCOME_SIGNAL.matcher(text).find() || INCOME_SIGNAL_WITH_NUMBER.matcher(text).find()
-                ? Direction.INCOME
-                : Direction.EXPENSE;
+        int expense = firstPosition(text, EXPENSE_SIGNAL);
+        int income = Math.min(firstPosition(text, INCOME_SIGNAL), firstPosition(text, INCOME_SIGNAL_WITH_NUMBER));
+        return income < expense ? Direction.INCOME : Direction.EXPENSE;
+    }
+
+    private static int firstPosition(String text, Pattern pattern) {
+        Matcher matcher = pattern.matcher(text);
+        return matcher.find() ? matcher.start() : Integer.MAX_VALUE;
     }
 
     /**
@@ -568,9 +676,12 @@ class RuleBasedEntryParser implements EntryParser {
     /**
      * Converte {@code 1.250,90} → 1250.90, {@code 50,90} → 50.90, {@code 2.5} → 2.5 e
      * {@code 50} → 50. Ponto seguido de exatamente três dígitos é separador de milhar, como no
-     * padrão brasileiro.
+     * padrão brasileiro; com vírgula de milhar e ponto decimal ({@code 1,000.50}) é o padrão americano.
      */
     static BigDecimal toDecimal(String number) {
+        if (number.matches("\\d{1,3}(?:,\\d{3})+\\.\\d+")) {
+            return new BigDecimal(number.replace(",", ""));
+        }
         if (number.contains(",")) {
             return new BigDecimal(number.replace(".", "").replace(',', '.'));
         }
