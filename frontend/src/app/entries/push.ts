@@ -13,9 +13,23 @@ export type PushPlugin = Pick<
   'checkPermissions' | 'requestPermissions' | 'register' | 'unregister' | 'addListener' | 'removeAllListeners'
 >;
 
+/**
+ * Na web o plugin não existe. O objeto do Capacitor é um proxy que cria um método para qualquer
+ * propriedade consultada, e na web cada um devolve uma promessa rejeitada; por isso a web recebe um
+ * plugin vazio, que o {@link PushService} nem chega a chamar.
+ */
+const WEB_PUSH: PushPlugin = {
+  checkPermissions: () => Promise.resolve({ receive: 'denied' }),
+  requestPermissions: () => Promise.resolve({ receive: 'denied' }),
+  register: () => Promise.resolve(),
+  unregister: () => Promise.resolve(),
+  addListener: () => Promise.resolve({ remove: () => Promise.resolve() }),
+  removeAllListeners: () => Promise.resolve(),
+};
+
 export const PUSH_PLUGIN = new InjectionToken<PushPlugin>('PUSH_PLUGIN', {
   providedIn: 'root',
-  factory: () => PushNotifications,
+  factory: () => (Capacitor.isNativePlatform() ? PushNotifications : WEB_PUSH),
 });
 
 /** {@code android}, {@code ios} ou {@code web}. Substituível nos testes. */

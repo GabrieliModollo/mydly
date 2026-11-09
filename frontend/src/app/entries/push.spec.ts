@@ -187,3 +187,14 @@ describe('PushService', () => {
     expect(navigate.mock.calls).toEqual([['/resumo']]);
   });
 });
+
+describe('PUSH_PLUGIN na web', () => {
+  it('é um plugin vazio, e não o proxy do Capacitor que rejeita cada chamada', async () => {
+    TestBed.configureTestingModule({});
+    const plugin = TestBed.inject(PUSH_PLUGIN);
+
+    await expect(plugin.checkPermissions()).resolves.toEqual({ receive: 'denied' });
+    await expect(plugin.removeAllListeners()).resolves.toBeUndefined();
+    expect((plugin as unknown as Record<string, unknown>)['then']).toBeUndefined();
+  });
+});
